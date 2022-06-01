@@ -120,83 +120,103 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
 
 
 @click.command()
-@click.option('--subdir/--nosubdir', is_flag=True, default=True, show_default=True,
-              help="Move file into a subdirectory")
+@click.option('--move', is_flag=True, help="Move files into a subdirectory")
 @click.option('--local_alignment/--global_alignment', is_flag=True, default=False, show_default=True,
               help="Local or global alignments (local takes significantly longer)")
 @click.option('--extra_thickness', default=0, show_default=True, help="Extra thickness in unbinned pixels")
 @click.option('-b', '--bin', default=1, show_default=True, help="Final reconstruction binning")
 @click.option('--sirt', default=5, show_default=True, help="SIRT-like filter iterations")
+@click.option('--previous', type=click.Path(exists=True),
+               help="Don't do alignments, but use previous alignments and MDOC file of the passed tilt-series")
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
-def reconstruct(subdir, local_alignment, extra_thickness, bin, sirt, input_files):
+def reconstruct(move, local_alignment, extra_thickness, bin, sirt, previous, input_files):
     for tiltseries in input_files:
-        mdoc_file = f'{tiltseries}.mdoc'
+        mdoc_file = f'{tiltseries}.mdoc' if previous is None else f'{previous}.mdoc'
         if not path.isfile(mdoc_file):
             raise FileNotFoundError(f'No MDOC file found at {mdoc_file}')
-        if subdir:
+        if move:
             print('Move files to subdir {subdir}')
-            subdir = splitext(tiltseries)[0]
-            new_tiltseries = join(subdir, basename(tiltseries))
-            new_mdoc_file = join(subdir, basename(mdoc_file))
-            mkdir(subdir)
+            dir = splitext(tiltseries)[0]
+            new_tiltseries = join(dir, basename(tiltseries))
+            mkdir(dir)
             os.rename(tiltseries, new_tiltseries)
-            os.rename(mdoc_file, new_mdoc_file)
             tiltseries = new_tiltseries
-            mdoc_file = new_mdoc_file
+            # Only move the MDOC file if it's not from a previous reconstruction
+            if previous is None:
+                new_mdoc_file = join(dir, basename(mdoc_file))
+                os.rename(mdoc_file, new_mdoc_file)
+                mdoc_file = new_mdoc_file
 
+        # MRC files
         rootname = splitext(tiltseries)[0]
         ali_file = f'{rootname}_ali.mrc'
         ali_file_bin = f'{rootname}_ali_b{bin}.mrc'
         ali_file_bin8 = f'{rootname}_ali_b8.mrc'
         full_rec_file = f'{rootname}_full_rec.mrc'
         rec_file = f'{rootname}_rec_b{bin}.mrc'
-        tlt_file = f'{rootname}.tlt'
-        tlt_file_ali = f'{rootname}_ali.tlt'
-        tomopitch_file = f'{rootname}.mod'
+        # Alignment files (depend on whether or not --previous is passed)
+        ali_rootname = splitext(previous)[0] if previous is not None else rootname
+        tlt_file = f'{ali_rootname}.tlt'
+        tlt_file_ali = f'{ali_rootname}_ali.tlt'
+        tomopitch_file = f'{ali_rootname}.mod'
+        aln_file = f'{ali_rootname}.aln'
 
         # Aretomo
-        subprocess.run(['extracttilts', tiltseries, tlt_file])
-        subprocess.run(['/opt/aretomo/aretomo',
-                        '-InMrc', tiltseries,
-                        '-OutMrc', ali_file,
-                        '-AngFile', tlt_file,
-                        '-VolZ', '0',
-                        '-TiltCor', '1'] + (['-Patch', '6', '4'] if local_alignment else []))
+        if previous is None:
+            subprocess.run(['extracttilts', tiltseries, tlt_file])
+            subprocess.run(['/opt/aretomo/aretomo',
+                            '-InMrc', tiltseries,
+                            '-OutMrc', ali_file,
+                            '-AngFile', tlt_file,
+                            '-VolZ', '0',
+                            '-TiltCor', '1'] + (['-Patch', '6', '4'] if local_alignment else []))
+        else:
+            subprocess.run(['/opt/aretomo/aretomo',
+                            '-InMrc', tiltseries,
+                            '-OutMrc', ali_file,
+                            '-AlnFile', aln_file,
+                            '-VolZ', '0'])
+        pix_size = subprocess.run(['header', '-PixelSize', tiltseries], capture_output=True, text=True).stdout
+        pix_size = ",".join(pix_size.strip().split())
+        subprocess.run(['alterheader', '-PixelSize', pix_size, ali_file])
+
+        # Dose filtration
         subprocess.run(['mtffilter', '-dtype', '4', '-dfile', mdoc_file, ali_file, f'{rootname}_mtf.mrc'])
         os.replace(f'{rootname}_mtf.mrc', ali_file)
 
         # Tomo pitch
-        subprocess.run(['binvol', '-x', '8', '-y', '8', '-z', '1', ali_file, ali_file_bin8])
-        subprocess.run(['tilt']
-                       + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
-                       ['-InputProjections', ali_file_bin8,
-                        '-OutputFile', full_rec_file,
-                        '-IMAGEBINNED', '8',
-                        '-TILTFILE', tlt_file_ali,
-                        '-THICKNESS', '2000',
-                        '-RADIAL', '0.35,0.035',
-                        '-FalloffIsTrueSigma', '1',
-                        '-SCALE', '0.0,0.05',
-                        '-PERPENDICULAR',
-                        '-MODE', '2',
-                        '-FULLIMAGE', '4092,5760',
-                        '-SUBSETSTART', '0,0',
-                        '-AdjustOrigin',
-                        '-ActionIfGPUFails', '1,2',
-                        '-OFFSET', '0.0',
-                        '-SHIFT', '0.0,0.0',
-                        '-UseGPU', '0']
-                       )
+        if previous is None:
+            subprocess.run(['binvol', '-x', '8', '-y', '8', '-z', '1', ali_file, ali_file_bin8])
+            subprocess.run(['tilt']
+                           + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
+                           ['-InputProjections', ali_file_bin8,
+                            '-OutputFile', full_rec_file,
+                            '-IMAGEBINNED', '8',
+                            '-TILTFILE', tlt_file_ali,
+                            '-THICKNESS', '2000',
+                            '-RADIAL', '0.35,0.035',
+                            '-FalloffIsTrueSigma', '1',
+                            '-SCALE', '0.0,0.05',
+                            '-PERPENDICULAR',
+                            '-MODE', '2',
+                            '-FULLIMAGE', '4092,5760',
+                            '-SUBSETSTART', '0,0',
+                            '-AdjustOrigin',
+                            '-ActionIfGPUFails', '1,2',
+                            '-OFFSET', '0.0',
+                            '-SHIFT', '0.0,0.0',
+                            '-UseGPU', '0']
+                           )
 
-        os.remove(ali_file_bin8)
-        subprocess.run([
-            'findsection',
-            '-tomo', full_rec_file,
-            '-pitch', tomopitch_file,
-            '-scales', '2',
-            '-size', '16,1,16',
-            '-samples', '5',
-            '-block', '48'])
+            os.remove(ali_file_bin8)
+            subprocess.run([
+                'findsection',
+                '-tomo', full_rec_file,
+                '-pitch', tomopitch_file,
+                '-scales', '2',
+                '-size', '16,1,16',
+                '-samples', '5',
+                '-block', '48'])
         # Get tomopitch
         tomopitch = subprocess.run([
             'tomopitch',
@@ -245,3 +265,4 @@ def reconstruct(subdir, local_alignment, extra_thickness, bin, sirt, input_files
                         '-f', '-rx',
                         full_rec_file, rec_file])
         os.remove(full_rec_file)
+        os.remove('mask3000.mrc')
