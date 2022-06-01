@@ -30,8 +30,8 @@ def blend_montages(input_files, output_dir):
     links = [basename(input_file) for input_file in input_files]
     subprocess.run(['justblend', '--cpus', '32'] + [basename(input_file) for input_file in input_files])
     # Delete temporary files
-    for file in links + glob('*.ecd') + glob('*.pl') + glob('*.xef')\
-            + glob('*.yef') + glob('*.com') + glob('*.log') + ['processchunks-jb.out']:
+    for file in links + glob('*.ecd') + glob('*.pl') + glob('*.xef') \
+                + glob('*.yef') + glob('*.com') + glob('*.log') + ['processchunks-jb.out']:
         os.remove(file)
 
 
@@ -48,11 +48,13 @@ def blend_montages(input_files, output_dir):
               help='Use this gain reference instead looking for one in the MDOC files')
 @click.option('--group', type=int, default=1, show_default=True,
               help='Group frames, useful for low-dose frames. Also see motioncor2 manual')
-@click.option('--gpus', type=str, default=None, help='GPUs list, comma separated (e.g. 0,1), determined automatically if not passed')
+@click.option('--gpus', type=str, default=None,
+              help='GPUs list, comma separated (e.g. 0,1), determined automatically if not passed')
 @click.option('--exposuredose', type=float, default=None)
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
 @click.argument('output_dir', type=click.Path(writable=True))
-def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, gpus, exposuredose, input_files, output_dir):
+def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, gpus, exposuredose, input_files,
+                             output_dir):
     """Prepare tilt-series for reconstruction.
 
     This function runs MotionCor2 on movie frames, stacks the motion-corrected frames and sorts them by tilt-angle.
@@ -101,7 +103,8 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
             print(f'Subframes were found for {input_file}, will run MotionCor2 on them')
             frames_corrected_dir = path.join(output_dir, 'frames_corrected')
             subframes_corrected = frame_utils.motioncor2(subframes, frames_corrected_dir, splitsum=splitsum,
-                                                         binning=mcbin, group=group, override_gainref=gainref, gpus=gpus)
+                                                         binning=mcbin, group=group, override_gainref=gainref,
+                                                         gpus=gpus)
             if reorder:
                 subframes_corrected = frame_utils.sort_subframes_list(subframes_corrected)
             stack, stack_mdoc = frame_utils.frames2stack(subframes_corrected,
@@ -115,13 +118,17 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
             continue
             # raise NotImplementedError('Sorry, non-motioncor2 path is not implemented yet')
 
+
 @click.command()
-@click.option('--subdirectory/--nosubdirectory', is_flag=True, default=True, show_default=True, help="Move file into a subdirectory")
-@click.option('--local_alignment/--global_alignment', is_flag=True, default=False, show_default=True, help="Local or global alignments (local takes significantly longer)")
+@click.option('--subdirectory/--nosubdirectory', is_flag=True, default=True, show_default=True,
+              help="Move file into a subdirectory")
+@click.option('--local_alignment/--global_alignment', is_flag=True, default=False, show_default=True,
+              help="Local or global alignments (local takes significantly longer)")
 @click.option('--extra_thickness', default=0, show_default=True, help="Extra thickness in unbinned pixels")
 @click.option('-b', '--bin', default=1, show_default=True, help="Final reconstruction binning")
+@click.option('--sirt', default=5, show_default=True, help="SIRT-like filter iterations")
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
-def reconstruct(subdirectory, local_alignment, extra_thickness, bin, input_files):
+def reconstruct(subdirectory, local_alignment, extra_thickness, bin, sirt, input_files):
     for tiltseries in input_files:
         mdoc_file = f'{tiltseries}.mdoc'
         if not path.isfile(mdoc_file):
@@ -160,25 +167,27 @@ def reconstruct(subdirectory, local_alignment, extra_thickness, bin, input_files
 
         # Tomo pitch
         subprocess.run(['binvol', '-x', '8', '-y', '8', '-z', '1', ali_file, ali_file_bin8])
-        subprocess.run(['tilt',
-            '-FakeSIRTiterations', '5',
-            '-InputProjections', ali_file_bin8,
-            '-OutputFile', full_rec_file,
-            '-IMAGEBINNED', '8',
-            '-TILTFILE', tlt_file_ali,
-            '-THICKNESS', '2000',
-            '-RADIAL', '0.35,0.035',
-            '-FalloffIsTrueSigma', '1',
-            '-SCALE', '0.0,0.05',
-            '-PERPENDICULAR',
-            '-MODE', '2',
-            '-FULLIMAGE', '4092,5760',
-            '-SUBSETSTART', '0,0',
-            '-AdjustOrigin',
-            '-ActionIfGPUFails', '1,2',
-            '-OFFSET', '0.0',
-            '-SHIFT', '0.0,0.0',
-            '-UseGPU', '0'])
+        subprocess.run(['tilt']
+                       + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
+                       ['-InputProjections', ali_file_bin8,
+                        '-OutputFile', full_rec_file,
+                        '-IMAGEBINNED', '8',
+                        '-TILTFILE', tlt_file_ali,
+                        '-THICKNESS', '2000',
+                        '-RADIAL', '0.35,0.035',
+                        '-FalloffIsTrueSigma', '1',
+                        '-SCALE', '0.0,0.05',
+                        '-PERPENDICULAR',
+                        '-MODE', '2',
+                        '-FULLIMAGE', '4092,5760',
+                        '-SUBSETSTART', '0,0',
+                        '-AdjustOrigin',
+                        '-ActionIfGPUFails', '1,2',
+                        '-OFFSET', '0.0',
+                        '-SHIFT', '0.0,0.0',
+                        '-UseGPU', '0']
+                       )
+
         os.remove(ali_file_bin8)
         subprocess.run([
             'findsection',
@@ -201,39 +210,38 @@ def reconstruct(subdirectory, local_alignment, extra_thickness, bin, input_files
 
         # Final reconstruction
         subprocess.run(['binvol', '-x', str(bin), '-y', str(bin), '-z', '1', ali_file, ali_file_bin])
-        subprocess.run([
-            'tilt',
-                '-FakeSIRTiterations', '5',
-                '-InputProjections', ali_file_bin,
-                '-OutputFile', full_rec_file,
-                '-IMAGEBINNED', str(bin),
-                '-XAXISTILT', x_axis_tilt,
-                '-TILTFILE', f'{rootname}_ali.tlt',
-                '-THICKNESS', thickness,
-                '-RADIAL', '0.35,0.035',
-                '-FalloffIsTrueSigma', '1',
-                '-SCALE', '0.0,0.05',
-                '-PERPENDICULAR',
-                '-MODE', '2',
-                '-FULLIMAGE', '4092,5760',
-                '-SUBSETSTART', '0,0',
-                '-AdjustOrigin',
-                '-ActionIfGPUFails', '1,2',
-                '-OFFSET', '0.0',
-                '-SHIFT', f'0.0,{z_shift}',
-                '-UseGPU', '0'])
+        subprocess.run(['tilt']
+                       + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
+                       ['-InputProjections', ali_file_bin,
+                        '-OutputFile', full_rec_file,
+                        '-IMAGEBINNED', str(bin),
+                        '-XAXISTILT', x_axis_tilt,
+                        '-TILTFILE', f'{rootname}_ali.tlt',
+                        '-THICKNESS', thickness,
+                        '-RADIAL', '0.35,0.035',
+                        '-FalloffIsTrueSigma', '1',
+                        '-SCALE', '0.0,0.05',
+                        '-PERPENDICULAR',
+                        '-MODE', '2',
+                        '-FULLIMAGE', '4092,5760',
+                        '-SUBSETSTART', '0,0',
+                        '-AdjustOrigin',
+                        '-ActionIfGPUFails', '1,2',
+                        '-OFFSET', '0.0',
+                        '-SHIFT', f'0.0,{z_shift}',
+                        '-UseGPU', '0'])
         os.remove(ali_file_bin)
 
         # Trim
         bin = int(bin)
         thickness = int(thickness)
         subprocess.run(['trimvol',
-            '-x', f'1,{4092/bin:.0f}',
-            '-y', f'1,{5760/bin:.0f}',
-            '-z', f'1,{thickness/bin:.0f}',
-            '-sx', f'1,{4092/bin:.0f}',
-            '-sy', f'1,{5760/bin:.0f}',
-            '-sz', f'{thickness/bin/3:.0f},{thickness/bin*2/3:.0f}',
-            '-f', '-rx',
-            full_rec_file, rec_file])
+                        '-x', f'1,{4092 / bin:.0f}',
+                        '-y', f'1,{5760 / bin:.0f}',
+                        '-z', f'1,{thickness / bin:.0f}',
+                        '-sx', f'1,{4092 / bin:.0f}',
+                        '-sy', f'1,{5760 / bin:.0f}',
+                        '-sz', f'{thickness / bin / 3:.0f},{thickness / bin * 2 / 3:.0f}',
+                        '-f', '-rx',
+                        full_rec_file, rec_file])
         os.remove(full_rec_file)
