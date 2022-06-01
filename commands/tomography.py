@@ -120,7 +120,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
 
 
 @click.command()
-@click.option('--subdirectory/--nosubdirectory', is_flag=True, default=True, show_default=True,
+@click.option('--subdir/--nosubdir', is_flag=True, default=True, show_default=True,
               help="Move file into a subdirectory")
 @click.option('--local_alignment/--global_alignment', is_flag=True, default=False, show_default=True,
               help="Local or global alignments (local takes significantly longer)")
@@ -128,12 +128,12 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
 @click.option('-b', '--bin', default=1, show_default=True, help="Final reconstruction binning")
 @click.option('--sirt', default=5, show_default=True, help="SIRT-like filter iterations")
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
-def reconstruct(subdirectory, local_alignment, extra_thickness, bin, sirt, input_files):
+def reconstruct(subdir, local_alignment, extra_thickness, bin, sirt, input_files):
     for tiltseries in input_files:
         mdoc_file = f'{tiltseries}.mdoc'
         if not path.isfile(mdoc_file):
             raise FileNotFoundError(f'No MDOC file found at {mdoc_file}')
-        if subdirectory:
+        if subdir:
             print('Move files to subdir {subdir}')
             subdir = splitext(tiltseries)[0]
             new_tiltseries = join(subdir, basename(tiltseries))
