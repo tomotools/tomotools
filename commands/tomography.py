@@ -121,15 +121,16 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
 
 @click.command()
 @click.option('--move', is_flag=True, help="Move files into a subdirectory")
-@click.option('--local_alignment/--global_alignment', is_flag=True, default=False, show_default=True,
+@click.option('--local/--global', is_flag=True, default=False, show_default=True,
               help="Local or global alignments (local takes significantly longer)")
-@click.option('--extra_thickness', default=0, show_default=True, help="Extra thickness in unbinned pixels")
+@click.option('--extra-thickness', default=0, show_default=True, help="Extra thickness in unbinned pixels")
 @click.option('-b', '--bin', default=1, show_default=True, help="Final reconstruction binning")
 @click.option('--sirt', default=5, show_default=True, help="SIRT-like filter iterations")
+@click.option('--keep-ali-stack/--delete-ali-stack', is_flag=True, default=False, show_default=True, help="Keep or delete the non-dose-filtered aligned stack (useful for Relion)")
 @click.option('--previous', type=click.Path(exists=True),
                help="Don't do alignments, but use previous alignments and MDOC file of the passed tilt-series")
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
-def reconstruct(move, local_alignment, extra_thickness, bin, sirt, previous, input_files):
+def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previous, input_files):
     for tiltseries in input_files:
         mdoc_file = f'{tiltseries}.mdoc' if previous is None else f'{previous}.mdoc'
         if not path.isfile(mdoc_file):
@@ -150,8 +151,9 @@ def reconstruct(move, local_alignment, extra_thickness, bin, sirt, previous, inp
         # MRC files
         rootname = splitext(tiltseries)[0]
         ali_file = f'{rootname}_ali.mrc'
-        ali_file_bin = f'{rootname}_ali_b{bin}.mrc'
-        ali_file_bin8 = f'{rootname}_ali_b8.mrc'
+        ali_file_mtf = f'{rootname}_ali_mtf.mrc'
+        ali_file_mtf_bin = f'{rootname}_ali_mtf_b{bin}.mrc'
+        ali_file_mtf_bin8 = f'{rootname}_ali_mtf_b8.mrc'
         full_rec_file = f'{rootname}_full_rec.mrc'
         rec_file = f'{rootname}_rec_b{bin}.mrc'
         # Alignment files (depend on whether or not --previous is passed)
@@ -169,7 +171,7 @@ def reconstruct(move, local_alignment, extra_thickness, bin, sirt, previous, inp
                             '-OutMrc', ali_file,
                             '-AngFile', tlt_file,
                             '-VolZ', '0',
-                            '-TiltCor', '1'] + (['-Patch', '6', '4'] if local_alignment else []))
+                            '-TiltCor', '1'] + (['-Patch', '6', '4'] if local else []))
         else:
             subprocess.run(['/opt/aretomo/aretomo',
                             '-InMrc', tiltseries,
@@ -181,15 +183,16 @@ def reconstruct(move, local_alignment, extra_thickness, bin, sirt, previous, inp
         subprocess.run(['alterheader', '-PixelSize', pix_size, ali_file])
 
         # Dose filtration
-        subprocess.run(['mtffilter', '-dtype', '4', '-dfile', mdoc_file, ali_file, f'{rootname}_mtf.mrc'])
-        os.replace(f'{rootname}_mtf.mrc', ali_file)
+        subprocess.run(['mtffilter', '-dtype', '4', '-dfile', mdoc_file, ali_file, ali_file_mtf])
+        if not keep_ali_stack:
+            os.remove(ali_file)
 
         # Tomo pitch
         if previous is None:
-            subprocess.run(['binvol', '-x', '8', '-y', '8', '-z', '1', ali_file, ali_file_bin8])
+            subprocess.run(['binvol', '-x', '8', '-y', '8', '-z', '1', ali_file_mtf, ali_file_mtf_bin8])
             subprocess.run(['tilt']
                            + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
-                           ['-InputProjections', ali_file_bin8,
+                           ['-InputProjections', ali_file_mtf_bin8,
                             '-OutputFile', full_rec_file,
                             '-IMAGEBINNED', '8',
                             '-TILTFILE', tlt_file_ali,
@@ -208,7 +211,7 @@ def reconstruct(move, local_alignment, extra_thickness, bin, sirt, previous, inp
                             '-UseGPU', '0']
                            )
 
-            os.remove(ali_file_bin8)
+            os.remove(ali_file_mtf_bin8)
             subprocess.run([
                 'findsection',
                 '-tomo', full_rec_file,
@@ -229,10 +232,14 @@ def reconstruct(move, local_alignment, extra_thickness, bin, sirt, previous, inp
         thickness = tomopitch_z[1].split()[-1]
 
         # Final reconstruction
-        subprocess.run(['binvol', '-x', str(bin), '-y', str(bin), '-z', '1', ali_file, ali_file_bin])
+        if bin == 1:
+            ali_file_mtf_bin = ali_file_mtf
+        else:
+            subprocess.run(['binvol', '-x', str(bin), '-y', str(bin), '-z', '1', ali_file_mtf, ali_file_mtf_bin])
+            os.remove(ali_file_mtf)
         subprocess.run(['tilt']
                        + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
-                       ['-InputProjections', ali_file_bin,
+                       ['-InputProjections', ali_file_mtf_bin,
                         '-OutputFile', full_rec_file,
                         '-IMAGEBINNED', str(bin),
                         '-XAXISTILT', x_axis_tilt,
@@ -250,10 +257,9 @@ def reconstruct(move, local_alignment, extra_thickness, bin, sirt, previous, inp
                         '-OFFSET', '0.0',
                         '-SHIFT', f'0.0,{z_shift}',
                         '-UseGPU', '0'])
-        os.remove(ali_file_bin)
+        os.remove(ali_file_mtf_bin)
 
         # Trim
-        bin = int(bin)
         thickness = int(thickness)
         subprocess.run(['trimvol',
                         '-x', f'1,{4092 / bin:.0f}',
@@ -265,4 +271,5 @@ def reconstruct(move, local_alignment, extra_thickness, bin, sirt, previous, inp
                         '-f', '-rx',
                         full_rec_file, rec_file])
         os.remove(full_rec_file)
-        os.remove('mask3000.mrc')
+        if path.isfile('mask3000.mrc'):
+            os.remove('mask3000.mrc')
