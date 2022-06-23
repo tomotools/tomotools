@@ -12,9 +12,10 @@ from utils import mdocfile, frame_utils
 
 
 @click.command()
+@click.option('--cpus', default=8, show_default=True, help='Number of CPUs, passed to justblend')
 @click.argument('input_files', nargs=-1)
 @click.argument('output_dir')
-def blend_montages(input_files, output_dir):
+def blend_montages(cpus, input_files, output_dir):
     """Blend montages using justblend
 
     The input files must be montage .mrc/.st files, so usually you will invoke this function with something like:
@@ -28,7 +29,7 @@ def blend_montages(input_files, output_dir):
 
     os.chdir(output_dir)
     links = [basename(input_file) for input_file in input_files]
-    subprocess.run(['justblend', '--cpus', '32'] + [basename(input_file) for input_file in input_files])
+    subprocess.run(['justblend', '--cpus', str(cpus)] + [basename(input_file) for input_file in input_files])
     # Delete temporary files
     for file in links + glob('*.ecd') + glob('*.pl') + glob('*.xef') \
                 + glob('*.yef') + glob('*.com') + glob('*.log') + ['processchunks-jb.out']:
