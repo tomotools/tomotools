@@ -1,6 +1,6 @@
 import click
 
-from commands import commands
+from .commands import commands
 
 
 @click.group()
