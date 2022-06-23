@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='Tomotools',
     version='0.1.0',
-    py_modules=['tomotools', 'mdocfile', 'util'],
+    packages=['tomotools', 'tomotools.commands', 'tomotools.utils'],
     install_requires=[
         'Click',
         'numpy',

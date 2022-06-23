@@ -8,7 +8,7 @@ from os.path import abspath, basename, join, splitext
 
 import click
 
-from utils import mdocfile, frame_utils
+from tomotools.utils import mdocfile, frame_utils
 
 
 @click.command()

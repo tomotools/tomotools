@@ -7,7 +7,7 @@ from typing import Optional, Tuple, List
 
 import mrcfile
 
-from utils import mdocfile, util
+from tomotools.utils import mdocfile, util
 
 
 def assert_subframes_list(subframes: list, is_split):

@@ -7,7 +7,7 @@ from os import path, mkdir
 
 import click
 
-from utils import comfile, util
+from tomotools.utils import comfile, util
 
 
 # @click.command()
