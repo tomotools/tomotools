@@ -1,9 +1,11 @@
 import os
+import shutil
 import subprocess
+import warnings
 from os import path
 from os.path import splitext, isfile, join, isdir, dirname, basename, abspath
 from shutil import rmtree
-from typing import Optional, Tuple, List
+from typing import Optional
 
 import mrcfile
 
@@ -130,6 +132,11 @@ class SubFrame:
 def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning: int = 2, group: int = 1,
                override_gainref: str = None, gpus: Optional[str]=None):
     assert_subframes_list(subframes, is_split=False)
+    mc2_exe = motioncor2_executable()
+    if mc2_exe is None:
+        raise FileNotFoundError('The MotionCor2 executable could not be found. '
+                                'Either specify it by setting MOTIONCOR2_EXECUTABLE '
+                                'or put it into the PATH and rename it to "motioncor2"')
     tempdir = join(output_dir, 'motioncor2_temp')
     if not isdir(tempdir):
         os.makedirs(tempdir)
@@ -162,10 +169,9 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
     for subframe in subframes:
         os.symlink(abspath(subframe.path), join(tempdir, basename(subframe.path)))
 
-    command = ['/net/urz/sds-hd/sd18g002/Moritz/scripts/MotionCor2_1.4.2/MotionCor2_1.4.2_Cuda111-02-15-2020',
+    command = [mc2_exe,
                '-InTiff', abspath(tempdir) + path.sep,
                '-OutMrc', abspath(output_dir) + path.sep,
-               # '-InSuffix', '.tif',
                '-Patch', '7', '5',
                '-Iter', '10',
                '-Tol', '0.5',
@@ -207,3 +213,15 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
     print('Checking MotionCor2 output files')
     assert_subframes_list(output_frames, is_split=splitsum)
     return output_frames
+
+def motioncor2_executable() -> Optional[str]:
+    '''The MotionCor executable can be set with one of the following ways (in order of priority):
+    1. Setting the MOTIONCOR2_EXECUTABLE variable to the full path of the executable file
+    2. Putting the appropriate executable into the PATH and renaming it to "motioncor2"'''
+    if 'MOTIONCOR2_EXECUTABLE' in os.environ:
+        mc2_exe = os.environ['MOTIONCOR2_EXECUTABLE']
+        if isfile(mc2_exe):
+            return mc2_exe
+        else:
+            warnings.warn(f'MOTIONCOR2_EXECUTABLE is set to "{mc2_exe}", but the file does not exist. Falling back to PATH')
+    return shutil.which('motioncor2')
