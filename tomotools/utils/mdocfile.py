@@ -31,7 +31,7 @@ def find_relative_path(working_dir, abs_path):
             abs_path = abs_path.split(sep=path.sep, maxsplit=1)[1]
         except IndexError:
             return None
-    print(f'Found subframe path: "{join(working_dir, abs_path)}')
+    #print(f'Found subframe path: "{join(working_dir, abs_path)}')
     return join(working_dir, abs_path)
 
 

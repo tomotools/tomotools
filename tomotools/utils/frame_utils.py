@@ -33,12 +33,11 @@ def sanitize_subframes_list(subframes: list):
 def sort_subframes_list(subframes: list):
     '''Sorts a list of SubFrames by tilt-angle
     Requires that all SubFrames have a corresponding MDOC file'''
-    # TODO: Check whether reordering can be done w/o subframes
     # Check if the list is a list of subframes
     if not all(isinstance(subframe, SubFrame) for subframe in subframes):
         raise ValueError('sort_subframes_list only supports lists of SubFrames')
-    return sorted(subframes, key=lambda subframe: subframe.mdoc['framesets'][0]['TiltAngle'])
-
+    
+    return sorted(subframes, key=lambda subframe: subframe.tilt_angle)
 
 def frames2stack(subframes: list, stack_path, full_mdoc: Optional[dict]=None, overwrite_titles=None, skip_evnodd=False):
     # Check if frames and their respective mdoc files exist
@@ -61,7 +60,7 @@ def frames2stack(subframes: list, stack_path, full_mdoc: Optional[dict]=None, ov
         if overwrite_titles is not None:
             stack_mdoc['titles'] = overwrite_titles
             
-    # Else, just use the input mdoc file
+    # Else, just use the input mdoc file which has possibly been reordered
     # TODO: Implement pixel size change if binned
     else:
         stack_mdoc = full_mdoc
@@ -77,7 +76,7 @@ def frames2stack(subframes: list, stack_path, full_mdoc: Optional[dict]=None, ov
 
     # Run newstack for the full stack and, if desired, the EVN/ODD halves
     for partial_stack_path, partial_stack_subframes in stack_subframes_pairs:
-        subprocess.run(['newstack -q'] + partial_stack_subframes + [partial_stack_path])
+        subprocess.run(['newstack'] + partial_stack_subframes + [partial_stack_path] + ['-quiet'])
         # Update the header of the stack MRC
         with mrcfile.mmap(partial_stack_path, 'r+') as mrc:
             # Copy the first 10 titles into the newly created mrc
@@ -128,10 +127,11 @@ class SubFrame:
         
     @property
     def subframe_mdoc(self):
-        return isfile(self.mdoc_path)        
+        return isfile(self.mdoc_path)
 
-    def __init__(self, path: str):
+    def __init__(self, path: str, tilt_angle):
         self.path = path
+        self.tilt_angle = float(tilt_angle)
         # MDOC files are read lazily
         self._mdoc = None
 
@@ -222,7 +222,7 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
     if gain_ref_mrc is not None:
         command += ['-Gain', abspath(gain_ref_mrc)]
 
-    print(f'Running motioncor2 with command:\n{" ".join(command)}')
+    #print(f'Running motioncor2 with command:\n{" ".join(command)}')
     with open(join(output_dir, 'motioncor2.log'), 'a') as out, open(join(output_dir, 'motioncor2.err'), 'a') as err:
         subprocess.run(command, cwd=tempdir, stdout=out, stderr=err)
     
@@ -244,7 +244,7 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
     rmtree(tempdir)
 
     # Build a list of output files that will be returned to the caller
-    output_frames = [SubFrame(path=join(output_dir, splitext(basename(subframe.path))[0] + '.mrc')) for subframe in
+    output_frames = [SubFrame(path=join(output_dir, splitext(basename(subframe.path))[0] + '.mrc'), tilt_angle=subframe.tilt_angle) for subframe in
                      subframes]
     print('Checking MotionCor2 output files')
     assert_subframes_list(output_frames, is_split=splitsum)

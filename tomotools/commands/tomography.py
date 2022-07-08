@@ -6,6 +6,7 @@ from os import mkdir
 from os import path
 from os.path import abspath, basename, join, splitext
 import re
+from operator import itemgetter
 
 import click
 
@@ -65,29 +66,37 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
     This function runs MotionCor2 on movie frames, stacks the motion-corrected frames and sorts them by tilt-angle.
     The input files may be individual .mrc/.st tilt-series files or directories containing them.
     In the latter case, a simple search for MRC and ST files will be run (using the globs *.mrc and *.st).
-    Every input file requires a corresponding .mdoc file.
+    If a directory is given, will first check for PACEtomo targeting files and move them to a subdirectory to prevent interference.
+    
+    Every input file requires a corresponding .mdoc file. 
     The last argument is the output dir. It will be created if it doesn't exist.
     """
-    # Check for PACEtomo files by regex _tgts.txt, save all roots
-    tgts_temp = list()
-    tgts_temp = glob(path.join(input_files, '*_tgts.txt'))
-    
-    if len(tgts_temp) == 0:
-        print('No PACEtomo files found. Continuing.')
-    else:
-        roots = list()
-        for tgt in tgts_temp:
-            roots.append(re.split('[_tgts_]',tgt)[0])
-            print('Found PACEtomo root file' + tgt)
+    # If input_files is a directory, check for PACEtomo files by regex _tgts.txt, save all roots
+    if any(path.isdir(input_file) for input_file in input_files):
+       
+        tgts_temp = list()
+        tgts_temp = glob(path.join(input_files, '*_tgts.txt'))
         
-        # Move all targeting data (_tgt_*.mrc, _tgts.txt) to a separate directory
-        for root in roots:
-            output_dir = root + "_tgts"
-            if not path.isdir(output_dir):
-                mkdir(output_dir)
+        if len(tgts_temp) == 0:
+            print('No PACEtomo files found. Continuing.')
+        else:
+            roots = list()
+            pacetomo_dir = path.join(input_files, 'PACEtomo_targets')
             
-            cmd = "mv " + root + "_tgt* " + output_dir
-            os.system(cmd)
+            if not path.isdir(pacetomo_dir):
+                mkdir(pacetomo_dir)
+            
+            for tgt in tgts_temp:
+                roots.append(re.split('[_tgts_]',tgt)[0])
+                print('Found PACEtomo root file ' + tgt)
+            
+            # Move all targeting data (_tgt_*.mrc, _tgts.txt) to a separate directory
+            for root in roots:
+                root_path = path.join(input_files, root)
+                cmd = "mv " + root_path + "*_tgt* "  + pacetomo_dir
+                os.system(cmd)
+                
+                os.chdir(input_files)
         
     # Convert all directories into a list of MRC/ST files
     input_files_temp = list()
@@ -112,6 +121,8 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
         if mdoc.get('Montage', 0) == 1:
             print(f'Skipping {input_file} because it is a montage')
             continue
+        # TODO: Skip batch / anchor files
+        
         # File is a tilt-series, look for subframes
         print(f'Working on {input_file}, which looks like a tilt series')        
         for section in mdoc['sections']:
@@ -125,7 +136,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
                 section['ExposureDose'] = exposuredose
             #print(f'SubFramePath field: {section.get("SubFramePath", "")}')
         # Check if all subframes were found
-        subframes = [frame_utils.SubFrame(section['SubFramePath']) for section in mdoc['sections']]
+        subframes = [frame_utils.SubFrame(section['SubFramePath'],section['TiltAngle']) for section in mdoc['sections']]
         if all(subframe.files_exist(is_split=False) for subframe in subframes):
             print(f'Subframes were found for {input_file}, will run MotionCor2 on them')
             frames_corrected_dir = path.join(output_dir, 'frames_corrected')
@@ -133,13 +144,16 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
                                                          binning=mcbin, group=group, override_gainref=gainref,
                                                          gpus=gpus)
             
-            # Reorder as unidirectional if desired
+            # Reorder subframes and mdoc as unidirectional if desired
+            stack_mdoc = mdoc
+            
             if reorder:
                 subframes_corrected = frame_utils.sort_subframes_list(subframes_corrected)
+                stack_mdoc['sections'] = sorted(stack_mdoc['sections'], key=itemgetter('TiltAngle'))
             
             # Create stack from individual tilts
             stack, stack_mdoc = frame_utils.frames2stack(subframes_corrected,
-                                                         path.join(output_dir, path.basename(input_file)), full_mdoc=mdoc,
+                                                         path.join(output_dir, path.basename(input_file)), full_mdoc=stack_mdoc,
                                                          overwrite_titles=mdoc['titles'])
             
             shutil.rmtree(frames_corrected_dir)
@@ -150,6 +164,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
             print('Not implemented yet, skipping')
             continue
             # raise NotImplementedError('Sorry, non-motioncor2 path is not implemented yet')
+        # TODO: add archive flag which moves all input files + subframe stacks to an archive
 
 
 @click.command()
