@@ -144,7 +144,7 @@ class SubFrame:
                 raise FileNotFoundError(f'File does not exist: {file}')
 
 
-def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning: int = 2, group: int = 1,
+def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning: int = 2, group: int = 1, mcrot: int = 0, mcflip: int = 0,
                override_gainref: str = None, gpus: Optional[str]=None):
     assert_subframes_list(subframes, is_split=False)
     mc2_exe = motioncor2_executable()
@@ -159,9 +159,7 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
     # Check, if Subframe mdocs are given, if yes check whether zero or one unique gain refs are given
     # Otherwise, use the provided gain ref if it is supplied (option: override_gainref)
     # If neither are given, skip gain correction
-    
-    # TODO: Check rotationandflip!
-    
+        
     gain_ref_mrc = override_gainref
     
     if subframes[0].subframe_mdoc:    
@@ -218,7 +216,9 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
     if splitsum:
         command += ['-SplitSum', '1']
     if gain_ref_mrc is not None:
-        command += ['-Gain', abspath(gain_ref_mrc)]
+        command += ['-Gain', abspath(gain_ref_mrc),
+                    '-RotGain', str(mcrot), 
+                    '-FlipGain', str(mcflip)]
 
     #print(f'Running motioncor2 with command:\n{" ".join(command)}')
     with open(join(output_dir, 'motioncor2.log'), 'a') as out, open(join(output_dir, 'motioncor2.err'), 'a') as err:
@@ -271,3 +271,11 @@ def aretomo_executable() -> Optional[str]:
         else:
             warnings.warn(f'ARETOMO_EXECUTABLE is set to "{aretomo_exe}", but the file does not exist. Falling back to PATH')
     return shutil.which('AreTomo')
+
+def sem2mc2(RotationAndFlip: int = 0):
+    ''' Converts SerialEM property RotationAndFlip into MotionCor2-compatibly -RotGain / -FlipGain values.
+    Using List on https://bio3d.colorado.edu/SerialEM/hlp/html/setting_up_serialem.htm#cameraOrientation as Reference, 
+    For MotionCor2: Rotation = n*90deg, Flip 1 = flip around X, Flip 2 = flip around Y
+    Returns a List with first item as rotation and second item as flip.'''
+    conv = {0: [0,0], 1: [3,0], 2: [2,0], 3: [1, 0], 4: [0,2], 5: [1,2], 6: [2,2], 7: [3,2] }
+    return conv[RotationAndFlip]

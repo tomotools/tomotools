@@ -15,10 +15,9 @@ from tomotools.utils import mdocfile, frame_utils
 
 @click.command()
 @click.option('--cpus', default=8, show_default=True, help='Number of CPUs, passed to justblend')
-@click.option('--archive', default=False, show_default=True, help='Move maps and map mdocs to montages-archived')
 @click.argument('input_files', nargs=-1)
 @click.argument('output_dir')
-def blend_montages(cpus, archive, input_files, output_dir):
+def blend_montages(cpus, input_files, output_dir):
     """Blend montages using justblend
 
     The input files must be montage .mrc/.st files, so usually you will invoke this function with something like:
@@ -41,27 +40,12 @@ def blend_montages(cpus, archive, input_files, output_dir):
         os.remove(file)
 
     os.chdir(wd)
-    
-    if archive:
-        for input_file in input_files:
-            basepath = path.dirname(path.abspath(input_file))
-            archive_dir = path.join(basepath,'montages-archived')
-            
-            if not path.isdir(archive_dir):
-                mkdir(archive_dir)
-
-            
-            shutil.move(input_file,archive_dir)
-            shutil.move(f'{input_file}.mdoc',archive_dir)
-
 
 @click.command()
 @click.option('--splitsum/--nosplitsum', is_flag=True, default=True, show_default=True,
               help='Create even/odd split sums, e.g. for denoising')
 @click.option('--mcbin', '--motioncor_binning', default=2, show_default=True,
               help='Binning parameter passed to MotionCor2')
-@click.option('--mcrot', default=0, show_default=True, help='GainRef Rotation flag passed on to MotionCor2')
-@click.option('--mcflip', default=0, show_default=True, help='GainRef Flip flag passed on to MotionCor2')
 @click.option('--reorder/--noreorder', is_flag=True, default=True, show_default=True,
               help='Sort tilt-series by angle in ascending order and create an appropriate MDOC file')
 @click.option('--frames', type=click.Path(exists=True, file_okay=False, dir_okay=True),
@@ -75,7 +59,7 @@ def blend_montages(cpus, archive, input_files, output_dir):
 @click.option('--exposuredose', type=float, default=None)
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
 @click.argument('output_dir', type=click.Path(writable=True))
-def batch_prepare_tiltseries(splitsum, mcbin, mcrot, mcflip, reorder, frames, gainref, group, gpus, exposuredose, input_files,
+def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, gpus, exposuredose, input_files,
                              output_dir):
     """Prepare tilt-series for reconstruction.
 
@@ -146,7 +130,6 @@ def batch_prepare_tiltseries(splitsum, mcbin, mcrot, mcflip, reorder, frames, ga
             print(f'{input_file} is not a tilt series, as all TiltAngles are near zero. Skipping.')
             continue       
         
-        
         # File is a tilt-series, look for subframes
         print(f'Working on {input_file}, which looks like a tilt series')        
         for section in mdoc['sections']:
@@ -158,26 +141,29 @@ def batch_prepare_tiltseries(splitsum, mcbin, mcrot, mcflip, reorder, frames, ga
             )
             if exposuredose is not None:
                 section['ExposureDose'] = exposuredose
+            # TODO: add PriorRecordDose field here for dose filtration 
             #print(f'SubFramePath field: {section.get("SubFramePath", "")}')
         # Check if all subframes were found
         subframes = [frame_utils.SubFrame(section['SubFramePath'],section['TiltAngle']) for section in mdoc['sections']]
         if all(subframe.files_exist(is_split=False) for subframe in subframes):
             print(f'Subframes were found for {input_file}, will run MotionCor2 on them')
+            
+            # Get rotation and flip of Gain reference from mdoc file property
+            mcrot, mcflip = frame_utils.sem2mc2(mdoc['sections'][0]['RotationAndFlip'])
+                        
             frames_corrected_dir = path.join(output_dir, 'frames_corrected')
             subframes_corrected = frame_utils.motioncor2(subframes, frames_corrected_dir, splitsum=splitsum,
-                                                          binning=mcbin, group=group, override_gainref=gainref,
+                                                          binning=mcbin, mcrot=mcrot, mcflip=mcflip, group=group, override_gainref=gainref,
                                                           gpus=gpus)
             
-            # Reorder subframes and mdoc as unidirectional if desired
-            stack_mdoc = mdoc
-            
+            # Reorder subframes and mdoc as unidirectional if desired           
             if reorder:
                 subframes_corrected = frame_utils.sort_subframes_list(subframes_corrected)
-                stack_mdoc['sections'] = sorted(stack_mdoc['sections'], key=itemgetter('TiltAngle'))
+                mdoc['sections'] = sorted(mdoc['sections'], key=itemgetter('TiltAngle'))
             
             # Create stack from individual tilts
             stack, stack_mdoc = frame_utils.frames2stack(subframes_corrected,
-                                                          path.join(output_dir, path.basename(input_file)), full_mdoc=stack_mdoc,
+                                                          path.join(output_dir, path.basename(input_file)), full_mdoc=mdoc,
                                                           overwrite_titles=mdoc['titles'])
             
             shutil.rmtree(frames_corrected_dir)
