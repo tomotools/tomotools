@@ -15,9 +15,10 @@ from tomotools.utils import mdocfile, frame_utils
 
 @click.command()
 @click.option('--cpus', default=8, show_default=True, help='Number of CPUs, passed to justblend')
+@click.option('--archive', default=False, show_default=True, help='Move maps and map mdocs to montages-archived')
 @click.argument('input_files', nargs=-1)
 @click.argument('output_dir')
-def blend_montages(cpus, input_files, output_dir):
+def blend_montages(cpus, archive, input_files, output_dir):
     """Blend montages using justblend
 
     The input files must be montage .mrc/.st files, so usually you will invoke this function with something like:
@@ -28,7 +29,9 @@ def blend_montages(cpus, input_files, output_dir):
 
     for input_file in input_files:
         os.symlink(abspath(input_file), join(output_dir, basename(input_file)))
-
+    
+    wd = os.getcwd()
+    
     os.chdir(output_dir)
     links = [basename(input_file) for input_file in input_files]
     subprocess.run(['justblend', '--cpus', str(cpus)] + [basename(input_file) for input_file in input_files])
@@ -36,8 +39,20 @@ def blend_montages(cpus, input_files, output_dir):
     for file in links + glob('*.ecd') + glob('*.pl') + glob('*.xef') \
                 + glob('*.yef') + glob('*.com') + glob('*.log') + ['processchunks-jb.out']:
         os.remove(file)
-        
-    # TODO: Add archive flag
+
+    os.chdir(wd)
+    
+    if archive:
+        for input_file in input_files:
+            basepath = path.dirname(path.abspath(input_file))
+            archive_dir = path.join(basepath,'montages-archived')
+            
+            if not path.isdir(archive_dir):
+                mkdir(archive_dir)
+
+            
+            shutil.move(input_file,archive_dir)
+            shutil.move(f'{input_file}.mdoc',archive_dir)
 
 
 @click.command()
@@ -45,21 +60,22 @@ def blend_montages(cpus, input_files, output_dir):
               help='Create even/odd split sums, e.g. for denoising')
 @click.option('--mcbin', '--motioncor_binning', default=2, show_default=True,
               help='Binning parameter passed to MotionCor2')
+@click.option('--mcrot', default=0, show_default=True, help='GainRef Rotation flag passed on to MotionCor2')
+@click.option('--mcflip', default=0, show_default=True, help='GainRef Flip flag passed on to MotionCor2')
 @click.option('--reorder/--noreorder', is_flag=True, default=True, show_default=True,
               help='Sort tilt-series by angle in ascending order and create an appropriate MDOC file')
 @click.option('--frames', type=click.Path(exists=True, file_okay=False, dir_okay=True),
               help='If your frames are not automatically found, you can pass the path to the frames directory')
 @click.option('--gainref', type=click.Path(exists=True, dir_okay=False),
-              help='Use this gain reference instead looking for one in the MDOC files')
+              help='Use this gain reference instead looking for one in the Subframe MDOC files')
 @click.option('--group', type=int, default=1, show_default=True,
               help='Group frames, useful for low-dose frames. Also see motioncor2 manual')
 @click.option('--gpus', type=str, default=None,
               help='GPUs list, comma separated (e.g. 0,1), determined automatically if not passed')
 @click.option('--exposuredose', type=float, default=None)
-# TODO: discuss nargs=-1 -> eats up output_dir!
-@click.argument('input_files', nargs=1, type=click.Path(exists=True))
+@click.argument('input_files', nargs=-1, type=click.Path(exists=True))
 @click.argument('output_dir', type=click.Path(writable=True))
-def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, gpus, exposuredose, input_files,
+def batch_prepare_tiltseries(splitsum, mcbin, mcrot, mcflip, reorder, frames, gainref, group, gpus, exposuredose, input_files,
                              output_dir):
     """Prepare tilt-series for reconstruction.
 
@@ -72,31 +88,35 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
     The last argument is the output dir. It will be created if it doesn't exist.
     """
     # If input_files is a directory, check for PACEtomo files by regex _tgts.txt, save all roots
+    wd = os.getcwd()
+    
     if any(path.isdir(input_file) for input_file in input_files):
        
         tgts_temp = list()
-        tgts_temp = glob(path.join(input_files, '*_tgts.txt'))
+        
+        for input_file in input_files:
+            tgts_temp.extend(glob(path.join(input_file, '*_tgts.txt')))
         
         if len(tgts_temp) == 0:
             print('No PACEtomo files found. Continuing.')
+        
         else:
-            roots = list()
-            pacetomo_dir = path.join(input_files, 'PACEtomo_targets')
-            
-            if not path.isdir(pacetomo_dir):
-                mkdir(pacetomo_dir)
-            
+            # Move all targeting data (_tgt_*.mrc, _tgts.txt) to a separate directory
             for tgt in tgts_temp:
-                roots.append(re.split('[_tgts_]',tgt)[0])
+                
+                pacetomo_dir = path.join(path.dirname(path.abspath(tgt)), 'PACEtomo_targets')
+                
+                if not path.isdir(pacetomo_dir):
+                    mkdir(pacetomo_dir)
+                    
+                root = re.split('[_tgts_]',tgt)[0]
                 print('Found PACEtomo root file ' + tgt)
             
-            # Move all targeting data (_tgt_*.mrc, _tgts.txt) to a separate directory
-            for root in roots:
-                root_path = path.join(input_files, root)
+                root_path = path.join(path.dirname(path.abspath(tgt)), root)
                 cmd = "mv " + root_path + "*_tgt* "  + pacetomo_dir
                 os.system(cmd)
-                
-                os.chdir(input_files)
+                    
+    os.chdir(wd)
         
     # Convert all directories into a list of MRC/ST files
     input_files_temp = list()
@@ -121,7 +141,11 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
         if mdoc.get('Montage', 0) == 1:
             print(f'Skipping {input_file} because it is a montage')
             continue
-        # TODO: Skip batch / anchor files
+        # Identify batch / anchoring files, as they all should have a tilt angle < abs(1) for all section -> feels a bit hacky
+        if all(section['TiltAngle'] < abs(1) for section in mdoc['sections']):
+            print(f'{input_file} is not a tilt series, as all TiltAngles are near zero. Skipping.')
+            continue       
+        
         
         # File is a tilt-series, look for subframes
         print(f'Working on {input_file}, which looks like a tilt series')        
@@ -141,8 +165,8 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
             print(f'Subframes were found for {input_file}, will run MotionCor2 on them')
             frames_corrected_dir = path.join(output_dir, 'frames_corrected')
             subframes_corrected = frame_utils.motioncor2(subframes, frames_corrected_dir, splitsum=splitsum,
-                                                         binning=mcbin, group=group, override_gainref=gainref,
-                                                         gpus=gpus)
+                                                          binning=mcbin, group=group, override_gainref=gainref,
+                                                          gpus=gpus)
             
             # Reorder subframes and mdoc as unidirectional if desired
             stack_mdoc = mdoc
@@ -153,8 +177,8 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
             
             # Create stack from individual tilts
             stack, stack_mdoc = frame_utils.frames2stack(subframes_corrected,
-                                                         path.join(output_dir, path.basename(input_file)), full_mdoc=stack_mdoc,
-                                                         overwrite_titles=mdoc['titles'])
+                                                          path.join(output_dir, path.basename(input_file)), full_mdoc=stack_mdoc,
+                                                          overwrite_titles=mdoc['titles'])
             
             shutil.rmtree(frames_corrected_dir)
             print(f'Successfully created {path.basename(stack)}')
@@ -164,8 +188,6 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
             print('Not implemented yet, skipping')
             continue
             # raise NotImplementedError('Sorry, non-motioncor2 path is not implemented yet')
-        # TODO: add archive flag which moves all input files + subframe stacks to an archive
-
 
 @click.command()
 @click.option('--move', is_flag=True, help="Move files into a subdirectory")

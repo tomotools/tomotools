@@ -103,7 +103,7 @@ class SubFrame:
 
     @property
     def mdoc(self):
-        if self._mdoc is None:
+        if self._mdoc is None and self.subframe_mdoc:
             self._mdoc = mdocfile.read(self.mdoc_path)
         return self._mdoc
 
@@ -136,13 +136,9 @@ class SubFrame:
         self._mdoc = None
 
     def files_exist(self, is_split) -> bool:
-        # TODO: check w/ Moritz whether per-tilt mdoc is really needed
-        #return self.path is not None and isfile(self.path) and isfile(self.mdoc_path) and is_split == self.is_split
         return self.path is not None and isfile(self.path) and is_split == self.is_split
 
     def assert_files_exist(self, is_split):
-        # TODO: check w/ Moritz whether per-tilt mdoc is really needed
-        #for file in [self.path, self.mdoc_path] + ([self.path_evn, self.path_odd] if is_split else []):
         for file in [self.path] + ([self.path_evn, self.path_odd] if is_split else []):
             if not isfile(file):
                 raise FileNotFoundError(f'File does not exist: {file}')
@@ -163,6 +159,8 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
     # Check, if Subframe mdocs are given, if yes check whether zero or one unique gain refs are given
     # Otherwise, use the provided gain ref if it is supplied (option: override_gainref)
     # If neither are given, skip gain correction
+    
+    # TODO: Check rotationandflip!
     
     gain_ref_mrc = override_gainref
     
@@ -261,3 +259,15 @@ def motioncor2_executable() -> Optional[str]:
         else:
             warnings.warn(f'MOTIONCOR2_EXECUTABLE is set to "{mc2_exe}", but the file does not exist. Falling back to PATH')
     return shutil.which('motioncor2')
+
+def aretomo_executable() -> Optional[str]:
+    '''The AreTomo executable can be set with one of the following ways (in order of priority):
+    1. Setting the ARETOMO_EXECUTABLE variable to the full path of the executable file
+    2. Putting the appropriate executable into the PATH and renaming it to "aretomo"'''
+    if 'ARETOMO_EXECUTABLE' in os.environ:
+        aretomo_exe = os.environ['ARETOMO_EXECUTABLE']
+        if isfile(aretomo_exe):
+            return aretomo_exe
+        else:
+            warnings.warn(f'ARETOMO_EXECUTABLE is set to "{aretomo_exe}", but the file does not exist. Falling back to PATH')
+    return shutil.which('AreTomo')
