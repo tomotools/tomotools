@@ -219,6 +219,11 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
         command += ['-Gain', abspath(gain_ref_mrc),
                     '-RotGain', str(mcrot), 
                     '-FlipGain', str(mcflip)]
+        
+    # TODO: also use defects file, according to the description on the SerialEM Help:
+    #     clip defect -D defects...txt  fileWithFrames  defects...mrc
+    # where the fileWithFrames is used only to set the size of the output and can be any file of the right X and Y size. 
+    # Then, give file to MotionCor2 as -DefectFile
 
     #print(f'Running motioncor2 with command:\n{" ".join(command)}')
     with open(join(output_dir, 'motioncor2.log'), 'a') as out, open(join(output_dir, 'motioncor2.err'), 'a') as err:

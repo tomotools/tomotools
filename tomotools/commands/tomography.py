@@ -185,18 +185,37 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
 @click.option('--keep-ali-stack/--delete-ali-stack', is_flag=True, default=False, show_default=True, help="Keep or delete the non-dose-filtered aligned stack (useful for Relion)")
 @click.option('--previous', type=click.Path(exists=True),
                help="Don't do alignments, but use previous alignments and MDOC file of the passed tilt-series")
+@click.option('--batch-file', type=click.Path(exists=True, dir_okay=False),help = "You can pass a tab-separated file with tilt series names and views to exclude before reconstruction.")
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
-def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previous, input_files):
-    # TODO: move to separate folders
+def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previous, batch_file, input_files):
+    # TODO: Take file list w/ angles to exclude as input
+    if batch_file is not None:
+        ts_info = {}
+        with open(batch_file) as file:
+            for line in file:
+                l=line.split('\t')
+                temp={l[0]: l[1].rstrip()}
+                ts_info.update(temp)
+                                  
+    # TODO: move to separate folders   
     for tiltseries in input_files:
         mdoc_file = f'{tiltseries}.mdoc' if previous is None else f'{previous}.mdoc'
         if not path.isfile(mdoc_file):
             raise FileNotFoundError(f'No MDOC file found at {mdoc_file}')
+        
+        # Check for tilts to exclude
+        excludetilts = None
+        if batch_file is not None:
+            excludetilts = {}
+            if tiltseries in ts_info:
+                excludetilts = ts_info[tiltseries]
+                print(f'Found tilts to exclude in {batch_file}. Will exclude tilts {excludetilts}.')
+                
         if move:
-            print('Move files to subdir {subdir}')
             dir = splitext(tiltseries)[0]
             new_tiltseries = join(dir, basename(tiltseries))
             mkdir(dir)
+            print(f'Move files to subdir {dir}')
             os.rename(tiltseries, new_tiltseries)
             tiltseries = new_tiltseries
             # Only move the MDOC file if it's not from a previous reconstruction
@@ -205,8 +224,23 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                 os.rename(mdoc_file, new_mdoc_file)
                 mdoc_file = new_mdoc_file
 
-        # MRC files
+       
+        # Run newstack to exclude tilts
+        # TODO: Consider already binning here before AreTomo?
         rootname = splitext(tiltseries)[0]
+    
+        if excludetilts is not None:
+            subprocess.run(['newstack', 
+                            '-in', tiltseries,
+                            '-mdoc',
+                            '-quiet',
+                            '-exclude', excludetilts,
+                            '-ou', f'{rootname}_excludetilts.mrc'])
+            tiltseries = f'{rootname}_excludetilts.mrc'
+            mdoc_file = f'{tiltseries}.mdoc'
+
+        # MRC files
+        # TODO: Make a class!  
         ali_file = f'{rootname}_ali.mrc'
         ali_file_mtf = f'{rootname}_ali_mtf.mrc'
         ali_file_mtf_bin = f'{rootname}_ali_mtf_b{bin}.mrc'
@@ -220,17 +254,18 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         tomopitch_file = f'{ali_rootname}.mod'
         aln_file = f'{ali_rootname}.aln'
 
-        # Aretomo
+    # Aretomo
+        
         if previous is None:
             subprocess.run(['extracttilts', tiltseries, tlt_file])
-            subprocess.run(['/opt/aretomo/aretomo',
+            subprocess.run([frame_utils.aretomo_executable(),
                             '-InMrc', tiltseries,
                             '-OutMrc', ali_file,
                             '-AngFile', tlt_file,
                             '-VolZ', '0',
                             '-TiltCor', '1'] + (['-Patch', '6', '4'] if local else []))
         else:
-            subprocess.run(['/opt/aretomo/aretomo',
+            subprocess.run([frame_utils.aretomo_executable(),
                             '-InMrc', tiltseries,
                             '-OutMrc', ali_file,
                             '-AlnFile', aln_file,
@@ -240,6 +275,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         subprocess.run(['alterheader', '-PixelSize', pix_size, ali_file])
 
         # Dose filtration
+        # TODO: Check about the PriorRecordExposure
         subprocess.run(['mtffilter', '-dtype', '4', '-dfile', mdoc_file, ali_file, ali_file_mtf])
         if not keep_ali_stack:
             os.remove(ali_file)
@@ -248,7 +284,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         if previous is None:
             subprocess.run(['binvol', '-x', '8', '-y', '8', '-z', '1', ali_file_mtf, ali_file_mtf_bin8])
             subprocess.run(['tilt']
-                           + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
+                        + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
                            ['-InputProjections', ali_file_mtf_bin8,
                             '-OutputFile', full_rec_file,
                             '-IMAGEBINNED', '8',
@@ -265,28 +301,27 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                             '-ActionIfGPUFails', '1,2',
                             '-OFFSET', '0.0',
                             '-SHIFT', '0.0,0.0',
-                            '-UseGPU', '0']
-                           )
+                            '-UseGPU', '0'])
 
             os.remove(ali_file_mtf_bin8)
-            subprocess.run([
-                'findsection',
-                '-tomo', full_rec_file,
-                '-pitch', tomopitch_file,
-                '-scales', '2',
-                '-size', '16,1,16',
-                '-samples', '5',
-                '-block', '48'])
-        # Get tomopitch
-        tomopitch = subprocess.run([
-            'tomopitch',
-            '-mod', tomopitch_file,
-            '-extra', str(extra_thickness),
-            '-scale', str(8)], capture_output=True, text=True).stdout.splitlines()
-        x_axis_tilt = tomopitch[-3].split()[-1]
-        tomopitch_z = tomopitch[-1].split(';')
-        z_shift = tomopitch_z[0].split()[-1]
-        thickness = tomopitch_z[1].split()[-1]
+            subprocess.run(['findsection',
+                            '-tomo', full_rec_file,
+                            '-pitch', tomopitch_file,
+                            '-scales', '2',
+                            '-size', '16,1,16',
+                            '-samples', '5',
+                            '-block', '48'])
+            
+            # Get tomopitch
+            tomopitch = subprocess.run([
+                'tomopitch',
+                '-mod', tomopitch_file,
+                '-extra', str(extra_thickness),
+                '-scale', str(8)], capture_output=True, text=True).stdout.splitlines()
+            x_axis_tilt = tomopitch[-3].split()[-1]
+            tomopitch_z = tomopitch[-1].split(';')
+            z_shift = tomopitch_z[0].split()[-1]
+            thickness = tomopitch_z[1].split()[-1]
 
         # Final reconstruction
         if bin == 1:
@@ -294,6 +329,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         else:
             subprocess.run(['binvol', '-x', str(bin), '-y', str(bin), '-z', '1', ali_file_mtf, ali_file_mtf_bin])
             os.remove(ali_file_mtf)
+        
         subprocess.run(['tilt']
                        + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
                        ['-InputProjections', ali_file_mtf_bin,
