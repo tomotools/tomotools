@@ -198,7 +198,6 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                     ts_info.update(temp)
                                       
     for tiltseries in input_files:
-        #TODO: Improve output! Make short, add sections for files, etc.
         mdoc_file = f'{tiltseries}.mdoc' if previous is None else f'{previous}.mdoc'
         if not path.isfile(mdoc_file):
             raise FileNotFoundError(f'No MDOC file found at {mdoc_file}')
@@ -245,7 +244,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         
         # To account for different sensor sizes, read from mdoc file.
         # Define default thickness as function of pixel size -> always reconstruct 1 um for tomopitch. 
-        thickness = int(10000 / mdoc['PixelSpacing'])
+        thickness = str(round(10000 / mdoc['PixelSpacing']))
         full_x, full_y = mdoc['ImageSize']
         patch_x, patch_y = [round(full_x/1000), round(full_y/1000)]
         
@@ -300,33 +299,32 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         print(f'Done dose-filtering {tiltseries}.')
 
         # Tomo pitch
-        # TODO: Somehow this does always fails - find sensible way around it! Eg. default values?
         if previous is None:
             subprocess.run(['binvol', '-x', '8', '-y', '8', '-z', '1', ali_file_mtf, ali_file_mtf_bin8],
                            stdout=subprocess.DEVNULL)
-            subprocess.run(['tilt']
-                        + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
-                           ['-InputProjections', ali_file_mtf_bin8,
-                            '-OutputFile', full_rec_file,
-                            '-IMAGEBINNED', '8',
-                            '-TILTFILE', tlt_file_ali,
-                            '-THICKNESS', thickness,
-                            '-RADIAL', '0.35,0.035',
-                            '-FalloffIsTrueSigma', '1',
-                            '-SCALE', '0.0,0.05',
-                            '-PERPENDICULAR',
-                            '-MODE', '2',
-                            '-FULLIMAGE', full_y , full_x,
-                            '-SUBSETSTART', '0,0',
-                            '-AdjustOrigin',
-                            '-ActionIfGPUFails', '1,2',
-                            '-OFFSET', '0.0',
-                            '-SHIFT', '0.0,0.0',
-                            '-UseGPU', '0'],
-                            stdout=subprocess.DEVNULL)
+            subprocess.run(['tilt',
+                           '-InputProjections', ali_file_mtf_bin8,
+                           '-OutputFile', full_rec_file,
+                           '-IMAGEBINNED', '8',
+                           '-TILTFILE', tlt_file_ali,
+                           '-THICKNESS', str(thickness),
+                           '-RADIAL', '0.35,0.035',
+                           '-FalloffIsTrueSigma', '1',
+                           '-SCALE', '0.0,0.05',
+                           '-PERPENDICULAR',
+                           '-MODE', '2',
+                           '-FULLIMAGE', f'{full_y} {full_x}',
+                           '-SUBSETSTART', '0,0',
+                           '-AdjustOrigin',
+                           '-ActionIfGPUFails', '1,2',
+                           '-OFFSET', '0.0',
+                           '-SHIFT', '0.0,0.0',
+                           '-UseGPU', '0'] +
+                           (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []),
+                           stdout=subprocess.DEVNULL)
 
             os.remove(ali_file_mtf_bin8)
-            subprocess.run(['findsection',
+            fs = subprocess.run(['findsection',
                             '-tomo', full_rec_file,
                             '-pitch', tomopitch_file,
                             '-scales', '2',
@@ -335,19 +333,26 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                             '-block', '48'],
                             stdout=subprocess.DEVNULL)
             
-            # Get tomopitch
-            # TODO: Implement default values if automatic finding fails
-            tomopitch = subprocess.run([
-                'tomopitch',
-                '-mod', tomopitch_file,
-                '-extra', str(extra_thickness),
-                '-scale', str(8)], capture_output=True, text=True).stdout.splitlines()
-            x_axis_tilt = tomopitch[-3].split()[-1]
-            tomopitch_z = tomopitch[-1].split(';')
-            z_shift = tomopitch_z[0].split()[-1]
-            thickness = tomopitch_z[1].split()[-1]
+            if fs.returncode != 0:
+                x_axis_tilt = '0'
+                tomopitch_z = '0'
+                z_shift = '0'
+                thickness = str(thickness)
+                print(f'{tiltseries}: findsection failed, using default values {tomopitch_z}, thickness {thickness}.')
             
-            print(f'{tiltseries}: Estimated tomopitch {tomopitch_z}, estimated thickness {thickness}.')
+            
+            else:    
+                # Get tomopitch
+                tomopitch = subprocess.run([
+                    'tomopitch',
+                    '-mod', tomopitch_file,
+                    '-extra', str(extra_thickness),
+                    '-scale', str(8)], capture_output=True, text=True).stdout.splitlines()                
+                x_axis_tilt = tomopitch[-3].split()[-1]
+                tomopitch_z = tomopitch[-1].split(';')
+                z_shift = tomopitch_z[0].split()[-1]
+                thickness = tomopitch_z[1].split()[-1]
+                print(f'{tiltseries}: Succesfully estimated tomopitch {tomopitch_z} and thickness {thickness}.')
 
         # Final reconstruction
         if bin == 1:
@@ -374,7 +379,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                         '-SCALE', '0.0,0.05',
                         '-PERPENDICULAR',
                         '-MODE', '2',
-                        '-FULLIMAGE', full_y, full_x,
+                        '-FULLIMAGE', f'{full_y} {full_x}',
                         '-SUBSETSTART', '0,0',
                         '-AdjustOrigin',
                         '-ActionIfGPUFails', '1,2',
