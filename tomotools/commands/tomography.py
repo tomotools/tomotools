@@ -324,6 +324,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                            stdout=subprocess.DEVNULL)
 
             os.remove(ali_file_mtf_bin8)
+            # Try to automatically find edges of tomogram
             fs = subprocess.run(['findsection',
                             '-tomo', full_rec_file,
                             '-pitch', tomopitch_file,
@@ -333,6 +334,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                             '-block', '48'],
                             stdout=subprocess.DEVNULL)
             
+            # If it fails, just use default values
             if fs.returncode != 0:
                 x_axis_tilt = '0'
                 tomopitch_z = '0'
@@ -342,17 +344,25 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
             
             
             else:    
-                # Get tomopitch
+                # Else, get tomopitch
                 tomopitch = subprocess.run([
                     'tomopitch',
                     '-mod', tomopitch_file,
                     '-extra', str(extra_thickness),
                     '-scale', str(8)], capture_output=True, text=True).stdout.splitlines()                
-                x_axis_tilt = tomopitch[-3].split()[-1]
-                tomopitch_z = tomopitch[-1].split(';')
-                z_shift = tomopitch_z[0].split()[-1]
-                thickness = tomopitch_z[1].split()[-1]
-                print(f'{tiltseries}: Succesfully estimated tomopitch {tomopitch_z} and thickness {thickness}.')
+                # Check for failed process again. 
+                if any(l.startswith('ERROR') for l in tomopitch):
+                    x_axis_tilt = '0'
+                    tomopitch_z = '0'
+                    z_shift = '0'
+                    thickness = str(thickness)
+                    print(f'{tiltseries}: tomopitch failed, using default values {tomopitch_z}, thickness {thickness}.')
+                else:    
+                    x_axis_tilt = tomopitch[-3].split()[-1]
+                    tomopitch_z = tomopitch[-1].split(';')
+                    z_shift = tomopitch_z[0].split()[-1]
+                    thickness = tomopitch_z[1].split()[-1]
+                    print(f'{tiltseries}: Succesfully estimated tomopitch {tomopitch_z} and thickness {thickness}.')
 
         # Final reconstruction
         if bin == 1:
@@ -393,7 +403,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         print(f'{tiltseries}: Finished reconstruction.')
 
         # Trim
-        # TODO: Consider case where image is not rotated 90deg in relation to mdoc (TiltAixs property?)
+        # TODO: Consider case where image is not rotated 90deg in relation to mdoc (TiltAxis property?)
         thickness = int(thickness)
         subprocess.run(['trimvol',
                         '-x', f'1,{full_y / bin:.0f}',
