@@ -246,7 +246,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         # Define default thickness as function of pixel size -> always reconstruct 1 um for tomopitch. 
         thickness = str(round(10000 / mdoc['PixelSpacing']))
         full_x, full_y = mdoc['ImageSize']
-        patch_x, patch_y = [round(full_x/1000), round(full_y/1000)]
+        patch_x, patch_y = [str(round(full_x/1000)), str(round(full_y/1000))]
         
         # Generate MRC filenames
         # TODO: Make a class?  
