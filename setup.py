@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='Tomotools',
-    version='0.1.0',
+    version='0.1.1',
     packages=['tomotools', 'tomotools.commands', 'tomotools.utils'],
     install_requires=[
         'Click',

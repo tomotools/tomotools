@@ -1,0 +1,2 @@
+*.mrc.mdoc filter=lfs diff=lfs merge=lfs -text
+*.mrc filter=lfs diff=lfs merge=lfs -text
