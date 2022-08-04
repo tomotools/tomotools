@@ -1,12 +1,12 @@
 import os
+import re
 import shutil
 import subprocess
 from glob import glob
+from operator import itemgetter
 from os import mkdir
 from os import path
 from os.path import abspath, basename, join, splitext
-import re
-from operator import itemgetter
 
 import click
 
@@ -28,9 +28,9 @@ def blend_montages(cpus, input_files, output_dir):
 
     for input_file in input_files:
         os.symlink(abspath(input_file), join(output_dir, basename(input_file)))
-    
+
     wd = os.getcwd()
-    
+
     os.chdir(output_dir)
     links = [basename(input_file) for input_file in input_files]
     subprocess.run(['justblend', '--cpus', str(cpus)] + [basename(input_file) for input_file in input_files])
@@ -73,35 +73,37 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
     """
     # If input_files is a directory, check for PACEtomo files by regex _tgts.txt, save all roots
     wd = os.getcwd()
-    
+
     if any(path.isdir(input_file) for input_file in input_files):
-       
+
         tgts_temp = list()
-        
+
         for input_file in input_files:
             tgts_temp.extend(glob(path.join(input_file, '*_tgts.txt')))
-        
+
         if len(tgts_temp) == 0:
             print('No PACEtomo files found. Continuing.')
-        
+
         else:
             # Move all targeting data (_tgt_*.mrc, _tgts.txt) to a separate directory
             for tgt in tgts_temp:
-                
+
                 pacetomo_dir = path.join(path.dirname(path.abspath(tgt)), 'PACEtomo_targets')
-                
+
                 if not path.isdir(pacetomo_dir):
                     mkdir(pacetomo_dir)
-                    
-                root = re.split('[_tgts_]',tgt)[0]
+
+                root = re.split('[_tgts_]', tgt)[0]
                 print('Found PACEtomo root file ' + tgt)
-            
+
                 root_path = path.join(path.dirname(path.abspath(tgt)), root)
-                cmd = "mv " + root_path + "*_tgt* "  + pacetomo_dir
-                os.system(cmd)
-                    
+
+                for target in glob(f"{root_path}*_tgt*"):
+                    new_target = path.join(pacetomo_dir, path.basename(target))
+                    os.rename(target, new_target)
+
     os.chdir(wd)
-        
+
     # Convert all directories into a list of MRC/ST files
     input_files_temp = list()
     for input_file in input_files:
@@ -128,13 +130,13 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
         # Identify batch / anchoring files, as they all should have a tilt angle < abs(1) for all section -> feels a bit hacky
         if all(section['TiltAngle'] < abs(1) for section in mdoc['sections']):
             print(f'{input_file} is not a tilt series, as all TiltAngles are near zero. Skipping.')
-            continue       
-        
+            continue
+
         # File is a tilt-series, look for subframes
-        print(f'Working on {input_file}, which looks like a tilt series')        
+        print(f'Working on {input_file}, which looks like a tilt series')
         for section in mdoc['sections']:
             subframes_root_path = path.dirname(input_file) if frames is None else frames
-            #print(f'SubFramePath field: {section.get("SubFramePath", "")}')
+            # print(f'SubFramePath field: {section.get("SubFramePath", "")}')
             section['SubFramePath'] = mdocfile.find_relative_path(
                 subframes_root_path,
                 section.get('SubFramePath', '').replace('\\', path.sep)
@@ -147,25 +149,25 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
         subframes = [frame_utils.SubFrame(section['SubFramePath'],section['TiltAngle']) for section in mdoc['sections']]
         if all(subframe.files_exist(is_split=False) for subframe in subframes):
             print(f'Subframes were found for {input_file}, will run MotionCor2 on them')
-            
+
             # Get rotation and flip of Gain reference from mdoc file property
             mcrot, mcflip = frame_utils.sem2mc2(mdoc['sections'][0]['RotationAndFlip'])
-                        
+
             frames_corrected_dir = path.join(output_dir, 'frames_corrected')
             subframes_corrected = frame_utils.motioncor2(subframes, frames_corrected_dir, splitsum=splitsum,
                                                           binning=mcbin, mcrot=mcrot, mcflip=mcflip, group=group, override_gainref=gainref,
                                                           gpus=gpus)
-            
+
             # Reorder subframes and mdoc as unidirectional if desired           
             if reorder:
                 subframes_corrected = frame_utils.sort_subframes_list(subframes_corrected)
                 mdoc['sections'] = sorted(mdoc['sections'], key=itemgetter('TiltAngle'))
-            
+
             # Create stack from individual tilts
             stack, stack_mdoc = frame_utils.frames2stack(subframes_corrected,
                                                           path.join(output_dir, path.basename(input_file)), full_mdoc=mdoc,
                                                           overwrite_titles=mdoc['titles'])
-            
+
             shutil.rmtree(frames_corrected_dir)
             print(f'Successfully created {path.basename(stack)}')
         else:
@@ -196,21 +198,21 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                     l=line.split('\t')
                     temp={l[0]: l[1].rstrip()}
                     ts_info.update(temp)
-                                      
+
     for tiltseries in input_files:
         mdoc_file = f'{tiltseries}.mdoc' if previous is None else f'{previous}.mdoc'
         if not path.isfile(mdoc_file):
             raise FileNotFoundError(f'No MDOC file found at {mdoc_file}')
-        
+
         print(f'Working on file {tiltseries}.')
-     
+
         # Check for tilts to exclude
         excludetilts = None
         if batch_file is not None:
             if tiltseries in ts_info:
                 excludetilts = ts_info[tiltseries]
                 print(f'Found tilts to exclude in {batch_file}. Will exclude tilts {excludetilts}.')
-                
+
         if move:
             dir = splitext(tiltseries)[0]
             new_tiltseries = join(dir, basename(tiltseries))
@@ -222,15 +224,15 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
             if previous is None:
                 new_mdoc_file = join(dir, basename(mdoc_file))
                 os.rename(mdoc_file, new_mdoc_file)
-                mdoc_file = new_mdoc_file       
+                mdoc_file = new_mdoc_file
 
         # Run newstack to exclude tilts
         # TODO: Consider already binning here before AreTomo?
         rootname = splitext(tiltseries)[0]
-    
+
         if excludetilts is not None:
             exclude_file = f'{rootname}_excludetilts.mrc'
-            subprocess.run(['newstack', 
+            subprocess.run(['newstack',
                             '-in', tiltseries,
                             '-mdoc',
                             '-quiet',
@@ -239,15 +241,15 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
             print(f'Excluded specified tilts from {tiltseries}.')
             tiltseries = exclude_file
             mdoc_file = f'{tiltseries}.mdoc'
-        
+
         mdoc = mdocfile.read(mdoc_file)
-        
+
         # To account for different sensor sizes, read from mdoc file.
         # Define default thickness as function of pixel size -> always reconstruct 1 um for tomopitch. 
         thickness = str(round(10000 / mdoc['PixelSpacing']))
         full_x, full_y = mdoc['ImageSize']
         patch_x, patch_y = [str(round(full_x/1000)), str(round(full_y/1000))]
-        
+
         # Generate MRC filenames
         # TODO: Make a class?  
         ali_file = f'{rootname}_ali.mrc'
@@ -281,11 +283,11 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                             '-AlnFile', aln_file,
                             '-VolZ', '0'],
                             stdout=subprocess.DEVNULL)
-            
+
         print(f'Done aligning {tiltseries} with AreTomo.')
 
         # TODO: Discuss whether to directly use the value from the mdoc here
-        pix_size = subprocess.run(['header', '-PixelSize', tiltseries], capture_output=True, text=True).stdout        
+        pix_size = subprocess.run(['header', '-PixelSize', tiltseries], capture_output=True, text=True).stdout
         pix_size = ",".join(pix_size.strip().split())
         subprocess.run(['alterheader', '-PixelSize', pix_size, ali_file],
                        stdout=subprocess.DEVNULL)
@@ -333,7 +335,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                             '-samples', '5',
                             '-block', '48'],
                             stdout=subprocess.DEVNULL)
-            
+
             # If it fails, just use default values
             if fs.returncode != 0:
                 x_axis_tilt = '0'
@@ -341,15 +343,15 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                 z_shift = '0'
                 thickness = str(thickness)
                 print(f'{tiltseries}: findsection failed, using default values {tomopitch_z}, thickness {thickness}.')
-            
-            
-            else:    
+
+
+            else:
                 # Else, get tomopitch
                 tomopitch = subprocess.run([
                     'tomopitch',
                     '-mod', tomopitch_file,
                     '-extra', str(extra_thickness),
-                    '-scale', str(8)], capture_output=True, text=True).stdout.splitlines()                
+                    '-scale', str(8)], capture_output=True, text=True).stdout.splitlines()
                 # Check for failed process again. 
                 if any(l.startswith('ERROR') for l in tomopitch):
                     x_axis_tilt = '0'
@@ -357,7 +359,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                     z_shift = '0'
                     thickness = str(thickness)
                     print(f'{tiltseries}: tomopitch failed, using default values {tomopitch_z}, thickness {thickness}.')
-                else:    
+                else:
                     x_axis_tilt = tomopitch[-3].split()[-1]
                     tomopitch_z = tomopitch[-1].split(';')
                     z_shift = tomopitch_z[0].split()[-1]
@@ -375,7 +377,6 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
             os.remove(ali_file_mtf)
             print(f'{tiltseries}: Binned to {bin}.')
 
-        
         subprocess.run(['tilt']
                        + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
                        ['-InputProjections', ali_file_mtf_bin,
@@ -397,7 +398,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                         '-SHIFT', f'0.0,{z_shift}',
                         '-UseGPU', '0'],
                         stdout=subprocess.DEVNULL)
-        
+
         os.remove(ali_file_mtf_bin)
 
         print(f'{tiltseries}: Finished reconstruction.')
@@ -415,7 +416,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                         '-f', '-rx',
                         full_rec_file, rec_file],
                         stdout=subprocess.DEVNULL)
-        
+
         print(f'{tiltseries}: Finished trimming.')
 
         os.remove(full_rec_file)
