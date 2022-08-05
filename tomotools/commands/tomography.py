@@ -266,6 +266,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         aln_file = f'{ali_rootname}.aln'
 
         # Run AreTomo 
+        # TODO: Read in Tiltaxis?
         if previous is None:
             subprocess.run(['extracttilts', tiltseries, tlt_file],
                            stdout=subprocess.DEVNULL)
@@ -327,6 +328,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
 
             os.remove(ali_file_mtf_bin8)
             # Try to automatically find edges of tomogram
+            # TODO: use cryoposition instead?
             fs = subprocess.run(['findsection',
                             '-tomo', full_rec_file,
                             '-pitch', tomopitch_file,
