@@ -1,5 +1,4 @@
 import os
-import re
 import shutil
 import subprocess
 from glob import glob
@@ -66,45 +65,10 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
     This function runs MotionCor2 on movie frames, stacks the motion-corrected frames and sorts them by tilt-angle.
     The input files may be individual .mrc/.st tilt-series files or directories containing them.
     In the latter case, a simple search for MRC and ST files will be run (using the globs *.mrc and *.st).
-    If a directory is given, will first check for PACEtomo targeting files and move them to a subdirectory to prevent interference.
     
     Every input file requires a corresponding .mdoc file. 
     The last argument is the output dir. It will be created if it doesn't exist.
     """
-    # If input_files is a directory, check for PACEtomo files by regex _tgts.txt, save all roots
-    # TODO: We might be able to skip this as there's now automated detection of .mrc files which are not tilt series
-    wd = os.getcwd()
-
-    if any(path.isdir(input_file) for input_file in input_files):
-
-        tgts_temp = list()
-
-        for input_file in input_files:
-            tgts_temp.extend(glob(path.join(input_file, '*_tgts.txt')))
-
-        if len(tgts_temp) == 0:
-            print('No PACEtomo files found. Continuing.')
-
-        else:
-            # Move all targeting data (_tgt_*.mrc, _tgts.txt) to a separate directory
-            for tgt in tgts_temp:
-
-                pacetomo_dir = path.join(path.dirname(path.abspath(tgt)), 'PACEtomo_targets')
-
-                if not path.isdir(pacetomo_dir):
-                    mkdir(pacetomo_dir)
-
-                root = re.split('[_tgts_]', tgt)[0]
-                print('Found PACEtomo root file ' + tgt)
-
-                root_path = path.join(path.dirname(path.abspath(tgt)), root)
-
-                for target in glob(f"{root_path}*_tgt*"):
-                    new_target = path.join(pacetomo_dir, path.basename(target))
-                    os.rename(target, new_target)
-
-    os.chdir(wd)
-
     # Convert all directories into a list of MRC/ST files
     input_files_temp = list()
     for input_file in input_files:
@@ -128,7 +92,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
         if mdoc.get('Montage', 0) == 1:
             print(f'Skipping {input_file} because it is a montage')
             continue
-        # Identify batch / anchoring files, as they all should have a tilt angle < abs(1) for all section -> feels a bit hacky
+        # Identify batch / anchoring files, as they all should have a tilt angle < abs(1) for all sections -> feels a bit hacky
         if all(section['TiltAngle'] < abs(1) for section in mdoc['sections']):
             print(f'{input_file} is not a tilt series, as all TiltAngles are near zero. Skipping.')
             continue
@@ -176,7 +140,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
         else:
             if reorder:    
                 subprocess.run(['newstack',
-                                '-reorder', 1,
+                                '-reorder', str(1),
                                 '-mdoc',
                                 '-in', input_file,
                                 '-mdoc',
