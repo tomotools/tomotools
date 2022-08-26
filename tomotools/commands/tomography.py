@@ -136,6 +136,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
                                                           overwrite_titles=mdoc['titles'])
 
             shutil.rmtree(frames_corrected_dir)
+            
             print(f'Successfully created {path.basename(stack)}')
         else:
             if reorder:    

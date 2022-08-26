@@ -78,8 +78,23 @@ def frames2stack(subframes: list, stack_path, full_mdoc: Optional[dict]=None, ov
 
     # Run newstack for the full stack and, if desired, the EVN/ODD halves
     # Run newstack for the full stack and, if desired, the EVN/ODD halves
-        for partial_stack_path, partial_stack_subframes in stack_subframes_pairs:
-            subprocess.run(['newstack'] + partial_stack_subframes + [partial_stack_path] + ['-quiet'])
+    for partial_stack_path, partial_stack_subframes in stack_subframes_pairs:
+        subprocess.run(['newstack'] + partial_stack_subframes + [partial_stack_path] + ['-quiet'])
+        # Update the header of the stack MRC
+        with mrcfile.mmap(partial_stack_path, 'r+') as mrc:
+            # Copy the first 10 titles into the newly created mrc
+            mrc.update_header_from_data()
+            mrc.update_header_stats()
+            for i in range(10):
+                title = stack_mdoc['titles'][i].encode() if i < len(stack_mdoc['titles']) else b''
+                mrc.header['label'][i] = title
+            mrc.header['nlabl'] = len(stack_mdoc['titles'])
+            mrc.voxel_size = stack_mdoc['sections'][0]['PixelSpacing']
+            # Copy over some global information from the first section into the mdoc
+            stack_mdoc['PixelSpacing'] = stack_mdoc['sections'][0]['PixelSpacing']
+            stack_mdoc['ImageFile'] = basename(partial_stack_path)
+            stack_mdoc['ImageSize'] = [mrc.header['nx'].item(), mrc.header['ny'].item()]
+            stack_mdoc['DataMode'] = mrc.header['mode'].item()
             # Update the header of the stack MRC
             with mrcfile.mmap(partial_stack_path, 'r+') as mrc:
                 # Copy the first 10 titles into the newly created mrc
@@ -95,21 +110,6 @@ def frames2stack(subframes: list, stack_path, full_mdoc: Optional[dict]=None, ov
                 stack_mdoc['ImageFile'] = basename(partial_stack_path)
                 stack_mdoc['ImageSize'] = [mrc.header['nx'].item(), mrc.header['ny'].item()]
                 stack_mdoc['DataMode'] = mrc.header['mode'].item()
-                # Update the header of the stack MRC
-                with mrcfile.mmap(partial_stack_path, 'r+') as mrc:
-                    # Copy the first 10 titles into the newly created mrc
-                    mrc.update_header_from_data()
-                    mrc.update_header_stats()
-                    for i in range(10):
-                        title = stack_mdoc['titles'][i].encode() if i < len(stack_mdoc['titles']) else b''
-                        mrc.header['label'][i] = title
-                    mrc.header['nlabl'] = len(stack_mdoc['titles'])
-                    mrc.voxel_size = stack_mdoc['sections'][0]['PixelSpacing']
-                    # Copy over some global information from the first section into the mdoc
-                    stack_mdoc['PixelSpacing'] = stack_mdoc['sections'][0]['PixelSpacing']
-                    stack_mdoc['ImageFile'] = basename(partial_stack_path)
-                    stack_mdoc['ImageSize'] = [mrc.header['nx'].item(), mrc.header['ny'].item()]
-                    stack_mdoc['DataMode'] = mrc.header['mode'].item()
     mdocfile.write(stack_mdoc, f'{stack_path}.mdoc')
     
     return stack_path, stack_mdoc
@@ -250,7 +250,7 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
                     '-FlipGain', str(mcflip)]
         
     if check_defects(gain_ref_dm4) is not None:
-        command += ['-DefectFile', defects_tif(gain_ref_dm4, tempdir, subframes[0].path)]
+        command += ['-DefectMap', defects_tif(gain_ref_dm4, tempdir, subframes[0].path)]
         
     with open(join(output_dir, 'motioncor2.log'), 'a') as out, open(join(output_dir, 'motioncor2.err'), 'a') as err:
         subprocess.run(command, cwd=tempdir, stdout=out, stderr=err)
@@ -270,7 +270,9 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
                 del subframe.mdoc['framesets'][0]['GainReference']
             mdocfile.write(subframe.mdoc,
                            join(output_dir, splitext(splitext(basename(subframe.mdoc_path))[0])[0] + '.mrc.mdoc'))
-    rmtree(tempdir)
+    
+    shutil.rmtree(tempdir)
+
 
     # Build a list of output files that will be returned to the caller
     output_frames = [SubFrame(path=join(output_dir, splitext(basename(subframe.path))[0] + '.mrc'), tilt_angle=subframe.tilt_angle) for subframe in
