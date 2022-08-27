@@ -169,6 +169,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
                help="Don't do alignments, but use previous alignments and MDOC file of the passed tilt-series")
 @click.option('--batch-file', type=click.Path(exists=True, dir_okay=False),help = "You can pass a tab-separated file with tilt series names and views to exclude before reconstruction.")
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
+# TODO: implement extra output file flags for AreTomo -> Relion4, Warp
 def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previous, batch_file, input_files):
     if batch_file is not None:
         ts_info = {}
