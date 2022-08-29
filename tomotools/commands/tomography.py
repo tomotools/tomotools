@@ -82,6 +82,9 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
             input_files_temp += glob(path.join(input_file, '*.st'))
     input_files = input_files_temp
 
+    if not path.isdir(output_dir):
+        os.makedirs(output_dir)
+
     for input_file in input_files:
         if input_file.endswith('.mdoc'):
             mdoc = mdocfile.read(input_file)
@@ -148,8 +151,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
                                 '-reorder', str(1),
                                 '-mdoc',
                                 '-in', input_file,
-                                '-mdoc',
-                                '-ou', f'{output_dir}/{input_file}'])  
+                                '-ou', f'{output_dir}/{path.basename(input_file)}'])
                 print(f'No subframes were found for {input_file}, ran newstack -reorder')
 
             else:
