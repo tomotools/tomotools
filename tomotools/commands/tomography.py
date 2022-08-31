@@ -266,6 +266,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         aln_file = f'{ali_rootname}.aln'
 
         # Run AreTomo 
+        #TODO: add multi-GPU support analog to MotionCor2
         if previous is None:
             subprocess.run(['extracttilts', tiltseries, tlt_file],
                            stdout=subprocess.DEVNULL)
@@ -439,3 +440,6 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
             
         if path.isfile('mask3000.mrc'):
             os.remove('mask3000.mrc')
+
+
+# TODO: Make a separate function to re-reconstruct good TS including CTF estimation and AreTomo output files for Relion (-OutImod) or Warp (-DarkTol 0.01 -OutXF). Make sure to set TiltCor 0 so missing wedge stays stable! Should be able to look into directories, in case --move was used for initial reconstruction

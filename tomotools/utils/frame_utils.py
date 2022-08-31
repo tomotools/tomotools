@@ -220,7 +220,7 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
                       '-Iter', '10',
                       '-Tol', '0.5',
                       '-Kv', '300',
-                      '-Ftbin', str(binning),
+                      '-FtBin', str(binning),
                       '-Group', str(group),
                       '-Serial', '1']
         
@@ -310,6 +310,7 @@ def sem2mc2(RotationAndFlip: int = 0):
 def check_defects(gainref: os.PathLike):
     ''' Checks for a SerialEM-created defects file and -if found- creates a -DefectsFile input for MotionCor2. '''
     defects_temp = list()
+
     defects_temp.extend(glob(path.join(path.dirname(gainref), 'defects*.txt')))
 
     if len(defects_temp) == 1:
