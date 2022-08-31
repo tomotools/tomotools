@@ -51,6 +51,8 @@ def blend_montages(cpus, input_files, output_dir):
               help='If your frames are not automatically found, you can pass the path to the frames directory')
 @click.option('--gainref', type=click.Path(exists=True, dir_okay=False),
               help='Use this gain reference instead looking for one in the Subframe MDOC files')
+@click.option('--rotationandflip', type=int,
+              help='Override RotationAndFlip for the gain reference (useful if it\'s not in the mdoc file)')
 @click.option('--group', type=int, default=1, show_default=True,
               help='Group frames, useful for low-dose frames. Also see motioncor2 manual')
 @click.option('--gpus', type=str, default=None,
@@ -58,7 +60,8 @@ def blend_montages(cpus, input_files, output_dir):
 @click.option('--exposuredose', type=float, default=None)
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
 @click.argument('output_dir', type=click.Path(writable=True))
-def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, gpus, exposuredose, input_files,
+def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotationandflip, group, gpus, exposuredose,
+                             input_files,
                              output_dir):
     """Prepare tilt-series for reconstruction.
 
@@ -78,6 +81,9 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
             input_files_temp += glob(path.join(input_file, '*.mrc'))
             input_files_temp += glob(path.join(input_file, '*.st'))
     input_files = input_files_temp
+
+    if not path.isdir(output_dir):
+        os.makedirs(output_dir)
 
     for input_file in input_files:
         if input_file.endswith('.mdoc'):
@@ -118,7 +124,8 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
             print(f'Subframes were found for {input_file}, will run MotionCor2 on them')
 
             # Get rotation and flip of Gain reference from mdoc file property
-            mcrot, mcflip = frame_utils.sem2mc2(mdoc['sections'][0]['RotationAndFlip'])
+            mcrot, mcflip = frame_utils.sem2mc2(
+                rotationandflip if rotationandflip is not None else mdoc['sections'][0]['RotationAndFlip'])
 
             frames_corrected_dir = path.join(output_dir, 'frames_corrected')
             subframes_corrected = frame_utils.motioncor2(subframes, frames_corrected_dir, splitsum=splitsum,
@@ -144,8 +151,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
                                 '-reorder', str(1),
                                 '-mdoc',
                                 '-in', input_file,
-                                '-mdoc',
-                                '-ou', f'{output_dir}/{input_file}'])  
+                                '-ou', f'{output_dir}/{path.basename(input_file)}'])
                 print(f'No subframes were found for {input_file}, ran newstack -reorder')
 
             else:

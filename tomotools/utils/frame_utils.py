@@ -2,11 +2,10 @@ import os
 import shutil
 import subprocess
 import warnings
-from os import path
-from os.path import splitext, isfile, join, isdir, dirname, basename, abspath
-from shutil import rmtree
-from typing import Optional
 from glob import glob
+from os import path
+from os.path import splitext, isfile, join, isdir, basename, abspath
+from typing import Optional
 
 import mrcfile
 
@@ -166,6 +165,8 @@ class SubFrame:
 def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning: int = 2, group: int = 1, mcrot: int = 0, mcflip: int = 0,
                override_gainref: str = None, gpus: Optional[str]=None):
     assert_subframes_list(subframes, is_split=False)
+    gain_ref_dm4 = None
+    gain_ref_mrc = None
     mc2_exe = motioncor2_executable()
     if mc2_exe is None:
         raise FileNotFoundError('The MotionCor2 executable could not be found. '
@@ -176,54 +177,45 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
         os.makedirs(tempdir)
 
     # If override_gainref is given, check if it is already mrc or needs to be converted. 
-
     # If neither are given, skip gain correction
-        
     if override_gainref is not None:
         if splitext(override_gainref)[1] == '.dm4':
             gain_ref_dm4 = override_gainref
-            
-        
         elif splitext(override_gainref)[1] == '.mrc':
-            gain_ref_dm4 = None
             gain_ref_mrc = override_gainref
-    
-    # Check, if Subframe mdocs are given, if yes check whether zero or one unique gain refs are given
-    # Otherwise, use the provided gain ref if it is supplied (option: override_gainref)
-    if subframes[0].subframe_mdoc:    
-        gain_refs = set([subframe.mdoc['framesets'][0].get('GainReference', None) for subframe in subframes]) \
-            if override_gainref is None \
-            else {override_gainref}
+    elif subframes[0].subframe_mdoc:
+        # Check, if Subframe mdocs are given, if yes check whether zero or one unique gain refs are given
+        gain_refs = set([subframe.mdoc['framesets'][0].get('GainReference', None) for subframe in subframes])
         if len(gain_refs) != 1:
             raise Exception(
                 f'Only zero or one unique gain refs are supported, yet {len(gain_refs)} were found in the MDOC files:\n{", ".join(gain_refs)}')
         # The gain ref should be in the same folder as the input file(s), so check if it's there
         gain_ref_dm4 = gain_refs.pop()
-     
+
     if gain_ref_dm4 is not None:
         if not isfile(gain_ref_dm4):
             raise FileNotFoundError(f'Expected gain reference at {gain_ref_dm4}, aborting')
         print(f'Found unique gain reference {gain_ref_dm4}, converting to MRC')
-        
         # The gain ref is saved in dm4 format, convert to MRC for motioncor
         gain_ref_mrc = splitext(basename(gain_ref_dm4))[0]  # Basename of gain ref without extension and path
         gain_ref_mrc = join(tempdir, gain_ref_mrc) + '.mrc'
         subprocess.run(['dm2mrc', gain_ref_dm4, gain_ref_mrc])
-    
-    if gain_ref_mrc is not None and splitext(gain_ref_mrc)[1] == '.mrc':
-        print(f'Found gainref override file {gain_ref_mrc}')
-    
+
+    if gain_ref_mrc is not None:
+        if not isfile(gain_ref_mrc):
+            raise FileNotFoundError(f"The GainRef file {gain_ref_mrc} doesn't exist, something must have gone wrong!")
+        print(f'Using gainref file {gain_ref_mrc}')
     else:
-        print('No gain reference is specified in the MDOC files or given as an argument, continuing without gain correction')
+        print(
+            'No gain reference is specified in the MDOC files or given as an argument, continuing without gain correction')
 
     # Link the input files to the working dir
     # so that files that should not be motioncor'ed are not
     for subframe in subframes:
         os.symlink(abspath(subframe.path), join(tempdir, basename(subframe.path)))
-        
-        # TODO: Set path no. dynamically
+	# TODO: Set path no. dynamically
         command = [mc2_exe,
-                      '-OutMrc', abspath(output_dir) + path.sep,
+                   '-OutMrc', abspath(output_dir) + path.sep,
                       '-Patch', '7', '5',
                       '-Iter', '10',
                       '-Tol', '0.5',
@@ -249,8 +241,8 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
         command += ['-Gain', abspath(gain_ref_mrc),
                     '-RotGain', str(mcrot), 
                     '-FlipGain', str(mcflip)]
-        
-    if check_defects(gain_ref_dm4) is not None:
+
+    if gain_ref_dm4 is not None and check_defects(gain_ref_dm4) is not None:
         command += ['-DefectMap', defects_tif(gain_ref_dm4, tempdir, subframes[0].path)]
         
     with open(join(output_dir, 'motioncor2.log'), 'a') as out, open(join(output_dir, 'motioncor2.err'), 'a') as err:
@@ -314,14 +306,15 @@ def sem2mc2(RotationAndFlip: int = 0):
     conv = {0: [0,0], 1: [3,0], 2: [2,0], 3: [1, 0], 4: [0,2], 5: [1,2], 6: [2,2], 7: [3,2] }
     return conv[RotationAndFlip]
 
-def check_defects(gainref):
+
+def check_defects(gainref: os.PathLike):
     ''' Checks for a SerialEM-created defects file and -if found- creates a -DefectsFile input for MotionCor2. '''
     defects_temp = list()
     defects_temp.extend(glob(join(dirname(gainref),'defects*.txt')))
   
     if len(defects_temp) == 1:
         return defects_temp[0]
-    
+
     elif len(defects_temp) > 1:
         print('Multiple defect files are found. Skipping defects correction.')
         return None
