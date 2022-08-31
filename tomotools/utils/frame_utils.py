@@ -213,7 +213,7 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
     # so that files that should not be motioncor'ed are not
     for subframe in subframes:
         os.symlink(abspath(subframe.path), join(tempdir, basename(subframe.path)))
-	# TODO: Set path no. dynamically
+
         command = [mc2_exe,
                    '-OutMrc', abspath(output_dir) + path.sep,
                       '-Patch', '7', '5',
@@ -264,7 +264,7 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
             mdocfile.write(subframe.mdoc,
                            join(output_dir, splitext(splitext(basename(subframe.mdoc_path))[0])[0] + '.mrc.mdoc'))
     
-    rmtree(tempdir)
+    shutil.rmtree(tempdir)
 
 
     # Build a list of output files that will be returned to the caller
@@ -310,8 +310,9 @@ def sem2mc2(RotationAndFlip: int = 0):
 def check_defects(gainref: os.PathLike):
     ''' Checks for a SerialEM-created defects file and -if found- creates a -DefectsFile input for MotionCor2. '''
     defects_temp = list()
-    defects_temp.extend(glob(join(dirname(gainref),'defects*.txt')))
-  
+
+    defects_temp.extend(glob(path.join(path.dirname(gainref), 'defects*.txt')))
+
     if len(defects_temp) == 1:
         return defects_temp[0]
 
