@@ -169,7 +169,6 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, group, g
                help="Don't do alignments, but use previous alignments and MDOC file of the passed tilt-series")
 @click.option('--batch-file', type=click.Path(exists=True, dir_okay=False),help = "You can pass a tab-separated file with tilt series names and views to exclude before reconstruction.")
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
-# TODO: implement extra output file flags for AreTomo -> Relion4, Warp
 def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previous, batch_file, input_files):
     if batch_file is not None:
         ts_info = {}
@@ -261,6 +260,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         aln_file = f'{ali_rootname}.aln'
 
         # Run AreTomo 
+        #TODO: add multi-GPU support analog to MotionCor2
         if previous is None:
             subprocess.run(['extracttilts', tiltseries, tlt_file],
                            stdout=subprocess.DEVNULL)
@@ -434,3 +434,6 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
             
         if path.isfile('mask3000.mrc'):
             os.remove('mask3000.mrc')
+
+
+# TODO: Make a separate function to re-reconstruct good TS including CTF estimation and AreTomo output files for Relion (-OutImod) or Warp (-DarkTol 0.01 -OutXF). Make sure to set TiltCor 0 so missing wedge stays stable! Should be able to look into directories, in case --move was used for initial reconstruction
