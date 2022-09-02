@@ -7,7 +7,7 @@ import click
 from tomotools.utils import mathutil
 
 @click.command()
-@click.option('--defocus', help = 'Defocus in um. Positive values denote underfocus. If not given, will be automatically determined.')
+@click.option('--defocus', help = '(Central) defocus in um. Positive values denote underfocus. If not given, will be automatically determined.')
 @click.option('--snrfalloff', default=1, show_default=True, help='How fast the SNR falls off - 1.0 or 1.2 usually')
 @click.option('--deconvstrength', default=1, show_default=True, help='Overall deconvolution strength, depends on SNR. 1 for SNR 1000, 0.67 for SNR 100, etc.')
 @click.option('--hpnyquist', default = 0.02, show_default=True, help='Fraction of Nyquist frequency to be cut off on the lower end.')
@@ -24,7 +24,7 @@ def deconv(defocus,snrfalloff,deconvstrength,hpnyquist,phaseshift,phaseflipped,i
     Original Script at https://github.com/dtegunov/tom_deconv/.
     """
     
-    # TODO: automatically determine defocus!
+    # TODO: automatically determine defocus / read it out of ctfplotter or ctffind diagnostic files?
     
     for input_file in input_files:
         
@@ -35,7 +35,9 @@ def deconv(defocus,snrfalloff,deconvstrength,hpnyquist,phaseshift,phaseflipped,i
         wiener = mathutil.wiener(angpix, float(defocus), float(snrfalloff), float(deconvstrength), float(hpnyquist), phaseflipped, int(phaseshift))
         
         # Define coordinates along xyz in relationship to center of volume 
-        # TODO: test what happens with even dimension!          
+        # In mcrfile convention, the array is ordered zyx! 
+        
+        # TODO: test whether it works as intended with even dimension!          
         sx = -1*np.floor(volume_in.shape[2]/2)
         fx = sx + volume_in.shape[2] -1
         
@@ -45,7 +47,6 @@ def deconv(defocus,snrfalloff,deconvstrength,hpnyquist,phaseshift,phaseflipped,i
         sz = int(-1*np.floor(volume_in.shape[0]/2))
         fz = sz + volume_in.shape[0] -1
                 
-        # in mcrfile convention, the array is ordered zyx! 
         x = np.arange(sx,fx+1,dtype = 'int16')
         x = x * np.ones(list(volume_in.shape[1:3]),dtype = 'int16')
         x = x[:,:,np.newaxis] * np.ones(volume_in.shape[0],dtype = 'int16')
@@ -64,6 +65,8 @@ def deconv(defocus,snrfalloff,deconvstrength,hpnyquist,phaseshift,phaseflipped,i
         y = np.divide(y,np.abs(sy), dtype = 'float32')
         z = np.divide(z,np.maximum(1,np.abs(sz)), dtype = 'float32')
 
+        # Create input array with Euclidean distance from the center as cell value
+        # TODO: find out whether there's a more elegant way of doing this using numpy, circumventing the xyz volumes.        
         r = np.sqrt(np.power(x,2)+np.power(y,2)+np.power(z,2))
         
         del(x,y,z,sx,sy,sz,fx,fy,fz)
@@ -79,11 +82,12 @@ def deconv(defocus,snrfalloff,deconvstrength,hpnyquist,phaseshift,phaseflipped,i
 
         vol_deconv = np.real(np.fft.ifftn(np.fft.fftn(volume_in)*ramp))
         
-        vol_deconv = vol_deconv.astype('float32')
+        # Cast to int16 = MRC mode 1 / maximum allowed is float32
+        vol_deconv = vol_deconv.astype('int16')
         
         output_file = f'{path.splitext(input_file)[0]}_deconv.mrc'
         
         with mrcfile.open(output_file, mode = 'w+') as mrc:
-            mrc.voxel_size = angpix
             mrc.set_data(vol_deconv)
+            mrc.voxel_size = str(angpix)
             mrc.update_header_stats()
