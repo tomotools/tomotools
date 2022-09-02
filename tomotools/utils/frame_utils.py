@@ -308,7 +308,7 @@ def sem2mc2(RotationAndFlip: int = 0):
 
 
 def check_defects(gainref: os.PathLike):
-    ''' Checks for a SerialEM-created defects file and -if found- creates a -DefectsFile input for MotionCor2. '''
+    ''' Checks for a SerialEM-created defects file and -if found- returns file name. '''
     defects_temp = list()
 
     defects_temp.extend(glob(path.join(path.dirname(gainref), 'defects*.txt')))
@@ -324,7 +324,8 @@ def check_defects(gainref: os.PathLike):
         return None
     
 def defects_tif(gainref,tempdir,template):
-    ''' Creates a -DefectsFile input for MotionCor2 from SerialEM defects txt '''
+    ''' Creates a -DefectsMap input for MotionCor2 from SerialEM defects txt in the passed temporary directory.
+    Requires a template file with the dimensions of the frames to be corrected. '''
     
     defects_txt = check_defects(gainref)
     defects_tif = join(tempdir,f'{basename(defects_txt)}.tif')

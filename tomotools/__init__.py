@@ -5,7 +5,7 @@ from .commands import commands
 
 @click.group()
 def tomotools():
-    click.echo('Tomotools version 0.1.1')
+    click.echo('Tomotools version 0.2')
 
 
 for command in commands:
