@@ -34,42 +34,24 @@ def deconv(defocus,snrfalloff,deconvstrength,hpnyquist,phaseshift,phaseflipped,i
                         
         wiener = mathutil.wiener(angpix, float(defocus), float(snrfalloff), float(deconvstrength), float(hpnyquist), phaseflipped, int(phaseshift))
         
-        # Define coordinates along xyz in relationship to center of volume 
-        # In mcrfile convention, the array is ordered zyx! 
-        
+        # In mcrfile convention, the array is ordered zyx!         
         # TODO: test whether it works as intended with even dimension!          
-        sx = -1*np.floor(volume_in.shape[2]/2)
+        sx = int(-1*np.floor(volume_in.shape[2]/2))
         fx = sx + volume_in.shape[2] -1
         
-        sy = -1*np.floor(volume_in.shape[1]/2)
+        sy = int(-1*np.floor(volume_in.shape[1]/2))
         fy = sy + volume_in.shape[1] -1
         
         sz = int(-1*np.floor(volume_in.shape[0]/2))
         fz = sz + volume_in.shape[0] -1
                 
-        x = np.arange(sx,fx+1,dtype = 'int16')
-        x = x * np.ones(list(volume_in.shape[1:3]),dtype = 'int16')
-        x = x[:,:,np.newaxis] * np.ones(volume_in.shape[0],dtype = 'int16')
-        x = x.transpose(2,0,1)
-        
-        y = np.arange(sy,fy+1,dtype = 'int16')
-        y = y * np.ones(list(volume_in.shape[0:2]),dtype = 'int16')
-        y = y[:,:,np.newaxis] * np.ones(volume_in.shape[2],dtype = 'int16')
-        
-        z = np.arange(sz,fz+1,dtype = 'int16')
-        z = z * np.ones(list(volume_in.shape[0:2]),dtype = 'int16').transpose()
-        z = z[:,:,np.newaxis] * np.ones(volume_in.shape[2],dtype = 'int16')
-        z = z.transpose(1,0,2)        
-        
-        x = np.divide(x,np.abs(sx),dtype = 'float32')
-        y = np.divide(y,np.abs(sy), dtype = 'float32')
-        z = np.divide(z,np.maximum(1,np.abs(sz)), dtype = 'float32')
+        gridz,gridy,gridx = np.mgrid[sz:fz+1,sy:fy+1,sx:fx+1]
 
         # Create input array with Euclidean distance from the center as cell value
         # TODO: find out whether there's a more elegant way of doing this using numpy, circumventing the xyz volumes.        
-        r = np.sqrt(np.power(x,2)+np.power(y,2)+np.power(z,2))
+        r = np.sqrt(np.square(gridx)+np.square(gridy)+np.square(gridz))
         
-        del(x,y,z,sx,sy,sz,fx,fy,fz)
+        del(gridx,gridy,gridz,sx,sy,sz,fx,fy,fz)
         
         r = np.minimum(1, r)
         r = np.fft.ifftshift(r)
@@ -82,8 +64,8 @@ def deconv(defocus,snrfalloff,deconvstrength,hpnyquist,phaseshift,phaseflipped,i
 
         vol_deconv = np.real(np.fft.ifftn(np.fft.fftn(volume_in)*ramp))
         
-        # Cast to int16 = MRC mode 1 / maximum allowed is float32
-        vol_deconv = vol_deconv.astype('int16')
+        # Cast to single precision / float32 (maximum allowed by mrc standard)
+        vol_deconv = vol_deconv.astype('float32')
         
         output_file = f'{path.splitext(input_file)[0]}_deconv.mrc'
         
