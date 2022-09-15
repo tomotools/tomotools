@@ -2,14 +2,17 @@ import os
 import shutil
 import subprocess
 from glob import glob
-from operator import itemgetter
 from os import mkdir
 from os import path
 from os.path import abspath, basename, join, splitext
+from pathlib import Path
 
 import click
 
-from tomotools.utils import mdocfile, frame_utils
+from tomotools.utils import mdocfile
+from tomotools.utils.micrograph import Micrograph, sem2mc2
+from tomotools.utils.movie import Movie
+from tomotools.utils.tiltseries import aretomo_executable, TiltSeries
 
 
 @click.command()
@@ -61,8 +64,7 @@ def blend_montages(cpus, input_files, output_dir):
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
 @click.argument('output_dir', type=click.Path(writable=True))
 def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotationandflip, group, gpus, exposuredose,
-                             input_files,
-                             output_dir):
+                             input_files, output_dir):
     """Prepare tilt-series for reconstruction.
 
     This function runs MotionCor2 on movie frames, stacks the motion-corrected frames and sorts them by tilt-angle.
@@ -75,93 +77,89 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
     # Convert all directories into a list of MRC/ST files
     input_files_temp = list()
     for input_file in input_files:
-        if path.isfile(input_file):
+        input_file = Path(input_file)
+        if input_file.is_file():
             input_files_temp.append(input_file)
-        elif path.isdir(input_file):
+        elif input_file.is_dir():
             input_files_temp += glob(path.join(input_file, '*.mrc'))
             input_files_temp += glob(path.join(input_file, '*.st'))
     input_files = input_files_temp
 
-    if not path.isdir(output_dir):
-        os.makedirs(output_dir)
+    output_dir = Path(output_dir)
+    if not output_dir.is_dir():
+        output_dir.mkdir(parents=True)
 
     for input_file in input_files:
-        if input_file.endswith('.mdoc'):
+        if input_file.suffix == '.mdoc':
             mdoc = mdocfile.read(input_file)
-            input_file = path.splitext(input_file)[0]
+            input_file = input_file.with_suffix('')
         else:
             try:
-                mdoc = mdocfile.read(f'{input_file}.mdoc')
+                mdoc = mdocfile.read(Path(str(input_file) + '.mdoc'))
             except FileNotFoundError:
                 print(f'No MDOC file found for {input_file}')
                 continue
         if mdoc.get('Montage', 0) == 1:
             print(f'Skipping {input_file} because it is a montage')
             continue
-        # Identify batch / anchoring files, as they all should have a tilt angle < abs(1) for all sections -> feels a bit hacky
-        if all(section['TiltAngle'] < abs(1) for section in mdoc['sections']):
+        # Identify batch / anchoring files, as they all should have an abs tilt angle < 1 for all sections -> feels a bit hacky
+        if all(abs(section['TiltAngle']) < 1 for section in mdoc['sections']):
             print(f'{input_file} is not a tilt series, as all TiltAngles are near zero. Skipping.')
             continue
 
         # File is a tilt-series, look for subframes
-        print(f'Working on {input_file}, which looks like a tilt series')
+        print(f'Looking for movie frames for {input_file}, which looks like a tilt series')
         for section in mdoc['sections']:
             subframes_root_path = path.dirname(input_file) if frames is None else frames
-            # print(f'SubFramePath field: {section.get("SubFramePath", "")}')
             section['SubFramePath'] = mdocfile.find_relative_path(
-                subframes_root_path,
-                section.get('SubFramePath', '').replace('\\', path.sep)
+                Path(subframes_root_path),
+                Path(section.get('SubFramePath', '').replace('\\', path.sep))
             )
             if exposuredose is not None:
                 section['ExposureDose'] = exposuredose
-                        
+
         if any(section['ExposureDose'] == 0 for section in mdoc['sections']) and exposuredose is None:
-            print(f'{input_file} has no ExposureDose set. This might lead to problems down the road!')   
-        
-        # Check if all subframes were found
-        subframes = [frame_utils.SubFrame(section['SubFramePath'],section['TiltAngle']) for section in mdoc['sections']]
-        if all(subframe.files_exist(is_split=False) for subframe in subframes):
-            print(f'Subframes were found for {input_file}, will run MotionCor2 on them')
+            print(f'{input_file} has no ExposureDose set. This might lead to problems down the road!')
 
-            # Get rotation and flip of Gain reference from mdoc file property
-            mcrot, mcflip = frame_utils.sem2mc2(
-                rotationandflip if rotationandflip is not None else mdoc['sections'][0]['RotationAndFlip'])
-
-            frames_corrected_dir = path.join(output_dir, 'frames_corrected')
-            subframes_corrected = frame_utils.motioncor2(subframes, frames_corrected_dir, splitsum=splitsum,
-                                                          binning=mcbin, mcrot=mcrot, mcflip=mcflip, group=group, override_gainref=gainref,
-                                                          gpus=gpus)
-
-            # Reorder subframes and mdoc as unidirectional if desired           
+            # Check if all subframes were found
+        try:
+            movies = [Movie(section['SubFramePath'], section['TiltAngle']) for section in mdoc['sections']]
+        except FileNotFoundError:
+            print(f'Not all movie frames were found for {input_file}, not using them')
             if reorder:
-                subframes_corrected = frame_utils.sort_subframes_list(subframes_corrected)
-                mdoc['sections'] = sorted(mdoc['sections'], key=itemgetter('TiltAngle'))
-
-            # Create stack from individual tilts
-            stack, stack_mdoc = frame_utils.frames2stack(subframes_corrected,
-                                                          path.join(output_dir, path.basename(input_file)), full_mdoc=mdoc,
-                                                          overwrite_titles=mdoc['titles'])
-
-            shutil.rmtree(frames_corrected_dir)
-            
-            print(f'Successfully created {path.basename(stack)}')
-        else:
-            if reorder:    
+                print(f'Running newstack -reorder on {input_file}')
                 subprocess.run(['newstack',
                                 '-reorder', str(1),
                                 '-mdoc',
                                 '-in', input_file,
-                                '-ou', f'{output_dir}/{path.basename(input_file)}'])
-                print(f'No subframes were found for {input_file}, ran newstack -reorder')
-
+                                '-ou', str(output_dir.joinpath(input_file.name))])
             else:
+                print(f'Just copying {input_file} to {output_dir}')
                 subprocess.run(['cp',
                                 input_file,
                                 output_dir])
                 subprocess.run(['cp',
                                 f'{input_file}.mdoc',
                                 output_dir])
-                print(f'No subframes found and no reorder requested. Just copying {input_file} to output directory.')
+            continue
+
+        print(f'Subframes were found for {input_file}, will run MotionCor2 on them')
+        # Get rotation and flip of Gain reference from mdoc file property
+        mcrot, mcflip = None, None
+        if rotationandflip is not None:
+            rotationandflip = mdoc['sections'][0].get('RotationAndFlip', None)
+            mcrot, mcflip = sem2mc2(rotationandflip)
+
+        frames_corrected_dir = output_dir.joinpath('frames_corrected')
+        micrographs = Micrograph.from_movies(movies, frames_corrected_dir,
+                                             splitsum=splitsum, binning=mcbin, mcrot=mcrot, mcflip=mcflip,
+                                             group=group, override_gainref=gainref, gpus=gpus)
+
+        tilt_series = TiltSeries.from_micrographs(micrographs, output_dir.joinpath(input_file.name),
+                                                  orig_mdoc_path=mdoc['path'], reorder=True)
+        shutil.rmtree(frames_corrected_dir)
+        print(f'Successfully created {tilt_series.path}')
+
 
 @click.command()
 @click.option('--move', is_flag=True, help="Move files into a subdirectory")
@@ -170,7 +168,8 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
 @click.option('--extra-thickness', default=0, show_default=True, help="Extra thickness in unbinned pixels")
 @click.option('-b', '--bin', default=1, show_default=True, help="Final reconstruction binning")
 @click.option('--sirt', default=5, show_default=True, help="SIRT-like filter iterations")
-@click.option('--keep-ali-stack/--delete-ali-stack', is_flag=True, default=False, show_default=True, help="Keep or delete the non-dose-filtered aligned stack (useful for Relion)")
+@click.option('--keep-ali-stack/--delete-ali-stack', is_flag=True, default=False, show_default=True,
+              help="Keep or delete the non-dose-filtered aligned stack (useful for Relion)")
 @click.option('--previous', type=click.Path(exists=True),
                help="Don't do alignments, but use previous alignments and MDOC file of the passed tilt-series")
 @click.option('--batch-file', type=click.Path(exists=True, dir_okay=False),help = "You can pass a tab-separated file with tilt series names and views to exclude before reconstruction.")
@@ -270,20 +269,20 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         if previous is None:
             subprocess.run(['extracttilts', tiltseries, tlt_file],
                            stdout=subprocess.DEVNULL)
-            subprocess.run([frame_utils.aretomo_executable(),
+            subprocess.run([aretomo_executable(),
                             '-InMrc', tiltseries,
                             '-OutMrc', ali_file,
                             '-AngFile', tlt_file,
                             '-VolZ', '0',
                             '-TiltCor', '1'] + (['-Patch', patch_x, patch_y] if local else []),
-                            stdout=subprocess.DEVNULL)
+                           stdout=subprocess.DEVNULL)
         else:
-            subprocess.run([frame_utils.aretomo_executable(),
+            subprocess.run([aretomo_executable(),
                             '-InMrc', tiltseries,
                             '-OutMrc', ali_file,
                             '-AlnFile', aln_file,
                             '-VolZ', '0'],
-                            stdout=subprocess.DEVNULL)
+                           stdout=subprocess.DEVNULL)
 
         print(f'Done aligning {tiltseries} with AreTomo.')
 
