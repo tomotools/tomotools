@@ -48,7 +48,6 @@ def deconv(defocus,snrfalloff,deconvstrength,hpnyquist,phaseshift,phaseflipped,i
         gridz,gridy,gridx = np.mgrid[sz:fz+1,sy:fy+1,sx:fx+1]
 
         # Create input array with Euclidean distance from the center as cell value
-        # TODO: find out whether there's a more elegant way of doing this using numpy, circumventing the xyz volumes.        
         r = np.sqrt(np.square(gridx)+np.square(gridy)+np.square(gridz))
         
         del(gridx,gridy,gridz,sx,sy,sz,fx,fy,fz)

@@ -211,6 +211,7 @@ def motioncor2(subframes: list, output_dir: str, splitsum: bool = False, binning
 
     # Link the input files to the working dir
     # so that files that should not be motioncor'ed are not
+    # TODO: switch off sharpening over frames (Bft?) or switch to imod alignframes
     for subframe in subframes:
         os.symlink(abspath(subframe.path), join(tempdir, basename(subframe.path)))
 

@@ -233,6 +233,11 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         full_dimensions = mdoc['ImageSize']
 
         # Read pixelsize and image dimensions from brief header in case the stack was binned.
+        # TODO: use mrcfile instead, eg:
+        # with mrcfile.open(input_file) as mrc:
+        #   angpix = float(mrc.voxel_size.x)
+        #   volume_in = mrc.data.shape
+
         header = subprocess.run(['header', '-brief',tiltseries], capture_output=True, text=True).stdout
         header = header.strip().split()
         
@@ -265,6 +270,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         tomopitch_file = f'{ali_rootname}.mod'
         aln_file = f'{ali_rootname}.aln'
 
+        # TODO: add option to go through imod with batch mdoc?
         # Run AreTomo 
         #TODO: add multi-GPU support analog to MotionCor2
         if previous is None:
