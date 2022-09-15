@@ -12,8 +12,6 @@ Scripts to make cryo-electron tomography a bit easier
 ### Preprocessing & Reconstruction:
 - **batch-prepare-tiltseries**: takes data directories from SerialEM including frames, mdocs, anchor files, .., aligns the tilt series using MotionCor2, reorders if desired. Supports PACEtomo output files. 
 - **blend-montages**: blends SerialEM montages, writes results to separate folder.
-
-### Postprocessing
 - **reconstruct**: performs batch reconstruction using imod and/or AreTomo
 
 ### Denoising & Deconvolution
