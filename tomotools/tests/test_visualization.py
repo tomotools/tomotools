@@ -2,10 +2,11 @@ import unittest
 import numpy as np
 import csv
 
-#from tomotools.commands import visualization
+# from tomotools.commands import visualization
 from tomotools.utils import mathutil
 
-class Testing(unittest.TestCase):
+
+class mathutil_test(unittest.TestCase):
     def test_ctf1d(self):
         # Tests whether ctf1d returns correct ctf (compared to original implementation on https://github.com/dtegunov/tom_deconv
        
