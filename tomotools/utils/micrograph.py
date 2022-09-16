@@ -72,7 +72,7 @@ class Micrograph:
             gain_refs = set([movie.mdoc['framesets'][0].get('GainReference', None) for movie in movies])
             if len(gain_refs) != 1:
                 raise Exception(
-                    f'Only zero or one unique gain refs are supported, yet {len(gain_refs)} were found in the MDOC files:\n{", ".join(gain_refs)}')
+                    f'Only from os import pathzero or one unique gain refs are supported, yet {len(gain_refs)} were found in the MDOC files:\n{", ".join(gain_refs)}')
             # The gain ref should be in the same folder as the input file(s), so check if it's there
             gain_ref_dm4 = movies[0].path.parent.joinpath(gain_refs.pop())
 

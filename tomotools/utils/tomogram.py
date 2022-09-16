@@ -1,48 +1,52 @@
-import os
-import shutil
-import subprocess
-import warnings
-from glob import glob
-from os import path
-from os.path import splitext, isfile, join, isdir, basename, abspath
+import mrcfile
+import numpy as np
+from pathlib import Path
 from typing import Optional
 
-import mrcfile
-
-from tomotools.utils import mdocfile, util
-
-class Tilt_series:
-    def __init__(self, path:str, excludetilt:list()):
-        pass
-    
+from tomotools.utils.tiltseries import TiltSeries, get_defocus 
 
 class Tomogram:
-    def __init__(self, path: str):
-        self.path = path
+    def __init__(self, path: Path):
+        self.path: Path = path        
+        self.is_split: bool = False
+        self.evn_path: Optional[Path] = None
+        self.odd_path: Optional[Path] = None
         
     @property
     def angpix(self):
-        with mrcfile.open(self) as mrc:
+        with mrcfile.open(self.path) as mrc:
             angpix = float(mrc.voxel_size.x)
         return angpix
     
     @property
-    def dimensions(self):
-        with mrcfile.open(self) as mrc:
-            x,y,z = mrc.data.shape
-        return x,y,z
+    def dimensionsZYX(self):
+        with mrcfile.open(self.path) as mrc:
+            z,y,x = mrc.data.shape
+        return z,y,x
     
     @property
-    def with_split_volumes(self):
-        return self.path.endswith('.mrc') or self.path.endswith('.mrcs')
-        
+    def volume(self):
+        with mrcfile.open(self.path) as mrc:
+            volume = mrc.data
+        return volume
+    
     @property
-    def EVN_path(self, is_split):
-        return isfile(self.mdoc_path)
+    def EVN_path(self):
+        pass
 
     @property    
-    def ODD_path(self, is_split) -> bool:
-        return self.path is not None and isfile(self.path) and is_split == self.is_split
+    def ODD_path(self):
+        pass
 
-    def get_defocus(self):
+    @property
+    def with_split_volumes(self):
+        pass
+
+    @property()    
+    def central_defocus(self):
+        def_list = get_defocus(self.path)
+        return def_list[np.floor(len(def_list))]
+    
+    @staticmethod()
+    def from_tiltseries(tiltseries: TiltSeries, excludefile: Optional[Path]):
         pass

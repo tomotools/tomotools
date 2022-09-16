@@ -132,3 +132,7 @@ def aretomo_executable() -> Optional[Path]:
             warnings.warn(
                 f'ARETOMO_EXECUTABLE is set to "{aretomo_exe}", but the file does not exist. Falling back to PATH')
     return shutil.which('AreTomo')
+
+def get_defocus(file: Path): 
+    ''' This function checks whether CTFFIND4 or ctfplotter results are present and returns a list of defoci and astigmatism in um. '''
+    pass
