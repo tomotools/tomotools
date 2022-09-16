@@ -136,3 +136,37 @@ def aretomo_executable() -> Optional[Path]:
 def get_defocus(file: Path): 
     ''' This function checks whether CTFFIND4 or ctfplotter results are present and returns a list of defoci and astigmatism in um. '''
     pass
+
+def align_with_areTomo(ts: TiltSeries, local: bool, previous: Optional, excludetilts: Optional[Path]):
+    # Define filenames
+
+    # Exclude tilts
+    subprocess.run(['extracttilts', ts.path, f'{ts.path}.tlt'],
+                   stdout=subprocess.DEVNULL)
+
+    # Align on main stack if required
+    # TODO: Multi-GPU
+    if previous is None:
+        subprocess.run([aretomo_executable(),
+                        '-InMrc', ts.path,
+                        '-OutMrc', ali_file,
+                        '-AngFile', tlt_file,
+                        '-VolZ', '0',
+                        '-TiltCor', '1'] +
+                       (['-Patch', patch_x, patch_y] if local else []),
+                        stdout=subprocess.DEVNULL)
+    else:
+        subprocess.run([aretomo_executable(),
+                        '-InMrc', tiltseries,
+                        '-OutMrc', ali_file,
+                        '-AlnFile', aln_file,
+                        '-VolZ', '0'],
+                        stdout=subprocess.DEVNULL)
+
+    # if EVN/ODD are present, apply the same ali file on them
+    print(f'Done aligning {ts} with AreTomo.')
+    return output_file
+
+def align_with_imod(ts: TiltSeries, excludetilts: Optional[Path]):
+    # implement batch alignment with imod adoc here!
+    pass
