@@ -17,7 +17,7 @@ class Micrograph:
             raise FileNotFoundError(f'File not found: {path}')
         self.path: Path = path
         self.mdoc_path: Path = Path(str(path) + '.mdoc')
-        self.mdoc = mdocfile.read(self.mdoc_path)
+        self.mdoc = mdocfile.read(self.mdoc_path) if self.mdoc_path.is_file() else None
         self.tilt_angle: float = tilt_angle
         self.is_split: bool = False
         self.evn_path: Optional[Path] = None
