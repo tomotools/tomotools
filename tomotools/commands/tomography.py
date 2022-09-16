@@ -61,9 +61,12 @@ def blend_montages(cpus, input_files, output_dir):
 @click.option('--gpus', type=str, default=None,
               help='GPUs list, comma separated (e.g. 0,1), determined automatically if not passed')
 @click.option('--exposuredose', type=float, default=None)
+@click.option('--stack/--nostack', is_flag=True, default=True,
+              help='Create a tilt-series stack or keep the motion-corrected frames as they are')
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
 @click.argument('output_dir', type=click.Path(writable=True))
 def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotationandflip, group, gpus, exposuredose,
+                             stack,
                              input_files, output_dir):
     """Prepare tilt-series for reconstruction.
 
@@ -155,10 +158,16 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
                                              splitsum=splitsum, binning=mcbin, mcrot=mcrot, mcflip=mcflip,
                                              group=group, override_gainref=gainref, gpus=gpus)
 
-        tilt_series = TiltSeries.from_micrographs(micrographs, output_dir.joinpath(input_file.name),
-                                                  orig_mdoc_path=mdoc['path'], reorder=True)
-        shutil.rmtree(frames_corrected_dir)
-        print(f'Successfully created {tilt_series.path}')
+        if stack:
+            tilt_series = TiltSeries.from_micrographs(micrographs, output_dir.joinpath(input_file.name),
+                                                      orig_mdoc_path=mdoc['path'], reorder=True)
+            shutil.rmtree(frames_corrected_dir)
+            print(f'Successfully created {tilt_series.path}')
+        else:
+            for micrograph in micrographs:
+                micrograph.path.rename(output_dir.joinpath(micrograph.path.name))
+            shutil.rmtree(frames_corrected_dir)
+            print(f'Successfully created micrograph images in {output_dir}')
 
 
 @click.command()
