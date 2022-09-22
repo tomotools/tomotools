@@ -6,7 +6,7 @@ A very nice tomogram denoising algorithm, the Chlanda Lab's favorite. Find out m
 
 ## 0. Prerequisites
 
-* you have tomotools installed:
+* you have tomotools installed
 * during data acquisition, you saved and even amount of movie frames
 * the tilt-series frames were aligned with MotionCor2 and you saved the EVN/ODD splits
 * you reconstructed the MotionCor2'ed tilt-series (not the tilt-series which is created by SerialEM)
@@ -56,15 +56,15 @@ My example file here will be TS_04, you of course have to use your own file name
 1. you now have two reconstructions, each based on separate halves of your data (they will be quite noisy, that's fine)
 2. in your cryocare directory (where the EVN/ODD split-reconstruction directories are located), call the following commands:
     ```
-    tomotools.sh cryocare-extract EVN/TS_04_rec.mrc ODD/TS_04_rec.mrc
-    tomotools.sh cryocare-train
-    tomotools.sh cryocare-predict EVN/TS_04_rec.mrc ODD/TS_04_rec.mrc TS_04_denoised.mrc
+    tomotools cryocare-extract EVN/TS_04_rec.mrc ODD/TS_04_rec.mrc
+    tomotools cryocare-train
+    tomotools cryocare-predict EVN/TS_04_rec.mrc ODD/TS_04_rec.mrc TS_04_denoised.mrc
     ```
     * you can check the syntax and optional parameters by calling:
     ```
-    tomotools.sh cryocare-extract --help
-    tomotools.sh cryocare-train --help
-    tomotools.sh cryocare-predict --help
+    tomotools cryocare-extract --help
+    tomotools cryocare-train --help
+    tomotools cryocare-predict --help
     ```
     * this will run for a few hours
 
