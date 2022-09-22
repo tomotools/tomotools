@@ -194,6 +194,8 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                     ts_info.update(temp)
 
     for tiltseries in input_files:
+
+
         mdoc_file = f'{tiltseries}.mdoc' if previous is None else f'{previous}.mdoc'
         if not path.isfile(mdoc_file):
             raise FileNotFoundError(f'No MDOC file found at {mdoc_file}')

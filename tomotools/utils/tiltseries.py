@@ -4,10 +4,11 @@ import subprocess
 import warnings
 from pathlib import Path
 from typing import Optional, List
+from operator import itemgetter
 
 import mrcfile
 
-from tomotools.utils import mdocfile
+from tomotools.utils import util, mdocfile
 from tomotools.utils.micrograph import Micrograph
 
 
@@ -38,6 +39,15 @@ class TiltSeries:
         evn_file = dir.joinpath(f'{stem}_EVN{suffix}')
         odd_file = dir.joinpath(f'{stem}_ODD{suffix}')
         return self.with_split_files(evn_file, odd_file)
+
+    # TODO: parse ctffind or ctfplotter files
+    def get_defocus(self, output_file: Optional[Path] = None):
+        pass
+
+    @staticmethod
+    # TODO: run ctffind
+    def find_defocus(self):
+        pass
 
     @staticmethod
     def _update_mrc_header_from_mdoc(path: Path, mdoc: dict):
@@ -71,7 +81,7 @@ class TiltSeries:
 
         # First, take care of the MDOC files
         if all(micrograph.mdoc for micrograph in micrographs):
-            # If all subframes have their own associated mdoc, merge the mdoc files (except titles, see below)
+            # If all movies have their own associated mdoc, merge the mdoc files (except titles, see below)
             stack_mdoc = {'titles': list(), 'sections': list(), 'framesets': list()}
             for micrograph in micrographs:
                 mdoc = micrograph.mdoc
@@ -86,17 +96,19 @@ class TiltSeries:
             if overwrite_titles is not None:
                 # Update titles and append frameset as new section
                 stack_mdoc['titles'] = overwrite_titles
+
         elif orig_mdoc_path is not None:
-            # Use the input mdoc file which has possibly been reordered
-            # TODO: Implement pixel size change if binned
-            # TODO: Is the mdoc file being reordered? I think not
             stack_mdoc = mdocfile.read(orig_mdoc_path)
+            if reorder:
+                stack_mdoc['sections'] = sorted(stack_mdoc['sections'], key=itemgetter('TiltAngle'))
+
         else:
             raise FileNotFoundError('No original MDOC was provided and the movies don\'t have MDOCs, aborting!')
 
         # Now, create the TiltSeries files
         micrograph_paths = [str(micrograph.path) for micrograph in micrographs]
         subprocess.run(['newstack'] + micrograph_paths + [ts_path, '-quiet'])
+
         # Remove MRC header and MDOC, remove unnecessary entries
         TiltSeries._update_mrc_header_from_mdoc(ts_path, stack_mdoc)
         TiltSeries._update_mdoc_from_mrc_header(ts_path, stack_mdoc)
@@ -133,39 +145,61 @@ def aretomo_executable() -> Optional[Path]:
                 f'ARETOMO_EXECUTABLE is set to "{aretomo_exe}", but the file does not exist. Falling back to PATH')
     return shutil.which('AreTomo')
 
-def get_defocus(file: Path): 
-    ''' This function checks whether CTFFIND4 or ctfplotter results are present and returns a list of defoci and astigmatism in um. '''
-    pass
+def align_with_areTomo(ts: TiltSeries, local: bool, previous: Optional):
+    ''' Takes a TiltSeries as input and runs AreTomo on it, if desired with local alignment. A previously generated .aln file can be passed optionally.'''
+    # TODO: make sure reconstruct handles exclusion of tilts and moving to subfolders if desired
 
-def align_with_areTomo(ts: TiltSeries, local: bool, previous: Optional, excludetilts: Optional[Path]):
-    # Define filenames
+    ali_stack = ts.path.with_name(f'{ts.path.stem}_ali.mrc')
 
-    # Exclude tilts
-    subprocess.run(['extracttilts', ts.path, f'{ts.path}.tlt'],
-                   stdout=subprocess.DEVNULL)
-
-    # Align on main stack if required
-    # TODO: Multi-GPU
     if previous is None:
+        tlt_file = ts.path.with_suffix('.tlt')
+        aln_file = ts.path.with_suffix('.aln')
+
+        subprocess.run(['extracttilts', ts.path, tlt_file],
+                       stdout=subprocess.DEVNULL)
+
+        num_gpus = int(util.gpuinfo()['Attached GPUs'])
+
+        mdoc = mdocfile.read(f'{ts.path}.mdoc')
+        full_dimensions = mdoc['ImageSize']
+        patch_x, patch_y = [str(round(full_dimensions[0]/1000)), str(round(full_dimensions[1]/1000))]
+
         subprocess.run([aretomo_executable(),
                         '-InMrc', ts.path,
-                        '-OutMrc', ali_file,
+                        '-OutMrc', ali_stack,
                         '-AngFile', tlt_file,
                         '-VolZ', '0',
                         '-TiltCor', '1'] +
-                       (['-Patch', patch_x, patch_y] if local else []),
+                        (['-Gpu', [str(i) for i in range(num_gpus)]] if num_gpus > 0 else []) +
+                        (['-Patch', patch_x, patch_y] if local else []),
                         stdout=subprocess.DEVNULL)
+
     else:
         subprocess.run([aretomo_executable(),
-                        '-InMrc', tiltseries,
-                        '-OutMrc', ali_file,
-                        '-AlnFile', aln_file,
+                        '-InMrc', ts.path,
+                        '-OutMrc', ali_stack,
+                        '-AlnFile', previous,
                         '-VolZ', '0'],
                         stdout=subprocess.DEVNULL)
 
-    # if EVN/ODD are present, apply the same ali file on them
-    print(f'Done aligning {ts} with AreTomo.')
-    return output_file
+    print(f'Done aligning {ts.path.stem} with AreTomo.')
+
+    if ts.evn_path is not None and ts.odd_path is not None:
+        ali_stack_evn = ts.evn_path.with_name(f'{ts.evn_path.stem}_ali.mrc')
+        ali_stack_odd = ts.odd_path.with_name(f'{ts.odd_path.stem}_ali.mrc')
+        subprocess.run([aretomo_excecutable(),
+                        '-InMrc', ts.evn_path,
+                        '-OutMrc', ali_stack_evn,
+                        '-AlnFile', aln_file,
+                        '-VolZ', '0'])
+
+        subprocess.run([aretomo_excecutable(),
+                        '-InMrc', ts.odd_path,
+                        '-OutMrc', ali_stack_odd,
+                        '-AlnFile', aln_file,
+                        '-VolZ', '0'])
+
+        print(f'Done aligning ENV and ODD stacks for {ts.path.stem} with AreTomo.')
 
 def align_with_imod(ts: TiltSeries, excludetilts: Optional[Path]):
     # implement batch alignment with imod adoc here!

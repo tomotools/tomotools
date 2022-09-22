@@ -7,7 +7,7 @@ Created on Tue Jul 12 18:22:03 2022
 """
 
 import unittest
-from tomotools.commands import tomography
+from tomotools.commands import preprocessing_reconstruction
 
 # TODO: implement test mdoc reading
 # TODO: implement test anchor / batch detection
