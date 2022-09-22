@@ -31,11 +31,11 @@ Scripts to make cryo-electron tomography a bit easier
 We suggest installing tomotools into its own conda / mamba environment. 
 
 ### Install via:
-> conda env create tomotools  
-> conda activate tomotools  
-> git clone https://github.com/MoritzWM/tomotools.git  
-> cd tomotools  
-> pip install .    
+```
+conda create -n tomotools python=3.9
+conda activate tomotools
+pip install 'git+https://github.com/MoritzWM/tomotools.git'
+```  
 
 ### Notes on sbgrid:
 If you're using an sbgrid environment, make sure to set the following in your .sbgrid.conf file:
