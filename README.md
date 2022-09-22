@@ -2,9 +2,10 @@
 Scripts to make cryo-electron tomography a bit easier
 
 ## Usage
-
-> tomotools --help    
-> tomotools [subcommand] --help  
+```  
+tomotools --help    
+tomotools [subcommand] --help  
+```  
 
 ## Currently supported subcommands:
 
