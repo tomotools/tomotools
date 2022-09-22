@@ -36,7 +36,12 @@ We suggest installing tomotools into its own conda / mamba environment.
 conda create -n tomotools python=3.9
 conda activate tomotools
 pip install 'git+https://github.com/MoritzWM/tomotools.git'
-```  
+```
+With tomotools installed into a conda environment, you can then start tomotools with:
+```
+conda activate tomotools
+tomotools --help
+```
 
 ### Notes on sbgrid:
 If you're using an sbgrid environment, make sure to set the following in your .sbgrid.conf file:
