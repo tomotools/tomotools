@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import mrcfile
 from glob import glob
 from os import mkdir
 from os import path
@@ -12,7 +13,8 @@ import click
 from tomotools.utils import mdocfile
 from tomotools.utils.micrograph import Micrograph, sem2mc2
 from tomotools.utils.movie import Movie
-from tomotools.utils.tiltseries import aretomo_executable, TiltSeries
+from tomotools.utils.tiltseries import TiltSeries, align_with_areTomo, dose_filter
+from tomotools.utils.tomogram import Tomogram
 
 
 @click.command()
@@ -20,7 +22,7 @@ from tomotools.utils.tiltseries import aretomo_executable, TiltSeries
 @click.argument('input_files', nargs=-1)
 @click.argument('output_dir')
 def blend_montages(cpus, input_files, output_dir):
-    """Blend montages using justblend
+    """Blend montages using justblend.
 
     The input files must be montage .mrc/.st files, so usually you will invoke this function with something like:
     blend-montages MMM*.mrc output_dir
@@ -180,10 +182,15 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
 @click.option('--keep-ali-stack/--delete-ali-stack', is_flag=True, default=False, show_default=True,
               help="Keep or delete the non-dose-filtered aligned stack (useful for Relion)")
 @click.option('--previous', type=click.Path(exists=True),
-               help="Don't do alignments, but use previous alignments and MDOC file of the passed tilt-series")
+               help="Pass previous AreTomo .aln file to not re-do alignment.")
 @click.option('--batch-file', type=click.Path(exists=True, dir_okay=False),help = "You can pass a tab-separated file with tilt series names and views to exclude before reconstruction.")
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
 def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previous, batch_file, input_files):
+    """Align and reconstruct the given tiltseries. 
+    
+    Optionally moves tilt series and excludes specified tilts. Then runs AreTomo alignment and ultimately dose-filtration and imod WBP reconstruction.   
+    """
+    # Read in batch tilt exclude file
     if batch_file is not None:
         ts_info = {}
         with open(batch_file) as file:
@@ -193,14 +200,24 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                     temp={l[0]: l[1].rstrip()}
                     ts_info.update(temp)
 
-    for tiltseries in input_files:
+    input_ts = list()
+    
+    # Sanitize input list to only include the main stack.
+    for input_file in input_files:
+        if not input_file.endswith('_EVN.mrc') and not input_file.endswith('_ODD.mrc') and not input_file.endswith('.mdoc'):
+            input_ts.append(Path(input_file))
+    
+    for ts in input_ts:
+        # merge main EVN ODD into one TiltSeries object
+        if path.isfile(ts.with_name(f'{ts.stem}_EVN.mrc')) and path.isfile(ts.with_name(f'{ts.stem}_ODD.mrc')):
+            tiltseries = TiltSeries(ts).with_split_dir(Path(ts.root))
+            print(f'Found TiltSeries {ts} with EVN and ODD stacks.')
+        else:
+            tiltseries = TiltSeries(ts)
+            print(f'Found TiltSeries {ts}.')
 
-
-        mdoc_file = f'{tiltseries}.mdoc' if previous is None else f'{previous}.mdoc'
-        if not path.isfile(mdoc_file):
-            raise FileNotFoundError(f'No MDOC file found at {mdoc_file}')
-
-        print(f'Working on file {tiltseries}.')
+        if not path.isfile(tiltseries.mdoc):
+            raise FileNotFoundError(f'No MDOC file found at {tiltseries.mdoc}')
 
         # Check for tilts to exclude
         excludetilts = None
@@ -210,252 +227,114 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                 print(f'Found tilts to exclude in {batch_file}. Will exclude tilts {excludetilts}.')
 
         if move:
-            dir = splitext(tiltseries)[0]
-            new_tiltseries = join(dir, basename(tiltseries))
+            dir = tiltseries.path.stem
             mkdir(dir)
             print(f'Move files to subdir {dir}')
-            os.rename(tiltseries, new_tiltseries)
-            tiltseries = new_tiltseries
-            # Only move the MDOC file if it's not from a previous reconstruction
-            if previous is None:
-                new_mdoc_file = join(dir, basename(mdoc_file))
-                os.rename(mdoc_file, new_mdoc_file)
-                mdoc_file = new_mdoc_file
-
-        # Run newstack to exclude tilts
-        rootname = splitext(tiltseries)[0]
-
+            
+            shutil.move(tiltseries.path, dir)
+            shutil.move(tiltseries.mdoc, dir)
+            
+            if tiltseries.is_split:
+                shutil.move(tiltseries.evn_path, dir)
+                shutil.move(tiltseries.odd_path, dir)
+                tiltseries = TiltSeries(Path(join(dir,tiltseries.path.name))).with_split_files(Path(join(dir,tiltseries.evn_path.name)), Path(join(dir,tiltseries.odd_path.name)))
+            
+            else:
+                tiltseries = TiltSeries(Path(join(dir,tiltseries.path.name)))
+                
+        # Run newstack to exclude tilts 
         if excludetilts is not None:
-            exclude_file = f'{rootname}_excludetilts.mrc'
+            exclude_file = tiltseries.path.with_name(f'{tiltseries.path.stem}_excludetilts.mrc')
+            
             subprocess.run(['newstack',
-                            '-in', tiltseries,
+                            '-in', str(tiltseries.path),
                             '-mdoc',
                             '-quiet',
                             '-exclude', excludetilts,
-                            '-ou', exclude_file])
-            print(f'Excluded specified tilts from {tiltseries}.')
-            tiltseries = exclude_file
-            mdoc_file = f'{tiltseries}.mdoc'
-
-        # Read full stack size from mdoc header        
-        mdoc = mdocfile.read(mdoc_file)
-        
-        full_dimensions = mdoc['ImageSize']
-
-        # Read pixelsize and image dimensions from brief header in case the stack was binned.
-        # TODO: use mrcfile instead, eg:
-        # with mrcfile.open(input_file) as mrc:
-        #   angpix = float(mrc.voxel_size.x)
-        #   volume_in = mrc.data.shape
-
-        header = subprocess.run(['header', '-brief',tiltseries], capture_output=True, text=True).stdout
-        header = header.strip().split()
-        
-        stack_dimensions = [int(header[header.index('Dimensions:')+1]),int(header[header.index('Dimensions:')+2])]
-        pix_xy = [float(header[header.index('size:')+1]),float(header[header.index('size:')+2])]       
-        
-        # Get tilt axis from full header
-        header = subprocess.run(['header',tiltseries], capture_output=True, text=True).stdout
-        header = header.strip()
-        
-        tilt_axis = float(header[header.index("Tilt axis angle =") + len("Tilt axis angle =") + 1:header.index(", binning")])
-        
-        # Define default thickness as function of pixel size -> always reconstruct 1 um for tomopitch. 
-        thickness = str(round(10000 / pix_xy[0]))
-        
-        patch_x, patch_y = [str(round(full_dimensions[0]/1000)), str(round(full_dimensions[1]/1000))]
-
-        # Generate MRC filenames
-        # TODO: Make a class?  
-        ali_file = f'{rootname}_ali.mrc'
-        ali_file_mtf = f'{rootname}_ali_mtf.mrc'
-        ali_file_mtf_bin = f'{rootname}_ali_mtf_b{bin}.mrc'
-        ali_file_mtf_bin8 = f'{rootname}_ali_mtf_b8.mrc'
-        full_rec_file = f'{rootname}_full_rec.mrc'
-        rec_file = f'{rootname}_rec_b{bin}.mrc'
-        # Alignment files (depend on whether or not --previous is passed)
-        ali_rootname = splitext(previous)[0] if previous is not None else rootname
-        tlt_file = f'{ali_rootname}.tlt'
-        tlt_file_ali = f'{ali_rootname}_ali.tlt'
-        tomopitch_file = f'{ali_rootname}.mod'
-        aln_file = f'{ali_rootname}.aln'
-
-        # TODO: add option to go through imod with batch mdoc?
-        # Run AreTomo 
-        #TODO: add multi-GPU support analog to MotionCor2
-        if previous is None:
-            subprocess.run(['extracttilts', tiltseries, tlt_file],
-                           stdout=subprocess.DEVNULL)
-            subprocess.run([aretomo_executable(),
-                            '-InMrc', tiltseries,
-                            '-OutMrc', ali_file,
-                            '-AngFile', tlt_file,
-                            '-VolZ', '0',
-                            '-TiltCor', '1'] + (['-Patch', patch_x, patch_y] if local else []),
-                           stdout=subprocess.DEVNULL)
-        else:
-            subprocess.run([aretomo_executable(),
-                            '-InMrc', tiltseries,
-                            '-OutMrc', ali_file,
-                            '-AlnFile', aln_file,
-                            '-VolZ', '0'],
-                           stdout=subprocess.DEVNULL)
-
-        print(f'Done aligning {tiltseries} with AreTomo.')
-
-        # Apply pixel size from input stack to aligned stack
-        pix_xyz = subprocess.run(['header', '-PixelSize', tiltseries], capture_output=True, text=True).stdout
-        pix_xyz = ",".join(pix_xyz.strip().split())
-        subprocess.run(['alterheader', '-PixelSize', pix_xyz, ali_file],
-                       stdout=subprocess.DEVNULL)
-
-        # If exposuredose is set, do dose filtration. Only ExposureDose needs to be entered, as PriorRecordDose is deduced by mtffilter based on the DateTime entry, see mtffilter -help, section "-dtype"
-        if any(section['ExposureDose'] == 0 for section in mdoc['sections']):
-            ali_file_mtf = ali_file
-            print(f'{tiltseries} has no ExposureDose set. Skipping dose-filtration.')
+                            '-ou', str(exclude_file)])
+            print(f'Excluded specified tilts from {tiltseries.path}.')
+            tiltseries.path = exclude_file
+            tiltseries.mdoc = Path(f'{tiltseries.path}.mdoc')
             
+            if tiltseries.is_split:
+                exclude_evn = tiltseries.evn_path.with_name(f'{tiltseries.evn_path.stem}_excludetilts.mrc')
+                exclude_odd = tiltseries.odd_path.with_name(f'{tiltseries.odd_path.stem}_excludetilts.mrc')
+                
+                subprocess.run(['newstack',
+                                '-in', str(tiltseries.evn_path),
+                                '-quiet',
+                                '-exclude', excludetilts,
+                                '-ou', str(exclude_evn)])
+                subprocess.run(['newstack',
+                                '-in', str(tiltseries.odd_path),
+                                '-quiet',
+                                '-exclude', excludetilts,
+                                '-ou', str(exclude_odd)])
+                
+                tiltseries.evn_path = exclude_evn
+                tiltseries.odd_path = exclude_odd
+                
+                print(f'Excluded specified tilts from EVN and ODD stacks for {tiltseries.path}.')
+        
+        # Align Stack
+        tiltseries = align_with_areTomo(tiltseries, local, previous)
+
+        # Do dose filtration.
+        tiltseries = dose_filter(tiltseries,keep_ali_stack)
+        
+        # Get AngPix
+        with mrcfile.mmap(tiltseries.path, mode = 'r') as mrc:
+           pix_xy = float(mrc.voxel_size.x)
+        
+        # Perform reconstruction at bin 8 to find pitch / thickness        
+        tomo_pitch = Tomogram.from_tiltseries(tiltseries, bin = 8, do_EVN_ODD = False, trim = False, thickness = str(round(10000 / pix_xy)))
+        
+        # Try to automatically find edges of tomogram
+        # TODO: use cryoposition instead?
+        pitch_mod = tomo_pitch.path.with_name(f'{tiltseries.path.stem}_pitch.mod')
+        
+        fs = subprocess.run(['findsection',
+                        '-tomo', tomo_pitch.path,
+                        '-pitch', pitch_mod,
+                        '-scales', '2',
+                        '-size', '16,1,16',
+                        '-samples', '5',
+                        '-block', '48'],
+                        stdout=subprocess.DEVNULL)
+
+        # If it fails, just use default values
+        if fs.returncode != 0:
+            x_axis_tilt = '0'
+            tomopitch_z = '0'
+            z_shift = '0'
+            thickness = str(round(6000 / pix_xy[0])+extra_thickness)
+            print(f'{tiltseries}: findsection failed, using default values {tomopitch_z}, thickness {thickness}.')
+
         else:
-            subprocess.run(['mtffilter', '-dtype', '4', '-dfile', mdoc_file, ali_file, ali_file_mtf],
-                           stdout=subprocess.DEVNULL)
-            if not keep_ali_stack:
-                os.remove(ali_file)
-            print(f'Done dose-filtering {tiltseries}.')
-
-        # Set full_reconstruction_x and full_reconstruction_y based on TiltAxis property. Imod convention: tilt axis is x axis. 
-        if tilt_axis > 45 and tilt_axis < 135:
-            full_reconstruction_x = stack_dimensions[1]
-            full_reconstruction_y = stack_dimensions[0]
-        else:
-            [full_reconstruction_x,full_reconstrucion_y] = stack_dimensions
-
-        # Tomo pitch
-        if previous is None:
-            subprocess.run(['binvol', '-x', '8', '-y', '8', '-z', '1', ali_file_mtf, ali_file_mtf_bin8],
-                           stdout=subprocess.DEVNULL)
-            subprocess.run(['tilt',
-                           '-InputProjections', ali_file_mtf_bin8,
-                           '-OutputFile', full_rec_file,
-                           '-IMAGEBINNED', '8',
-                           '-TILTFILE', tlt_file_ali,
-                           '-THICKNESS', str(thickness),
-                           '-RADIAL', '0.35,0.035',
-                           '-FalloffIsTrueSigma', '1',
-                           '-SCALE', '0.0,0.05',
-                           '-PERPENDICULAR',
-                           '-MODE', '2',
-                           '-FULLIMAGE', f'{full_reconstruction_x} {full_reconstruction_y}',
-                           '-SUBSETSTART', '0,0',
-                           '-AdjustOrigin',
-                           '-ActionIfGPUFails', '1,2',
-                           '-OFFSET', '0.0',
-                           '-SHIFT', '0.0,0.0',
-                           '-UseGPU', '0'] +
-                           (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []),
-                           stdout=subprocess.DEVNULL)
-
-            os.remove(ali_file_mtf_bin8)
-            # Try to automatically find edges of tomogram
-            # TODO: use cryoposition instead?
-            fs = subprocess.run(['findsection',
-                            '-tomo', full_rec_file,
-                            '-pitch', tomopitch_file,
-                            '-scales', '2',
-                            '-size', '16,1,16',
-                            '-samples', '5',
-                            '-block', '48'],
-                            stdout=subprocess.DEVNULL)
-
-            # If it fails, just use default values
-            if fs.returncode != 0:
+            # Else, get tomopitch
+            tomopitch = subprocess.run([
+                'tomopitch',
+                '-mod', pitch_mod,
+                '-extra', str(extra_thickness),
+                '-scale', str(8)], capture_output=True, text=True).stdout.splitlines()
+            # Check for failed process again. 
+            if any(l.startswith('ERROR') for l in tomopitch):
                 x_axis_tilt = '0'
                 tomopitch_z = '0'
                 z_shift = '0'
                 thickness = str(round(6000 / pix_xy[0])+extra_thickness)
-                print(f'{tiltseries}: findsection failed, using default values {tomopitch_z}, thickness {thickness}.')
-
+                print(f'{tiltseries.path}: tomopitch failed, using default values {tomopitch_z}, thickness {thickness}.')
             else:
-                # Else, get tomopitch
-                tomopitch = subprocess.run([
-                    'tomopitch',
-                    '-mod', tomopitch_file,
-                    '-extra', str(extra_thickness),
-                    '-scale', str(8)], capture_output=True, text=True).stdout.splitlines()
-                # Check for failed process again. 
-                if any(l.startswith('ERROR') for l in tomopitch):
-                    x_axis_tilt = '0'
-                    tomopitch_z = '0'
-                    z_shift = '0'
-                    thickness = str(round(6000 / pix_xy[0])+extra_thickness)
-                    print(f'{tiltseries}: tomopitch failed, using default values {tomopitch_z}, thickness {thickness}.')
-                else:
-                    x_axis_tilt = tomopitch[-3].split()[-1]
-                    tomopitch_z = tomopitch[-1].split(';')
-                    z_shift = tomopitch_z[0].split()[-1]
-                    thickness = str(int(tomopitch_z[1].split()[-1])+extra_thickness)
-                    print(f'{tiltseries}: Succesfully estimated tomopitch {x_axis_tilt} and thickness {thickness}.')
-
-        # Final reconstruction
-        if bin == 1:
-            ali_file_mtf_bin = ali_file_mtf
-            print(f'{tiltseries}: Not binned.')
-
-        else:
-            subprocess.run(['binvol', '-x', str(bin), '-y', str(bin), '-z', '1', ali_file_mtf, ali_file_mtf_bin],
-                           stdout=subprocess.DEVNULL)
-            os.remove(ali_file_mtf)
-            print(f'{tiltseries}: Binned to {bin}.')
-
-        subprocess.run(['tilt']
-                       + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
-                       ['-InputProjections', ali_file_mtf_bin,
-                        '-OutputFile', full_rec_file,
-                        '-IMAGEBINNED', str(bin),
-                        '-XAXISTILT', x_axis_tilt,
-                        '-TILTFILE', f'{rootname}_ali.tlt',
-                        '-THICKNESS', thickness,
-                        '-RADIAL', '0.35,0.035',
-                        '-FalloffIsTrueSigma', '1',
-                        '-SCALE', '0.0,0.05',
-                        '-PERPENDICULAR',
-                        '-MODE', '2',
-                        '-FULLIMAGE', f'{full_reconstruction_x} {full_reconstruction_y}',
-                        '-SUBSETSTART', '0,0',
-                        '-AdjustOrigin',
-                        '-ActionIfGPUFails', '1,2',
-                        '-OFFSET', '0.0',
-                        '-SHIFT', f'0.0,{z_shift}',
-                        '-UseGPU', '0'],
-                        stdout=subprocess.DEVNULL)
-
-        os.remove(ali_file_mtf_bin)
-
-        print(f'{tiltseries}: Finished reconstruction.')
-
-        # Trim: Read in dimensions of full_rec (as XZY) to avoid rounding differences due to binning
-        header_rec = subprocess.run(['header', '-brief',full_rec_file], capture_output=True, text=True).stdout
-        header_rec = header_rec.strip().split()
+                x_axis_tilt = tomopitch[-3].split()[-1]
+                tomopitch_z = tomopitch[-1].split(';')
+                z_shift = tomopitch_z[0].split()[-1]
+                thickness = str(int(tomopitch_z[1].split()[-1])+extra_thickness)
+                print(f'{tiltseries.path}: Succesfully estimated tomopitch {x_axis_tilt} and thickness {thickness}.')
         
-        full_rec_dimensions = [header_rec[header_rec.index('Dimensions:')+1],header_rec[header_rec.index('Dimensions:')+2],header_rec[header_rec.index('Dimensions:')+3]]
-
-        tr = subprocess.run(['trimvol',
-                        '-x', f'1,{full_rec_dimensions[0]}',
-                        '-y', f'1,{full_rec_dimensions[2]}',
-                        '-z', f'1,{full_rec_dimensions[1]}',
-                        '-sx', f'1,{full_rec_dimensions[0]}',
-                        '-sy', f'1,{full_rec_dimensions[2]}',
-                        '-sz', f'{int(full_rec_dimensions[1]) / 3:.0f},{int(full_rec_dimensions[1]) * 2 / 3:.0f}',
-                        '-f', '-rx',
-                        full_rec_file, rec_file],
-                        stdout=subprocess.DEVNULL)
-
-        if tr.returncode != 0:
-            print(f'{tiltseries}: Trimming failed, keeping full_rec file.')        
-        else:
-            print(f'{tiltseries}: Finished trimming.')
-            os.remove(full_rec_file)
-            
-        if path.isfile('mask3000.mrc'):
-            os.remove('mask3000.mrc')
-
+        os.remove(tomo_pitch.path)
+        
+        # Perform final reconstruction
+        # TODO: add EVN/ODD functionality!
+        tomo_final = Tomogram.from_tiltseries(tiltseries, bin = bin,thickness = thickness, x_axis_tilt=x_axis_tilt, z_shift = z_shift, sirt = sirt)
 
 # TODO: Make a separate function to re-reconstruct good TS including CTF estimation and AreTomo output files for Relion (-OutImod) or Warp (-DarkTol 0.01 -OutXF). Make sure to set TiltCor 0 so missing wedge stays stable! Should be able to look into directories, in case --move was used for initial reconstruction
