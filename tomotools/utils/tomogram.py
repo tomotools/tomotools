@@ -113,7 +113,8 @@ class Tomogram:
                         '-UseGPU', '0'],
                         stdout=subprocess.DEVNULL)
 
-        os.remove(binned_stack)
+        if bin != 1:        
+            os.remove(binned_stack)
         print(f'{tiltseries.path}: Finished reconstruction.')
         
         if do_EVN_ODD and tiltseries.is_split:
@@ -164,8 +165,9 @@ class Tomogram:
                             '-UseGPU', '0'],
                             stdout=subprocess.DEVNULL)
 
-            os.remove(binned_stack_evn)
-            os.remove(binned_stack_odd)
+            if bin != 1:            
+                os.remove(binned_stack_evn)
+                os.remove(binned_stack_odd)
             print(f'{tiltseries.path}: Finished reconstruction of EVN/ODD stacks.')
         
         if trim:
