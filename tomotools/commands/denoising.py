@@ -1,93 +1,82 @@
 import os
-import pickle
-import shutil
-import subprocess
-from glob import glob
-from os import path, mkdir
-
 import click
+import pickle
 
-from tomotools.utils import comfile, util
+from os import path
+from pathlib import Path
+from glob import glob
 
-
-# @click.command()
-# @click.option('--evnodd_dir', type=click.Path(exists=True, file_okay=False), show_default='reconstruction_dir')
-# @click.argument('reconstruction_dir', type=click.Path(exists=True, file_okay=False))
-# @click.argument('output_dir', type=click.Path(file_okay=False))
-def split_reconstruct(evnodd_dir, reconstruction_dir, output_dir):
-    """WORK IN PROGRESS, DON'T USE"""
-    evnodd_dir = reconstruction_dir if evnodd_dir is None else evnodd_dir
-    input_ts = comfile.get_value(path.join(reconstruction_dir, 'newst.com'), 'InputFile')
-    input_ts_basename, input_ts_ext = path.splitext(input_ts)
-    if not path.isdir(output_dir):
-        mkdir(output_dir)
-    for eo in ['EVN']:  # , 'ODD']:
-        eo_dir = path.join(output_dir, eo)
-        eo_ts = f'{input_ts_basename}_{eo}{input_ts_ext}'
-        print(f'Reconstructing {eo_ts}')
-        # Create the reconstruction dir
-        mkdir(eo_dir)
-        # Link tilt-series: rec_dir/TS_xx_EVN.mrc -> eo_dir/TS_xx.mrc
-        os.symlink(path.abspath(path.join(evnodd_dir, eo_ts)), path.join(eo_dir, input_ts))
-        # Copy files for reconstruction
-        for file in glob(path.join(reconstruction_dir, '*.com')) \
-                + glob(path.join(reconstruction_dir, '*.xf')) \
-                + glob(path.join(reconstruction_dir, '*.xtilt')) \
-                + glob(path.join(reconstruction_dir, '*.tlt')) \
-                + glob(path.join(reconstruction_dir, '*.tltxf')) \
-                + glob(path.join(reconstruction_dir, '*.rawtlt')) \
-                + glob(path.join(reconstruction_dir, '*.resid')) \
-                + glob(path.join(reconstruction_dir, '*.resmod')) \
-                + glob(path.join(reconstruction_dir, '*.seed')) \
-                + glob(path.join(reconstruction_dir, '*.maggrad')) \
-                + glob(path.join(reconstruction_dir, '*.defocus')) \
-                + glob(path.join(reconstruction_dir, '*.fid')) \
-                + glob(path.join(reconstruction_dir, '*.3dmod')) \
-                + glob(path.join(reconstruction_dir, '*.prexf')) \
-                + glob(path.join(reconstruction_dir, '*.prexg')) \
-                + glob(path.join(reconstruction_dir, '*.xyz')) \
-                + glob(path.join(reconstruction_dir, '*.mod')) \
-                + glob(path.join(reconstruction_dir, '*.mdoc')):
-            shutil.copyfile(file, path.join(eo_dir, path.basename(file)))
-        # Run comscripts
-        subprocess.run(['submfg', 'newst.com'], cwd=eo_dir)
-        subprocess.run(['submfg', 'ctf3dsetup.com'], cwd=eo_dir)
-        comfile.modify_value(path.join(eo_dir, 'ctf3d-001-sync.com'), 'DoseWeightingFile', f'{input_ts}.mdoc')
-        gpu_list = ':'.join([str(i + 1) for i in range(int(util.gpuinfo()['Attached GPUs']))])
-        subprocess.run(['processchunks', '-G', f'localhost:{gpu_list}', 'ctf3d'], cwd=eo_dir)
-        # subprocess.run(['submfg', 'trimvol.com'], cwd=eo_dir)
-
+from tomotools.utils.tomogram import Tomogram
 
 @click.command()
-@click.option('--num_slices', type=int, default=1200, show_default=True)
-@click.option('--split', type=float, default=0.9, show_default=True)
-@click.option('--patch_shape', type=int, default=72, show_default=True)
-@click.option('--tilt_axis', type=str, default='Y', show_default=True)
-@click.option('--n_normalization_samples', type=int, default=500, show_default=True)
-@click.argument('even', type=click.Path(dir_okay=False, exists=True))
-@click.argument('odd', type=click.Path(dir_okay=False, exists=True))
-@click.argument('output_path', type=click.Path(dir_okay=True, file_okay=False), default='./')
-def cryocare_extract(**config):
+@click.option('--num_slices', type=int, default=1200, show_default=True, help='Number of sub-volume extracted per tomogram.')
+@click.option('--split', type=float, default=0.9, show_default=True, help='Training vs. validation split.')
+@click.option('--patch_shape', type=int, default=72, show_default=True, help='Size of sub-volumes for training. Should not be below 64.')
+@click.option('--tilt_axis', type=str, default='Y', show_default=True, help='Tilt-axis of the tomogram. Used for splitting into training/validation. Y is imod and AreTomo default.')
+@click.option('--n_normalization_samples', type=int, default=500, show_default=True, help='Number of sub-volumes extracted per tomogram to calculate mean and SD for normalization.')
+@click.argument('input_files', nargs=-1, type=click.Path(exists=True))
+@click.argument('output_path', type=click.Path(dir_okay=True, writable=True), default='./')
+
+def cryocare_extract(num_slices, split, patch_shape, tilt_axis, n_normalization_samples, input_files, output_path):
+    """ Prepares for cryoCARE-denoising. 
+    
+    Takes reconstructed tomograms or folders containing them as input. Must have EVN/ODD volumes associated!
+    The training data will be saved in output_path.   
+    
+    """
+    
     from cryocare.internals.CryoCAREDataModule import CryoCARE_DataModule
+    
+    input_tomo = list()
+    input_evn = list()
+    input_odd = list()
+    
+    if not path.isdir(output_path):
+        os.mkdir(output_path)
+    
+    # Convert all input_files into a list of Tomogram objects
+    for input_file in input_files:
+        input_file = Path(input_file)
+        if input_file.is_file():
+            input_tomo.append(Tomogram(Path(input_file)))
+        elif input_file.is_dir():
+            input_tomo += ([Tomogram(Path(file))for file in glob(path.join(input_file, '*_rec_bin_[0-9].mrc'))])
+            
+   
+    
+    for tomo in input_tomo:
+        if path.isfile(tomo.path.with_name(f'{tomo.path.stem}_EVN.mrc')) and path.isfile(tomo.path.with_name(f'{tomo.path.stem}_ODD.mrc')):
+            tomo = tomo.with_split_files(tomo.path.with_name(f'{tomo.path.stem}_EVN.mrc'), tomo.path.with_name(f'{tomo.path.stem}_ODD.mrc'))
+            input_evn.append(tomo.evn_path)
+            input_odd.append(tomo.odd_path)
+            print(f'Found reconstruction {tomo.path} with EVN and ODD stacks.')
+        else:
+            print(f'No EVN/ODD reconstructions found for {tomo.path}. Skipping.')
+    
     dm = CryoCARE_DataModule()
-    dm.setup([config['odd']], [config['even']], n_samples_per_tomo=config['num_slices'],
-             validation_fraction=(1.0 - config['split']), sample_shape=[config['patch_shape']]*3,
-             tilt_axis=config['tilt_axis'], n_normalization_samples=config['n_normalization_samples'])
-    dm.save(config['output_path'])
+    dm.setup(input_odd, input_evn, n_samples_per_tomo=num_slices,
+             validation_fraction=(1.0 - split), sample_shape=[patch_shape]*3,
+             tilt_axis=tilt_axis, n_normalization_samples=n_normalization_samples)
+    dm.save(output_path)
 
 
 @click.command()
 @click.option('--epochs', type=int, default=100, show_default=True)
 @click.option('--steps_per_epoch', type=int, default=200, show_default=True)
 @click.option('--batch_size', type=int, default=16, show_default=True)
-@click.option('--unet_kern_size', type=int, default=3, show_default=True)
+@click.option('--unet_kern_size', type=int, default=3, show_default=True, help='Convolution kernel size of the U-Net. Has to be odd.')
 @click.option('--unet_n_depth', type=int, default=3, show_default=True)
-@click.option('--unet_n_first', type=int, default=16, show_default=True)
+@click.option('--unet_n_first', type=int, default=16, show_default=True, help='Number of initial feature channels.')
 @click.option('--learning_rate', type=float, default=0.0004, show_default=True)
 @click.argument('train_data', type=click.Path(dir_okay=True, file_okay=False), default='./')
 @click.argument('path', type=click.Path(dir_okay=True, file_okay=False), default='./')
 @click.argument('model_name', type=str, default='model')
 def cryocare_train(**config):
+    """
+    Trains a Noise2Noise model with cryoCARE.
+    
+    Can only be used after cryocare-extract was run. Takes the training data generated as an input. Optionally, the output path and the model name can be specified.
+    """
     from cryocare.internals.CryoCAREDataModule import CryoCARE_DataModule
     from cryocare.internals.CryoCARE import CryoCARE
     from csbdeep.models import Config

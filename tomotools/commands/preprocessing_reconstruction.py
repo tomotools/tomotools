@@ -18,7 +18,7 @@ from tomotools.utils.tomogram import Tomogram
 
 
 @click.command()
-@click.option('--cpus', default=8, show_default=True, help='Number of CPUs, passed to justblend')
+@click.option('--cpus', type=int, default=8, show_default=True, help='Number of CPUs, passed to justblend')
 @click.argument('input_files', nargs=-1)
 @click.argument('output_dir')
 def blend_montages(cpus, input_files, output_dir):
@@ -68,8 +68,7 @@ def blend_montages(cpus, input_files, output_dir):
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
 @click.argument('output_dir', type=click.Path(writable=True))
 def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotationandflip, group, gpus, exposuredose,
-                             stack,
-                             input_files, output_dir):
+                             stack, input_files, output_dir):
     """Prepare tilt-series for reconstruction.
 
     This function runs MotionCor2 on movie frames, stacks the motion-corrected frames and sorts them by tilt-angle.
@@ -334,4 +333,5 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         os.remove(tomo_pitch.path)
         
         # Perform final reconstruction
+        # TODO: if imod alignment is present, use alttomosetup instead for EVN/ODD volumes
         Tomogram.from_tiltseries(tiltseries, bin = bin,thickness = thickness, x_axis_tilt=x_axis_tilt, z_shift = z_shift, sirt = sirt, do_EVN_ODD = do_evn_odd)
