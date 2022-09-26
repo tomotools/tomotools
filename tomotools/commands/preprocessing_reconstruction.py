@@ -5,7 +5,7 @@ import mrcfile
 from glob import glob
 from os import mkdir
 from os import path
-from os.path import abspath, basename, join, splitext
+from os.path import abspath, basename, join
 from pathlib import Path
 
 import click
@@ -181,11 +181,11 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
 @click.option('--sirt', default=5, show_default=True, help="SIRT-like filter iterations")
 @click.option('--keep-ali-stack/--delete-ali-stack', is_flag=True, default=False, show_default=True,
               help="Keep or delete the non-dose-filtered aligned stack (useful for Relion)")
-@click.option('--previous', type=click.Path(exists=True),
-               help="Pass previous AreTomo .aln file to not re-do alignment.")
-@click.option('--batch-file', type=click.Path(exists=True, dir_okay=False),help = "You can pass a tab-separated file with tilt series names and views to exclude before reconstruction.")
+@click.option('--previous', is_flag = True, help="Use previous alignment found in the folder.")
+@click.option('--do-evn-odd', is_flag = True, help="Perform alignment, dose-filtration and reconstruction also on EVN/ODD stacks, if present. Needed for later cryoCARE processing. If the EVN/ODD stacks are found, they will be moved and tilts will be excluded as with the original stack regardless of this flag.")
+@click.option('--batch-file', type=click.Path(exists=True, dir_okay=False),help = "You can pass a tab-separated file with tilt series names and views to exclude before alignment and reconstruction.")
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
-def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previous, batch_file, input_files):
+def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previous, do_evn_odd, batch_file, input_files):
     """Align and reconstruct the given tiltseries. 
     
     Optionally moves tilt series and excludes specified tilts. Then runs AreTomo alignment and ultimately dose-filtration and imod WBP reconstruction.   
@@ -210,7 +210,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
     for ts in input_ts:
         # merge main EVN ODD into one TiltSeries object
         if path.isfile(ts.with_name(f'{ts.stem}_EVN.mrc')) and path.isfile(ts.with_name(f'{ts.stem}_ODD.mrc')):
-            tiltseries = TiltSeries(ts).with_split_dir(Path(ts.root))
+            tiltseries = TiltSeries(ts).with_split_files(ts.with_name(f'{ts.stem}_EVN.mrc'), ts.with_name(f'{ts.stem}_ODD.mrc'))
             print(f'Found TiltSeries {ts} with EVN and ODD stacks.')
         else:
             tiltseries = TiltSeries(ts)
@@ -257,8 +257,8 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
             tiltseries.mdoc = Path(f'{tiltseries.path}.mdoc')
             
             if tiltseries.is_split:
-                exclude_evn = tiltseries.evn_path.with_name(f'{tiltseries.evn_path.stem}_excludetilts.mrc')
-                exclude_odd = tiltseries.odd_path.with_name(f'{tiltseries.odd_path.stem}_excludetilts.mrc')
+                exclude_evn = tiltseries.evn_path.with_name(f'{tiltseries.path.stem}_excludetilts_EVN.mrc')
+                exclude_odd = tiltseries.odd_path.with_name(f'{tiltseries.path.stem}_excludetilts_ODD.mrc')
                 
                 subprocess.run(['newstack',
                                 '-in', str(tiltseries.evn_path),
@@ -277,10 +277,11 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                 print(f'Excluded specified tilts from EVN and ODD stacks for {tiltseries.path}.')
         
         # Align Stack
-        tiltseries = align_with_areTomo(tiltseries, local, previous)
+        # TODO: somehow decide whether imod or AreTomo should be used!
+        tiltseries = align_with_areTomo(tiltseries, local, previous, do_evn_odd)
 
         # Do dose filtration.
-        tiltseries = dose_filter(tiltseries,keep_ali_stack)
+        tiltseries = dose_filter(tiltseries,keep_ali_stack, do_evn_odd)
         
         # Get AngPix
         with mrcfile.mmap(tiltseries.path, mode = 'r') as mrc:
@@ -290,7 +291,6 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         tomo_pitch = Tomogram.from_tiltseries(tiltseries, bin = 8, do_EVN_ODD = False, trim = False, thickness = str(round(10000 / pix_xy)))
         
         # Try to automatically find edges of tomogram
-        # TODO: use cryoposition instead?
         pitch_mod = tomo_pitch.path.with_name(f'{tiltseries.path.stem}_pitch.mod')
         
         fs = subprocess.run(['findsection',
@@ -307,8 +307,8 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
             x_axis_tilt = '0'
             tomopitch_z = '0'
             z_shift = '0'
-            thickness = str(round(6000 / pix_xy[0])+extra_thickness)
-            print(f'{tiltseries}: findsection failed, using default values {tomopitch_z}, thickness {thickness}.')
+            thickness = str(round(6000 / pix_xy)+extra_thickness)
+            print(f'{tiltseries.path}: findsection failed, using default values pitch {tomopitch_z}, thickness {thickness}.')
 
         else:
             # Else, get tomopitch
@@ -322,8 +322,8 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                 x_axis_tilt = '0'
                 tomopitch_z = '0'
                 z_shift = '0'
-                thickness = str(round(6000 / pix_xy[0])+extra_thickness)
-                print(f'{tiltseries.path}: tomopitch failed, using default values {tomopitch_z}, thickness {thickness}.')
+                thickness = str(round(6000 / pix_xy)+extra_thickness)
+                print(f'{tiltseries.path}: tomopitch failed, using default values pitch {tomopitch_z}, thickness {thickness}.')
             else:
                 x_axis_tilt = tomopitch[-3].split()[-1]
                 tomopitch_z = tomopitch[-1].split(';')
@@ -334,7 +334,4 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         os.remove(tomo_pitch.path)
         
         # Perform final reconstruction
-        # TODO: add EVN/ODD functionality!
-        tomo_final = Tomogram.from_tiltseries(tiltseries, bin = bin,thickness = thickness, x_axis_tilt=x_axis_tilt, z_shift = z_shift, sirt = sirt)
-
-# TODO: Make a separate function to re-reconstruct good TS including CTF estimation and AreTomo output files for Relion (-OutImod) or Warp (-DarkTol 0.01 -OutXF). Make sure to set TiltCor 0 so missing wedge stays stable! Should be able to look into directories, in case --move was used for initial reconstruction
+        Tomogram.from_tiltseries(tiltseries, bin = bin,thickness = thickness, x_axis_tilt=x_axis_tilt, z_shift = z_shift, sirt = sirt, do_EVN_ODD = do_evn_odd)

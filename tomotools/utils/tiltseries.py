@@ -4,6 +4,7 @@ import subprocess
 import warnings
 import mrcfile
 
+from os import path
 from pathlib import Path
 from typing import Optional, List
 from operator import itemgetter
@@ -150,20 +151,31 @@ def aretomo_executable() -> Optional[Path]:
                 f'ARETOMO_EXECUTABLE is set to "{aretomo_exe}", but the file does not exist. Falling back to PATH')
     return shutil.which('AreTomo')
 
-def align_with_areTomo(ts: TiltSeries, local: bool, previous: Optional):
-    ''' Takes a TiltSeries as input and runs AreTomo on it, if desired with local alignment. A previously generated .aln file can be passed optionally.
-    Will apply the pixel size from the input stack to the output stack.
+def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: bool):
+    ''' Takes a TiltSeries as input and runs AreTomo on it, if desired with local alignment. If previous is True, respect previous alignment in folder.
+    If do_evn_odd is passed, also perform alignment on half-stacks. Will apply the pixel size from the input stack to the output stack.
     '''
 
     ali_stack = ts.path.with_name(f'{ts.path.stem}_ali.mrc')
+    aln_file = ts.path.with_suffix('.aln')
     orig_mdoc = ts.mdoc
     
     with mrcfile.mmap(ts.path) as mrc:
         angpix = float(mrc.voxel_size.x)
 
-    if previous is None:
+    if previous: 
+        if not path.isfile(aln_file):
+            raise FileNotFoundError(f'{ts.path}: --previous was passed, but no previous alignment was found at {aln_file}.')
+        
+        subprocess.run([aretomo_executable(),
+                        '-InMrc', ts.path,
+                        '-OutMrc', ali_stack,
+                        '-AlnFile', aln_file,
+                        '-VolZ', '0'],
+                        stdout=subprocess.DEVNULL)
+    
+    if not previous:
         tlt_file = ts.path.with_suffix('.tlt')
-        aln_file = ts.path.with_suffix('.aln')
 
         subprocess.run(['extracttilts', ts.path, tlt_file],
                        stdout=subprocess.DEVNULL)
@@ -182,15 +194,7 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: Optional):
                         '-VolZ', '0',
                         '-TiltCor', '1'] +
                         (['-Patch', patch_x, patch_y] if local else []),
-                        stdout=subprocess.DEVNULL)
-
-    else:
-        subprocess.run([aretomo_executable(),
-                        '-InMrc', ts.path,
-                        '-OutMrc', ali_stack,
-                        '-AlnFile', previous,
-                        '-VolZ', '0'],
-                        stdout=subprocess.DEVNULL)
+                        stdout=subprocess.DEVNULL)       
     
     with mrcfile.mmap(ali_stack, mode = 'r+') as mrc:
            mrc.voxel_size = str(angpix)
@@ -198,9 +202,9 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: Optional):
     
     print(f'Done aligning {ts.path.stem} with AreTomo.')
 
-    if ts.is_split:
-        ali_stack_evn = ts.evn_path.with_name(f'{ts.evn_path.stem}_ali.mrc')
-        ali_stack_odd = ts.odd_path.with_name(f'{ts.odd_path.stem}_ali.mrc')
+    if do_evn_odd and ts.is_split:
+        ali_stack_evn = ts.evn_path.with_name(f'{ts.path.stem}_ali_EVN.mrc')
+        ali_stack_odd = ts.odd_path.with_name(f'{ts.path.stem}_ali_ODD.mrc')
         subprocess.run([aretomo_executable(),
                         '-InMrc', ts.evn_path,
                         '-OutMrc', ali_stack_evn,
@@ -227,9 +231,9 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: Optional):
     
     return TiltSeries(ali_stack).with_mdoc(orig_mdoc)
 
-def dose_filter(ts: TiltSeries, keep_ali_stack: bool):
-    """ Runs mtffilter on the given TiltSeries object with the doses in the associated mdoc file. Will take into account EVN/ODD stacks if present.
-    Only ExposureDose needs to be entered, as PriorRecordDose is deduced by mtffilter based on the DateTime entry, see mtffilter -help, section "-dtype"
+def dose_filter(ts: TiltSeries, keep_ali_stack: bool, do_evn_odd: bool):
+    """ Runs mtffilter on the given TiltSeries object with the doses in the associated mdoc file. Will take into account EVN/ODD stacks if do_evn_odd is passed.
+    mdoc needs to contain only ExposureDose, as PriorRecordDose is deduced by mtffilter based on the DateTime entry, see mtffilter -help, section "-dtype"
     """
     mdoc = mdocfile.read(ts.mdoc)    
       
@@ -243,9 +247,9 @@ def dose_filter(ts: TiltSeries, keep_ali_stack: bool):
         subprocess.run(['mtffilter', '-dtype', '4', '-dfile', ts.mdoc, ts.path, filtered_stack],
                        stdout=subprocess.DEVNULL)
         
-        if ts.is_split:
-            filtered_evn = ts.path.with_name(f'{ts.evn_path.stem}_filtered.mrc')
-            filtered_odd = ts.path.with_name(f'{ts.odd_path.stem}_filtered.mrc')
+        if ts.is_split and do_evn_odd:
+            filtered_evn = ts.path.with_name(f'{ts.path.stem}_filtered_EVN.mrc')
+            filtered_odd = ts.path.with_name(f'{ts.path.stem}_filtered_ODD.mrc')
         
             subprocess.run(['mtffilter', '-dtype', '4', '-dfile', ts.mdoc, ts.evn_path, filtered_evn],
                            stdout=subprocess.DEVNULL)
@@ -257,13 +261,13 @@ def dose_filter(ts: TiltSeries, keep_ali_stack: bool):
                 os.remove(ts.evn_path)
                 os.remove(ts.odd_path)
             
-            print(f'Done dose-filtering {ts} and EVN/ODD stacks.')
+            print(f'Done dose-filtering {ts.path} and EVN/ODD stacks.')
             return TiltSeries(filtered_stack).with_split_files(filtered_evn, filtered_odd).with_mdoc(orig_mdoc)
         
         if not keep_ali_stack:
             os.remove(ts.path)
 
-        print(f'Done dose-filtering {ts}.')
+        print(f'Done dose-filtering {ts.path}.')
         return TiltSeries(filtered_stack).with_mdoc(orig_mdoc)
 
 def align_with_imod(ts: TiltSeries, excludetilts: Optional[Path]):
