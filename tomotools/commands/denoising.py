@@ -83,10 +83,6 @@ def cryocare_train(epochs, steps_per_epoch, batch_size, unet_kern_size, unet_n_d
     from cryocare.internals.CryoCARE import CryoCARE
     from csbdeep.models import Config
 
-    if gpu is not None:
-        os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"] = gpu
-
     dm = CryoCARE_DataModule()
     dm.load(extraction_dir)
 
@@ -100,7 +96,8 @@ def cryocare_train(epochs, steps_per_epoch, batch_size, unet_kern_size, unet_n_d
         unet_n_depth=unet_n_depth,
         unet_n_first=unet_n_first,
         train_tensorboard=False,
-        train_learning_rate=learning_rate
+        train_learning_rate=learning_rate,
+        gpu_id=gpu.split(',')
     )
 
     model = CryoCARE(net_conf, model_name, basedir=training_dir)
