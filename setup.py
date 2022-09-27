@@ -11,7 +11,7 @@ setup(
         'mrcfile',
         'emfile',
         'dynamotable',
-        'tensorflow',
+        'tensorflow==2.4',
         'cryoCARE',
         'packaging',
     ],
