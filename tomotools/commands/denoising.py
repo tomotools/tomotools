@@ -68,10 +68,12 @@ def cryocare_extract(num_slices, split, patch_shape, tilt_axis, n_normalization_
 @click.option('--unet_n_depth', type=int, default=3, show_default=True)
 @click.option('--unet_n_first', type=int, default=16, show_default=True, help='Number of initial feature channels.')
 @click.option('--learning_rate', type=float, default=0.0004, show_default=True)
-@click.argument('train_data', type=click.Path(dir_okay=True, file_okay=False), default='./')
-@click.argument('path', type=click.Path(dir_okay=True, file_okay=False), default='./')
+@click.option('--gpu', type=str, default="0", show_default=True, help='Specify which GPUs to use.')
+@click.argument('extraction_dir', type=click.Path(dir_okay=True, file_okay=False), default='./')
+@click.argument('training_dir', type=click.Path(dir_okay=True, file_okay=False), default='./')
 @click.argument('model_name', type=str, default='model')
-def cryocare_train(**config):
+def cryocare_train(epochs, steps_per_epoch, batch_size, unet_kern_size, unet_n_depth, unet_n_first, learning_rate,
+                   gpu, extraction_dir, training_dir, model_name ):
     """
     Trains a Noise2Noise model with cryoCARE.
     
@@ -80,28 +82,33 @@ def cryocare_train(**config):
     from cryocare.internals.CryoCAREDataModule import CryoCARE_DataModule
     from cryocare.internals.CryoCARE import CryoCARE
     from csbdeep.models import Config
+
+    if gpu is not None:
+        os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+        os.environ["CUDA_VISIBLE_DEVICES"] = gpu
+
     dm = CryoCARE_DataModule()
-    dm.load(config['train_data'])
+    dm.load(extraction_dir)
 
     net_conf = Config(
         axes='ZYXC',
         train_loss='mse',
-        train_epochs=config['epochs'],
-        train_steps_per_epoch=config['steps_per_epoch'],
-        train_batch_size=config['batch_size'],
-        unet_kern_size=config['unet_kern_size'],
-        unet_n_depth=config['unet_n_depth'],
-        unet_n_first=config['unet_n_first'],
+        train_epochs=epochs,
+        train_steps_per_epoch=steps_per_epoch,
+        train_batch_size=batch_size,
+        unet_kern_size=unet_kern_size,
+        unet_n_depth=unet_n_depth,
+        unet_n_first=unet_n_first,
         train_tensorboard=False,
-        train_learning_rate=config['learning_rate']
+        train_learning_rate=learning_rate
     )
 
-    model = CryoCARE(net_conf, config['model_name'], basedir=config['path'])
+    model = CryoCARE(net_conf, model_name, basedir=training_dir)
 
     history = model.train(dm.get_train_dataset(), dm.get_val_dataset())
 
     print(list(history.history.keys()))
-    with open(path.join(config['path'], config['model_name'], 'history.dat'), 'wb+') as f:
+    with open(path.join(training_dir, model_name, 'history.dat'), 'wb+') as f:
         pickle.dump(history.history, f)
 
 
