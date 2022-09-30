@@ -98,6 +98,7 @@ class Micrograph:
         for movie in movies:
             tempdir.joinpath(movie.path.name).symlink_to(movie.path.absolute())
 
+        # TODO: here, -Bft should probably be zero to prevent high-pass filtering from later frames -> will be done during reconstruction
         command = [mc2_exe,
                    '-OutMrc', str(output_dir.absolute()) + os.path.sep,
                    '-Patch', '7', '5',
