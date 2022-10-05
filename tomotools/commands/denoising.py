@@ -3,7 +3,6 @@ import click
 import pickle
 import json
 import tarfile
-import sys
 
 from os import path
 from pathlib import Path
@@ -102,7 +101,8 @@ def cryocare_train(epochs, steps_per_epoch, batch_size, unet_kern_size, unet_n_d
         unet_n_depth=unet_n_depth,
         unet_n_first=unet_n_first,
         train_tensorboard=False,
-        train_learning_rate=learning_rate
+        train_learning_rate=learning_rate,
+        gpu_id=gpu.split(',')
     )
 
     model = CryoCARE(net_conf, model_name, basedir=training_dir)
