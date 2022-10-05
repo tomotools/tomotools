@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional, List
 from operator import itemgetter
 
-from tomotools.utils import util, mdocfile
+from tomotools.utils import mdocfile
 from tomotools.utils.micrograph import Micrograph
 
 
@@ -123,6 +123,8 @@ class TiltSeries:
                 if key in section:
                     del section[key]
         mdocfile.write(stack_mdoc, str(ts_path) + '.mdoc')
+        
+        ts_path = Path(ts_path)
 
         if all(micrograph.is_split for micrograph in micrographs):
             micrograph_evn_paths = [str(micrograph.evn_path) for micrograph in micrographs]

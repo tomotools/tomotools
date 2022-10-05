@@ -61,6 +61,7 @@ class Micrograph:
         # If override_gainref is given, check if it is already mrc or needs to be converted.
         # If neither are given, skip gain correction
         if override_gainref is not None:
+            override_gainref = Path(override_gainref)
             if override_gainref.suffix == '.dm4':
                 gain_ref_dm4 = override_gainref
             elif override_gainref.suffix == '.mrc':
@@ -72,7 +73,7 @@ class Micrograph:
             gain_refs = set([movie.mdoc['framesets'][0].get('GainReference', None) for movie in movies])
             if len(gain_refs) != 1:
                 raise Exception(
-                    f'Only from os import pathzero or one unique gain refs are supported, yet {len(gain_refs)} were found in the MDOC files:\n{", ".join(gain_refs)}')
+                    f'Only zero or one unique gain refs are supported, yet {len(gain_refs)} were found in the MDOC files:\n{", ".join(gain_refs)}')
             # The gain ref should be in the same folder as the input file(s), so check if it's there
             gain_ref_dm4 = movies[0].path.parent.joinpath(gain_refs.pop())
 
@@ -173,7 +174,7 @@ def check_defects(gainref: Path):
     if len(defects_temp) == 1:
         return defects_temp[0]
     elif len(defects_temp) > 1:
-        print('Multiple defect files are found. Skipping defects correction.')
+        print('Multiple defect files are found. Skipping defect correction.')
         return None
     else:
         return None
@@ -182,7 +183,7 @@ def check_defects(gainref: Path):
 def defects_tif(gainref: Path, tempdir: Path, template: Path):
     ''' Creates a -DefectsMap input for MotionCor2 from SerialEM defects txt in the passed temporary directory.
     Requires a template file with the dimensions of the frames to be corrected. '''
-    defects_txt = check_defects(gainref)
+    defects_txt = Path(check_defects(gainref))
     defects_tif = str(tempdir.joinpath(defects_txt.name)) + '.tif'
     subprocess.run(['clip', 'defect', '-D', defects_txt, template, defects_tif])
     print(f'Found and converted defects file {defects_tif}')

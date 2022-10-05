@@ -1,6 +1,9 @@
 import os
 import click
 import pickle
+import json
+import tarfile
+import sys
 
 from os import path
 from pathlib import Path
@@ -68,24 +71,23 @@ def cryocare_extract(num_slices, split, patch_shape, tilt_axis, n_normalization_
 @click.option('--unet_n_depth', type=int, default=3, show_default=True)
 @click.option('--unet_n_first', type=int, default=16, show_default=True, help='Number of initial feature channels.')
 @click.option('--learning_rate', type=float, default=0.0004, show_default=True)
-@click.option('--gpu', type=str, default="0", show_default=True, help='Specify which GPUs to use.')
-@click.argument('extraction_dir', type=click.Path(dir_okay=True, file_okay=False), default='./')
+@click.option('--gpu', type=str, default="0", show_default=True, help='Specify which GPUs to use. Not functional yet, sorry!')
+@click.argument('extraction_dir', type=click.Path(dir_okay=True, file_okay=False))
 @click.argument('training_dir', type=click.Path(dir_okay=True, file_okay=False), default='./')
 @click.argument('model_name', type=str, default='model')
 def cryocare_train(epochs, steps_per_epoch, batch_size, unet_kern_size, unet_n_depth, unet_n_first, learning_rate,
-                   gpu, extraction_dir, training_dir, model_name ):
-    """
-    Trains a Noise2Noise model with cryoCARE.
+                   gpu, extraction_dir, training_dir, model_name):
+    """ Trains a Noise2Noise model with cryoCARE.
     
     Can only be used after cryocare-extract was run. Takes the training data generated as an input. Optionally, the output path and the model name can be specified.
     """
-    from cryocare.internals.CryoCAREDataModule import CryoCARE_DataModule
     from cryocare.internals.CryoCARE import CryoCARE
     from csbdeep.models import Config
+    from cryocare.internals.CryoCAREDataModule import CryoCARE_DataModule
+    #from cryocare.scripts.cryoCARE_predict import set_gpu_id
 
-    if gpu is not None:
-        os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"] = gpu
+    # Multi-GPU is in repository, but not yet available as of version 0.2
+    #set_gpu_id({'gpu_id': gpu.split(',')})
 
     dm = CryoCARE_DataModule()
     dm.load(extraction_dir)
@@ -106,33 +108,58 @@ def cryocare_train(epochs, steps_per_epoch, batch_size, unet_kern_size, unet_n_d
     model = CryoCARE(net_conf, model_name, basedir=training_dir)
 
     history = model.train(dm.get_train_dataset(), dm.get_val_dataset())
+    mean, std = dm.train_dataset.mean, dm.train_dataset.std
 
-    print(list(history.history.keys()))
     with open(path.join(training_dir, model_name, 'history.dat'), 'wb+') as f:
         pickle.dump(history.history, f)
 
+    norm = {
+        "mean": float(mean),
+        "std": float(std)
+    }
+    
+    with open(path.join(training_dir, model_name, 'norm.json'), 'w') as fp:
+        json.dump(norm, fp)
+
+    with tarfile.open(path.join(training_dir, f"{model_name}.tar.gz"), "w:gz") as tar:
+        tar.add(path.join(training_dir, model_name), arcname=path.basename(path.join(training_dir, model_name)))
 
 @click.command()
-@click.option('--n_tiles', type=(int, int, int), default=[1, 2, 2])
-@click.option('--model_name', type=str, default='model')
-@click.argument('even', type=click.Path(dir_okay=False))
-@click.argument('odd', type=click.Path(dir_okay=False))
-@click.argument('output_name', type=click.Path(dir_okay=False, exists=False))
-def cryocare_predict(**config):
+@click.option('--tiles', type=(int, int, int), default=[1, 2, 2], show_default=True, help='Specify number of tiles.')
+@click.option('--model-path', type=click.Path(exists=True), default='./', show_default=True, help='Specify the folder containing the model.')
+@click.option('--output', type=click.Path(dir_okay=True), default='denoised', help='Specify the output directory for denoised tomograms.')
+@click.argument('tomogram', type=click.Path(dir_okay=False, exists=True))
+
+def cryocare_predict(tiles, model_path, output, tomogram):
+    """ Predicts denoised tomogram using cryoCARE.
+    
+    Takes tomogram with associated EVN/ODD halves and the trained model as inputs.
+    """
     from cryocare.internals.CryoCAREDataModule import CryoCARE_DataModule
     from cryocare.internals.CryoCARE import CryoCARE
     import mrcfile
     import numpy as np
     import datetime
-    config['path'] = './'
+    
+    tomogram = Path(tomogram)
+    
+    if path.isfile(tomogram.with_name(f'{tomogram.stem}_EVN.mrc')) and path.isfile(tomogram.with_name(f'{tomogram.stem}_ODD.mrc')):
+        tomo = Tomogram(tomogram).with_split_files(tomogram.with_name(f'{tomogram.stem}_EVN.mrc'), tomogram.with_name(f'{tomogram.stem}_ODD.mrc'))
+        print(f'Found reconstruction {tomo.path} with EVN and ODD stacks.')
+    else:
+        print('Tomogram EVN/ODD halves not found.')
+    
+    if not path.isdir(output):
+        os.mkdir(output)
+    
     dm = CryoCARE_DataModule()
-    dm.load(config['path'])
+    dm.load(model_path)
 
-    model = CryoCARE(None, config['model_name'], basedir=config['path'])
+    model = CryoCARE(None, model_path, basedir=model_path)
 
-    even = mrcfile.mmap(config['even'], mode='r', permissive=True)
-    odd = mrcfile.mmap(config['odd'], mode='r', permissive=True)
-    denoised = mrcfile.new_mmap(path.join(config['path'], config['output_name']), even.data.shape, mrc_mode=2,
+    even = mrcfile.mmap(tomo.evn_path, mode='r', permissive=True)
+    odd = mrcfile.mmap(tomo.odd_path, mode='r', permissive=True)
+    denoised = mrcfile.new_mmap(path.join(model_path, output), even.data.shape, mrc_mode=2,
                                 overwrite=True)
 
     even.data.shape += (1,)
@@ -142,7 +169,7 @@ def cryocare_predict(**config):
     mean, std = dm.train_dataset.mean, dm.train_dataset.std
 
     model.predict(even.data, odd.data, denoised.data, axes='ZYXC', normalizer=None, mean=mean, std=std,
-                  n_tiles=list(config['n_tiles']) + [1, ])
+                  n_tiles=list(tiles) + [1, ])
 
     for label in even.header.dtype.names:
         if label == 'label':
