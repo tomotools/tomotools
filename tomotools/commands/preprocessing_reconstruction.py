@@ -125,11 +125,14 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
         if any(section['ExposureDose'] == 0 for section in mdoc['sections']) and exposuredose is None:
             print(f'{input_file} has no ExposureDose set. This might lead to problems down the road!')
 
-            # Check if all subframes were found
-        try:
-            movies = [Movie(section['SubFramePath'], section['TiltAngle']) for section in mdoc['sections']]
-        except FileNotFoundError:
-            print(f'Not all movie frames were found for {input_file}, not using them')
+        # Check if all subframes were found (if specified in mdoc!)
+        if any('SubFramePath' in section for section in mdoc['sections']):    
+            try:
+                movies = [Movie(section['SubFramePath'], section['TiltAngle']) for section in mdoc['sections']]
+            except FileNotFoundError:
+                print(f'Not all movie frames were found for {input_file}, specify them using the --frames option. Skipping at this point.')
+                continue
+        else:
             if reorder:
                 print(f'Running newstack -reorder on {input_file}')
                 subprocess.run(['newstack',
@@ -150,17 +153,20 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
         print(f'Subframes were found for {input_file}, will run MotionCor2 on them')
         # Get rotation and flip of Gain reference from mdoc file property
         mcrot, mcflip = None, None
-        if rotationandflip is not None:
+        if rotationandflip is None:
             rotationandflip = mdoc['sections'][0].get('RotationAndFlip', None)
             mcrot, mcflip = sem2mc2(rotationandflip)
+            
+        # Grab frame size to estimate appropriate patch numbers
+        patch_x, patch_y = [str(round(mdoc['ImageSize'][0]/800)), str(round(mdoc['ImageSize'][1]/800))]
 
         frames_corrected_dir = output_dir.joinpath('frames_corrected')
         micrographs = Micrograph.from_movies(movies, frames_corrected_dir,
                                              splitsum=splitsum, binning=mcbin, mcrot=mcrot, mcflip=mcflip,
-                                             group=group, override_gainref=gainref, gpus=gpus)
+                                             group=group, override_gainref=gainref, gpus=gpus, patch_x = patch_x, patch_y = patch_y)
 
         if stack:
-            tilt_series = TiltSeries.from_micrographs(micrographs, output_dir.joinpath(input_file.name),
+            tilt_series = TiltSeries.from_micrographs(micrographs, Path(output_dir, input_file),
                                                       orig_mdoc_path=mdoc['path'], reorder=True)
             shutil.rmtree(frames_corrected_dir)
             print(f'Successfully created {tilt_series.path}')

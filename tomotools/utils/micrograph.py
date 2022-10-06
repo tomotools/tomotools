@@ -3,7 +3,7 @@ import shutil
 import subprocess
 import warnings
 from glob import glob
-from os.path import join
+from os.path import join, isfile
 from pathlib import Path
 from typing import Optional, List
 
@@ -45,7 +45,8 @@ class Micrograph:
     @staticmethod
     def from_movies(movies: List[Movie], output_dir: Path,
                     splitsum: bool = False, binning: int = 2,
-                    group: int = 1, mcrot: Optional[int] = None, mcflip: Optional[int] = None,
+                    group: int = 1, patch_x: int = 5, patch_y: int = 7, 
+                    mcrot: Optional[int] = None, mcflip: Optional[int] = None,
                     override_gainref: Optional[Path] = None,
                     gpus: Optional[str] = None) -> 'List[Micrograph]':
         tempdir = output_dir.joinpath('motioncor2_temp')
@@ -99,19 +100,18 @@ class Micrograph:
         for movie in movies:
             tempdir.joinpath(movie.path.name).symlink_to(movie.path.absolute())
 
-        # TODO: here, -Bft should probably be zero to prevent high-pass filtering from later frames -> will be done during reconstruction
+        # TODO: here, -Bft should probably be zero to prevent high-pass filtering from later frames -> will be done during reconstruction?
         command = [mc2_exe,
                    '-OutMrc', str(output_dir.absolute()) + os.path.sep,
-                   '-Patch', '7', '5',
+                   '-Patch', str(patch_x), str(patch_y),
                    '-Iter', '10',
                    '-Tol', '0.5',
-                   '-Kv', '300',
                    '-FtBin', str(binning),
                    '-Group', str(group),
                    '-Serial', '1']
-        if movies[0].is_mrc():
+        if movies[0].is_mrc:
             command += ['-InMrc', str(tempdir.absolute()) + '/']
-        elif movies[0].is_tiff():
+        elif movies[0].is_tiff:
             command += ['-InTiff', str(tempdir.absolute()) + '/']
         if gpus is None:
             num_gpus = int(util.gpuinfo()['Attached GPUs'])
@@ -120,13 +120,16 @@ class Micrograph:
             command += ['-Gpu', gpus]
         if splitsum:
             command += ['-SplitSum', '1']
-        if gain_ref_mrc is not None and mcrot is not None and mcflip is not None:
-            command += ['-Gain', gain_ref_mrc.absolute(),
-                        '-RotGain', str(mcrot),
+        
+        if gain_ref_mrc is not None:
+            command += ['-Gain', gain_ref_mrc.absolute()]
+            
+        if mcrot is not None and mcflip is not None:
+            command += ['-RotGain', str(mcrot),
                         '-FlipGain', str(mcflip)]
 
         if gain_ref_dm4 is not None and check_defects(gain_ref_dm4) is not None:
-            command += ['-DefectMap', defects_tif(gain_ref_dm4, tempdir, movies[0].path)]
+            command += ['-DefectMap', defects_tif(gain_ref_dm4, tempdir, movies[0].path).absolute()]
 
         with open(join(output_dir, 'motioncor2.log'), 'a') as out, open(join(output_dir, 'motioncor2.err'), 'a') as err:
             subprocess.run(command, cwd=tempdir, stdout=out, stderr=err)
@@ -138,7 +141,7 @@ class Micrograph:
             if movie.mdoc is not None:
                 # Sanity check: there should be only one frameset
                 if not (isinstance(movie.mdoc['framesets'], list) and len(movie.mdoc['framesets']) == 1):
-                    raise 'Unexpected MDOC format: tomotools can only handle a single frameset per mdoc'
+                    raise Exception('Unexpected MDOC format: tomotools can only handle a single frameset per mdoc')
                 # Adjust pixel size and binning
                 movie.mdoc['framesets'][0]['PixelSpacing'] *= binning
                 movie.mdoc['framesets'][0]['Binning'] *= binning
@@ -150,6 +153,12 @@ class Micrograph:
         shutil.rmtree(tempdir)
 
         print('Checking MotionCor2 output files')
+        
+        if gain_ref_mrc is not None:
+            with open(join(output_dir, 'motioncor2.log'), 'r') as log:
+                if any(l.startswith('Warning: Gain ref not found.') for l in log):
+                    raise Exception('Gain reference was specified, but not applied by MotionCor2. Check log file!')
+        
         output_micrographs = [
             Micrograph(path=output_dir.joinpath(movie.path.with_suffix('.mrc').name), tilt_angle=movie.tilt_angle)
             for movie in movies]
@@ -185,10 +194,14 @@ def defects_tif(gainref: Path, tempdir: Path, template: Path):
     ''' Creates a -DefectsMap input for MotionCor2 from SerialEM defects txt in the passed temporary directory.
     Requires a template file with the dimensions of the frames to be corrected. '''
     defects_txt = Path(check_defects(gainref))
-    defects_tif = str(tempdir.joinpath(defects_txt.name)) + '.tif'
-    subprocess.run(['clip', 'defect', '-D', defects_txt, template, defects_tif])
-    print(f'Found and converted defects file {defects_tif}')
-    return defects_tif
+    defects_tif = defects_txt.with_suffix(".tif")
+    if isfile(defects_tif):
+        return defects_tif
+        print(f'Found defects file {str(defects_tif)}')
+    else:
+        subprocess.run(['clip', 'defect', '-D', defects_txt, template, defects_tif])
+        print(f'Found defects file and converted to {str(defects_tif)}')
+        return defects_tif
 
 
 def motioncor2_executable() -> Optional[Path]:

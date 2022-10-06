@@ -124,8 +124,6 @@ class TiltSeries:
                     del section[key]
         mdocfile.write(stack_mdoc, str(ts_path) + '.mdoc')
         
-        ts_path = Path(ts_path)
-
         if all(micrograph.is_split for micrograph in micrographs):
             micrograph_evn_paths = [str(micrograph.evn_path) for micrograph in micrographs]
             micrograph_odd_paths = [str(micrograph.odd_path) for micrograph in micrographs]

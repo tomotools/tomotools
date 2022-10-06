@@ -13,8 +13,10 @@ class Movie:
         self.mdoc_path: Path = Path(f'{path}.mdoc')
         self.mdoc: Optional[dict] = mdocfile.read(self.mdoc_path) if self.mdoc_path.is_file() else None
 
+    @property
     def is_mrc(self):
         return self.path.suffix == '.mrc'
 
+    @property
     def is_tiff(self):
         return self.path.suffix == '.tiff' or self.path.suffix == '.tif'
