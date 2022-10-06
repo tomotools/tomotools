@@ -60,7 +60,6 @@ class Micrograph:
                                     'or put it into the PATH and rename it to "motioncor2"')
 
         # If override_gainref is given, check if it is already mrc or needs to be converted.
-        # If neither are given, skip gain correction
         if override_gainref is not None:
             override_gainref = Path(override_gainref)
             if override_gainref.suffix == '.dm4':
@@ -81,8 +80,11 @@ class Micrograph:
         if gain_ref_dm4 is not None and gain_ref_mrc is None:
             if not gain_ref_dm4.is_file():
                 raise FileNotFoundError(f'Expected gain reference at {gain_ref_dm4}, aborting')
-            # The gain ref is saved in dm4 format, convert to MRC for motioncor
-            gain_ref_mrc = tempdir.joinpath(gain_ref_dm4.stem + '.mrc')
+            # The gain ref is saved in dm4 format, convert to MRC for MotionCor2
+            # Write to a separate directory to prevent MotionCor2 from trying to open it.
+            temp_gain = output_dir.joinpath('motioncor2_gain')
+            temp_gain.mkdir()
+            gain_ref_mrc = temp_gain.joinpath(gain_ref_dm4.stem + '.mrc')
             print(f'Found unique gain reference {gain_ref_dm4}, converting to MRC at {gain_ref_mrc}')
             subprocess.run(['dm2mrc', gain_ref_dm4, gain_ref_mrc])
 
@@ -158,6 +160,7 @@ class Micrograph:
             with open(join(output_dir, 'motioncor2.log'), 'r') as log:
                 if any(l.startswith('Warning: Gain ref not found.') for l in log):
                     raise Exception('Gain reference was specified, but not applied by MotionCor2. Check log file!')
+            shutil.rmtree(temp_gain)
         
         output_micrographs = [
             Micrograph(path=output_dir.joinpath(movie.path.with_suffix('.mrc').name), tilt_angle=movie.tilt_angle)

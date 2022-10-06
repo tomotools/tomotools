@@ -56,15 +56,16 @@ def blend_montages(cpus, input_files, output_dir):
               help='If your frames are not automatically found, you can pass the path to the frames directory')
 @click.option('--gainref', type=click.Path(exists=True, dir_okay=False),
               help='Use this gain reference instead looking for one in the Subframe MDOC files')
-@click.option('--rotationandflip', type=int,
+@click.option('--rotationandflip', type=int, default=None,
               help='Override RotationAndFlip for the gain reference (useful if it\'s not in the mdoc file)')
 @click.option('--group', type=int, default=1, show_default=True,
               help='Group frames, useful for low-dose frames. Also see motioncor2 manual')
 @click.option('--gpus', type=str, default=None,
               help='GPUs list, comma separated (e.g. 0,1), determined automatically if not passed')
-@click.option('--exposuredose', type=float, default=None)
+@click.option('--exposuredose', type=float, default=None,
+              help='Pass ExposureDose per tilt to override value in mdoc file.')
 @click.option('--stack/--nostack', is_flag=True, default=True,
-              help='Create a tilt-series stack or keep the motion-corrected frames as they are')
+              help='Create a tilt-series stack or keep the motion-corrected frames as they are.')
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
 @click.argument('output_dir', type=click.Path(writable=True))
 def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotationandflip, group, gpus, exposuredose,
@@ -111,27 +112,31 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
             print(f'{input_file} is not a tilt series, as all TiltAngles are near zero. Skipping.')
             continue
 
-        # File is a tilt-series, look for subframes
-        print(f'Looking for movie frames for {input_file}, which looks like a tilt series')
-        for section in mdoc['sections']:
-            subframes_root_path = path.dirname(input_file) if frames is None else frames
-            section['SubFramePath'] = mdocfile.find_relative_path(
-                Path(subframes_root_path),
-                Path(section.get('SubFramePath', '').replace('\\', path.sep))
-            )
-            if exposuredose is not None:
+        # File is a tilt-series.
+        print(f'Working on {input_file}, which looks like a tilt series')
+        
+        # Fix ExposureDose is required
+        if exposuredose is not None:
+            for section in mdoc['sections']:         
                 section['ExposureDose'] = exposuredose
-
+        
         if any(section['ExposureDose'] == 0 for section in mdoc['sections']) and exposuredose is None:
             print(f'{input_file} has no ExposureDose set. This might lead to problems down the road!')
-
-        # Check if all subframes were found (if specified in mdoc!)
+         
+        # Are any SubFrames present?    
         if any('SubFramePath' in section for section in mdoc['sections']):    
+            for section in mdoc['sections']:
+                subframes_root_path = path.dirname(input_file) if frames is None else frames
+                section['SubFramePath'] = mdocfile.find_relative_path(
+                    Path(subframes_root_path),
+                    Path(section.get('SubFramePath', '').replace('\\', path.sep)))
+
             try:
                 movies = [Movie(section['SubFramePath'], section['TiltAngle']) for section in mdoc['sections']]
             except FileNotFoundError:
                 print(f'Not all movie frames were found for {input_file}, specify them using the --frames option. Skipping at this point.')
                 continue
+            
         else:
             if reorder:
                 print(f'Running newstack -reorder on {input_file}')
@@ -154,8 +159,8 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
         # Get rotation and flip of Gain reference from mdoc file property
         mcrot, mcflip = None, None
         if rotationandflip is None:
-            rotationandflip = mdoc['sections'][0].get('RotationAndFlip', None)
-            mcrot, mcflip = sem2mc2(rotationandflip)
+            mdoc_rotflip = mdoc['sections'][0].get('RotationAndFlip', None)
+            mcrot, mcflip = sem2mc2(mdoc_rotflip)
             
         # Grab frame size to estimate appropriate patch numbers
         patch_x, patch_y = [str(round(mdoc['ImageSize'][0]/800)), str(round(mdoc['ImageSize'][1]/800))]

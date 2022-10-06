@@ -127,8 +127,8 @@ class TiltSeries:
         if all(micrograph.is_split for micrograph in micrographs):
             micrograph_evn_paths = [str(micrograph.evn_path) for micrograph in micrographs]
             micrograph_odd_paths = [str(micrograph.odd_path) for micrograph in micrographs]
-            ts_evn = ts_path.with_stem(ts_path.stem + '_EVN')
-            ts_odd = ts_path.with_stem(ts_path.stem + '_ODD')
+            ts_evn = ts_path.with_name(ts_path.stem + '_EVN.mrc')
+            ts_odd = ts_path.with_name(ts_path.stem + '_ODD.mrc')
             subprocess.run(['newstack'] + micrograph_evn_paths + [ts_evn, '-quiet'])
             subprocess.run(['newstack'] + micrograph_odd_paths + [ts_odd, '-quiet'])
             TiltSeries._update_mrc_header_from_mdoc(ts_evn, stack_mdoc)
