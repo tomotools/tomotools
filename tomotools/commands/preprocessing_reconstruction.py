@@ -192,10 +192,11 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
 @click.option('--keep-ali-stack/--delete-ali-stack', is_flag=True, default=False, show_default=True,
               help="Keep or delete the non-dose-filtered aligned stack (useful for Relion)")
 @click.option('--previous', is_flag = True, help="Use previous alignment found in the folder.")
+@click.option('--gpu', type=str, default=None, help="Specify which GPUs to use for AreTomo. Default: all")
 @click.option('--do-evn-odd', is_flag = True, help="Perform alignment, dose-filtration and reconstruction also on EVN/ODD stacks, if present. Needed for later cryoCARE processing. If the EVN/ODD stacks are found, they will be moved and tilts will be excluded as with the original stack regardless of this flag.")
 @click.option('--batch-file', type=click.Path(exists=True, dir_okay=False),help = "You can pass a tab-separated file with tilt series names and views to exclude before alignment and reconstruction.")
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
-def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previous, do_evn_odd, batch_file, input_files):
+def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previous, gpu, do_evn_odd, batch_file, input_files):
     """Align and reconstruct the given tiltseries. 
     
     Optionally moves tilt series and excludes specified tilts. Then runs AreTomo alignment and ultimately dose-filtration and imod WBP reconstruction.   
@@ -232,8 +233,8 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         # Check for tilts to exclude
         excludetilts = None
         if batch_file is not None:
-            if tiltseries in ts_info:
-                excludetilts = ts_info[tiltseries]
+            if str(ts) in ts_info:
+                excludetilts = ts_info[str(ts)]
                 print(f'Found tilts to exclude in {batch_file}. Will exclude tilts {excludetilts}.')
 
         if move:
@@ -241,12 +242,12 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
             mkdir(dir)
             print(f'Move files to subdir {dir}')
             
-            shutil.move(tiltseries.path, dir)
-            shutil.move(tiltseries.mdoc, dir)
+            shutil.move(str(tiltseries.path), dir)
+            shutil.move(str(tiltseries.mdoc), dir)
             
             if tiltseries.is_split:
-                shutil.move(tiltseries.evn_path, dir)
-                shutil.move(tiltseries.odd_path, dir)
+                shutil.move(str(tiltseries.evn_path), dir)
+                shutil.move(str(tiltseries.odd_path), dir)
                 tiltseries = TiltSeries(Path(join(dir,tiltseries.path.name))).with_split_files(Path(join(dir,tiltseries.evn_path.name)), Path(join(dir,tiltseries.odd_path.name)))
             
             else:
@@ -288,7 +289,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         
         # Align Stack
         # TODO: somehow decide whether imod or AreTomo should be used!
-        tiltseries = align_with_areTomo(tiltseries, local, previous, do_evn_odd)
+        tiltseries = align_with_areTomo(tiltseries, local, previous, do_evn_odd, gpu)
 
         # Do dose filtration.
         tiltseries = dose_filter(tiltseries,keep_ali_stack, do_evn_odd)

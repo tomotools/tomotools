@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional, List
 from operator import itemgetter
 
-from tomotools.utils import mdocfile
+from tomotools.utils import mdocfile, util
 from tomotools.utils.micrograph import Micrograph
 
 
@@ -151,7 +151,7 @@ def aretomo_executable() -> Optional[Path]:
                 f'ARETOMO_EXECUTABLE is set to "{aretomo_exe}", but the file does not exist. Falling back to PATH')
     return shutil.which('AreTomo')
 
-def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: bool):
+def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: bool, gpu: str):
     ''' Takes a TiltSeries as input and runs AreTomo on it, if desired with local alignment. If previous is True, respect previous alignment in folder.
     If do_evn_odd is passed, also perform alignment on half-stacks. Will apply the pixel size from the input stack to the output stack.
     '''
@@ -159,6 +159,15 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
     ali_stack = ts.path.with_name(f'{ts.path.stem}_ali.mrc')
     aln_file = ts.path.with_suffix('.aln')
     orig_mdoc = ts.mdoc
+    
+    if gpu is None:
+        gpu_id = [int(i) for i in range(0,util.num_gpus())]
+ 
+    else:
+        # Turn GPU list into list of integers
+        gpu_id = gpu.split(',')
+        gpu_id = [int(gpu) for gpu in gpu_id]
+
     
     with mrcfile.mmap(ts.path) as mrc:
         angpix = float(mrc.voxel_size.x)
@@ -180,19 +189,17 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
         subprocess.run(['extracttilts', ts.path, tlt_file],
                        stdout=subprocess.DEVNULL)
 
-        #num_gpus = int(util.gpuinfo()['Attached GPUs'])
-
         mdoc = mdocfile.read(ts.mdoc)
         full_dimensions = mdoc['ImageSize']
         patch_x, patch_y = [str(round(full_dimensions[0]/1000)), str(round(full_dimensions[1]/1000))]
 
-        #TODO: Enable Multi-GPU processing
         subprocess.run([aretomo_executable(),
                         '-InMrc', ts.path,
                         '-OutMrc', ali_stack,
                         '-AngFile', tlt_file,
                         '-VolZ', '0',
-                        '-TiltCor', '1'] +
+                        '-TiltCor', '1']+
+                        (['-Gpu'] + [str(i) for i in gpu_id])+
                         (['-Patch', patch_x, patch_y] if local else []),
                         stdout=subprocess.DEVNULL)       
     

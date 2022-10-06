@@ -116,8 +116,7 @@ class Micrograph:
         elif movies[0].is_tiff:
             command += ['-InTiff', str(tempdir.absolute()) + '/']
         if gpus is None:
-            num_gpus = int(util.gpuinfo()['Attached GPUs'])
-            command += ['-Gpu'] + [str(i) for i in range(num_gpus)] if num_gpus > 0 else []
+            command += ['-Gpu'] + [str(i) for i in range(util.num_gpus())] if util.num_gpus() > 0 else []
         else:
             command += ['-Gpu', gpus]
         if splitsum:
