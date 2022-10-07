@@ -171,7 +171,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
                                              group=group, override_gainref=gainref, gpus=gpus, patch_x = patch_x, patch_y = patch_y)
 
         if stack:
-            tilt_series = TiltSeries.from_micrographs(micrographs, Path(output_dir, input_file),
+            tilt_series = TiltSeries.from_micrographs(micrographs, output_dir / input_file.name,
                                                       orig_mdoc_path=mdoc['path'], reorder=True)
             shutil.rmtree(frames_corrected_dir)
             print(f'Successfully created {tilt_series.path}')
