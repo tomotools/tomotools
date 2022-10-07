@@ -35,7 +35,6 @@ def deconv(defocus,snrfalloff,deconvstrength,hpnyquist,phaseshift,phaseflipped,i
         wiener = mathutil.wiener(angpix, float(defocus), float(snrfalloff), float(deconvstrength), float(hpnyquist), phaseflipped, int(phaseshift))
         
         # In mcrfile convention, the array is ordered zyx!         
-        # TODO: test whether it works as intended with even dimension!          
         sx = int(-1*np.floor(volume_in.shape[2]/2))
         fx = sx + volume_in.shape[2] -1
         
