@@ -1,7 +1,6 @@
 import os
 import shutil
 import subprocess
-import mrcfile
 from glob import glob
 from os import mkdir
 from os import path
@@ -9,6 +8,7 @@ from os.path import abspath, basename, join
 from pathlib import Path
 
 import click
+import mrcfile
 
 from tomotools.utils import mdocfile
 from tomotools.utils.micrograph import Micrograph, sem2mc2
@@ -86,8 +86,8 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
         if input_file.is_file():
             input_files_temp.append(input_file)
         elif input_file.is_dir():
-            input_files_temp += glob(path.join(input_file, '*.mrc'))
-            input_files_temp += glob(path.join(input_file, '*.st'))
+            input_files_temp += [Path(p) for p in glob(path.join(input_file, '*.mrc'))]
+            input_files_temp += [Path(p) for p in glob(path.join(input_file, '*.st'))]
     input_files = input_files_temp
 
     output_dir = Path(output_dir)
