@@ -199,7 +199,7 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
                         '-AngFile', tlt_file,
                         '-VolZ', '0',
                         '-TiltCor', '1']+
-                        (['-Gpu'] + [str(i) for i in gpu_id])+
+                        #(['-Gpu'] + [str(i) for i in gpu_id])+
                         (['-Patch', patch_x, patch_y] if local else []),
                         stdout=subprocess.DEVNULL)       
     
