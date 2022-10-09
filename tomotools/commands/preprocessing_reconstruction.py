@@ -253,9 +253,9 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                 tiltseries.evn_path = tiltseries.evn_path.rename(dir / tiltseries.evn_path.name)
                 tiltseries.odd_path = tiltseries.odd_path.rename(dir / tiltseries.odd_path.name)
                 
-        # Run newstack to exclude tilts 
-        exclude_cmd = ['excludeviews', '-views', excludetilts, '-delete']
+        # Exclude tilts
         if excludetilts is not None:
+            exclude_cmd = ['excludeviews', '-views', excludetilts, '-delete']
             subprocess.run(exclude_cmd + [str(tiltseries.path)])
             print(f'Excluded specified tilts from {tiltseries.path}.')
             if tiltseries.is_split:
@@ -280,6 +280,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         # Try to automatically find edges of tomogram
         pitch_mod = tomo_pitch.path.with_name(f'{tiltseries.path.stem}_pitch.mod')
         
+        # The parameters for findsection are taken from the etomo source code
         fs = subprocess.run(['findsection',
                         '-tomo', tomo_pitch.path,
                         '-pitch', pitch_mod,
