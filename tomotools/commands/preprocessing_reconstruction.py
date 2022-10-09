@@ -224,7 +224,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
             continue
         else:
             print(f'Found TiltSeries {input_file}.')
-            tiltseries = TiltSeries(input_file)
+            tiltseries = TiltSeries(Path(input_file))
             # Look for MDOC file
             if not path.isfile(tiltseries.mdoc):
                 raise FileNotFoundError(f'No MDOC file found at {tiltseries.mdoc}')
