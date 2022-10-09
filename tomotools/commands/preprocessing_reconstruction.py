@@ -238,7 +238,6 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
     
     # Iterate over the tiltseries objects and align and reconstruct
     for tiltseries in input_ts:
-        # TODO: change from newstack to excludeviews
         excludetilts = None
         if str(tiltseries.path) in ts_info:
             excludetilts = ts_info[str(tiltseries.path)]
@@ -255,37 +254,13 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                 tiltseries.odd_path = tiltseries.odd_path.rename(dir / tiltseries.odd_path.name)
                 
         # Run newstack to exclude tilts 
+        exclude_cmd = ['excludeviews', '-views', excludetilts, '-delete']
         if excludetilts is not None:
-            exclude_file = tiltseries.path.with_name(f'{tiltseries.path.stem}_excludetilts.mrc')
-            
-            subprocess.run(['newstack',
-                            '-in', str(tiltseries.path),
-                            '-mdoc',
-                            '-quiet',
-                            '-exclude', excludetilts,
-                            '-ou', str(exclude_file)])
+            subprocess.run(exclude_cmd + [str(tiltseries.path)])
             print(f'Excluded specified tilts from {tiltseries.path}.')
-            tiltseries.path = exclude_file
-            tiltseries.mdoc = Path(f'{tiltseries.path}.mdoc')
-            
             if tiltseries.is_split:
-                exclude_evn = tiltseries.evn_path.with_name(f'{tiltseries.path.stem}_excludetilts_EVN.mrc')
-                exclude_odd = tiltseries.odd_path.with_name(f'{tiltseries.path.stem}_excludetilts_ODD.mrc')
-                
-                subprocess.run(['newstack',
-                                '-in', str(tiltseries.evn_path),
-                                '-quiet',
-                                '-exclude', excludetilts,
-                                '-ou', str(exclude_evn)])
-                subprocess.run(['newstack',
-                                '-in', str(tiltseries.odd_path),
-                                '-quiet',
-                                '-exclude', excludetilts,
-                                '-ou', str(exclude_odd)])
-                
-                tiltseries.evn_path = exclude_evn
-                tiltseries.odd_path = exclude_odd
-                
+                subprocess.run(exclude_cmd + [str(tiltseries.evn_path)])
+                subprocess.run(exclude_cmd + [str(tiltseries.odd_path)])
                 print(f'Excluded specified tilts from EVN and ODD stacks for {tiltseries.path}.')
         
         # Align Stack
@@ -293,10 +268,10 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         tiltseries = align_with_areTomo(tiltseries, local, previous, do_evn_odd, gpu)
 
         # Do dose filtration.
-        tiltseries = dose_filter(tiltseries,keep_ali_stack, do_evn_odd)
+        tiltseries = dose_filter(tiltseries, keep_ali_stack, do_evn_odd)
         
         # Get AngPix
-        with mrcfile.mmap(tiltseries.path, mode = 'r') as mrc:
+        with mrcfile.mmap(tiltseries.path, mode='r') as mrc:
            pix_xy = float(mrc.voxel_size.x)
         
         # Perform reconstruction at bin 8 to find pitch / thickness        
