@@ -6,6 +6,7 @@ from os import mkdir
 from os import path
 from os.path import abspath, basename, join
 from pathlib import Path
+from warnings import warn
 
 import click
 import mrcfile
@@ -207,8 +208,11 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         with open(batch_file) as file:
             for line in file:
                 if line != '\n':
-                    l=line.split('\t')
-                    temp={l[0]: l[1].rstrip()}
+                    l = line.rsplit(maxsplit=1)
+                    if len(l) != 2:
+                        warn(f'Skipping invalid line in the batch file: "{line}"')
+                        continue
+                    temp = {l[0]: l[1].rstrip()}
                     ts_info.update(temp)
 
     input_ts = list()
