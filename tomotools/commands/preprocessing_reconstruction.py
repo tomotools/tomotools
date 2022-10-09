@@ -229,7 +229,8 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
             if not path.isfile(tiltseries.mdoc):
                 raise FileNotFoundError(f'No MDOC file found at {tiltseries.mdoc}')
             # Check if there are EVN/ODD files for this tiltseries
-            evn_path, odd_path = tiltseries.path.name(f'{tiltseries.path.stem}_EVN.mrc'), tiltseries.path.with_name(f'{tiltseries.path.stem}_ODD.mrc')
+            evn_path = tiltseries.path.with_name(f'{tiltseries.path.stem}_EVN.mrc')
+            odd_path = tiltseries.path.with_name(f'{tiltseries.path.stem}_ODD.mrc')
             if evn_path.is_file() and odd_path.is_file():
                 print(f'Found EVN and ODD stacks for {input_file}.')
                 tiltseries = tiltseries.with_split_files(evn_path, odd_path)
