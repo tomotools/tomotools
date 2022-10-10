@@ -198,8 +198,8 @@ def defects_tif(gainref: Path, tempdir: Path, template: Path):
     defects_txt = Path(check_defects(gainref))
     defects_tif = defects_txt.with_suffix(".tif")
     if isfile(defects_tif):
-        return defects_tif
         print(f'Found defects file {str(defects_tif)}')
+        return defects_tif
     else:
         subprocess.run(['clip', 'defect', '-D', defects_txt, template, defects_tif])
         print(f'Found defects file and converted to {str(defects_tif)}')

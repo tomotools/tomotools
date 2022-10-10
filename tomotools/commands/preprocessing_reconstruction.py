@@ -6,6 +6,7 @@ from os import mkdir
 from os import path
 from os.path import abspath, basename, join
 from pathlib import Path
+from warnings import warn
 
 import click
 import mrcfile
@@ -202,100 +203,88 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
     Optionally moves tilt series and excludes specified tilts. Then runs AreTomo alignment and ultimately dose-filtration and imod WBP reconstruction.   
     """
     # Read in batch tilt exclude file
+    ts_info = {}
     if batch_file is not None:
-        ts_info = {}
         with open(batch_file) as file:
             for line in file:
                 if line != '\n':
-                    l=line.split('\t')
-                    temp={l[0]: l[1].rstrip()}
+                    l = line.rsplit(maxsplit=1)
+                    if len(l) != 2:
+                        warn(f'Skipping invalid line in the batch file: "{line}"')
+                        continue
+                    temp = {l[0]: l[1].rstrip()}
                     ts_info.update(temp)
 
     input_ts = list()
     
-    # Sanitize input list to only include the main stack.
+    # Sanitize input list to only include the main stack and create TiltSeries objects
     for input_file in input_files:
-        if not input_file.endswith('_EVN.mrc') and not input_file.endswith('_ODD.mrc') and not input_file.endswith('.mdoc'):
-            input_ts.append(Path(input_file))
-    
-    for ts in input_ts:
-        # merge main EVN ODD into one TiltSeries object
-        if path.isfile(ts.with_name(f'{ts.stem}_EVN.mrc')) and path.isfile(ts.with_name(f'{ts.stem}_ODD.mrc')):
-            tiltseries = TiltSeries(ts).with_split_files(ts.with_name(f'{ts.stem}_EVN.mrc'), ts.with_name(f'{ts.stem}_ODD.mrc'))
-            print(f'Found TiltSeries {ts} with EVN and ODD stacks.')
+        if input_file.endswith('_EVN.mrc') or input_file.endswith('_ODD.mrc') or input_file.endswith('.mdoc'):
+            print(f'Skipping file {input_file}')
+            continue
         else:
-            tiltseries = TiltSeries(ts)
-            print(f'Found TiltSeries {ts}.')
-
-        if not path.isfile(tiltseries.mdoc):
-            raise FileNotFoundError(f'No MDOC file found at {tiltseries.mdoc}')
-
-        # Check for tilts to exclude
+            print(f'Found TiltSeries {input_file}.')
+            tiltseries = TiltSeries(Path(input_file))
+            # Look for MDOC file
+            if not path.isfile(tiltseries.mdoc):
+                raise FileNotFoundError(f'No MDOC file found at {tiltseries.mdoc}')
+            # Check if there are EVN/ODD files for this tiltseries
+            evn_path = tiltseries.path.with_name(f'{tiltseries.path.stem}_EVN.mrc')
+            odd_path = tiltseries.path.with_name(f'{tiltseries.path.stem}_ODD.mrc')
+            if evn_path.is_file() and odd_path.is_file():
+                print(f'Found EVN and ODD stacks for {input_file}.')
+                tiltseries = tiltseries.with_split_files(evn_path, odd_path)
+            input_ts.append(tiltseries)
+    
+    # Iterate over the tiltseries objects and align and reconstruct
+    for tiltseries in input_ts:
         excludetilts = None
-        if batch_file is not None:
-            if str(ts) in ts_info:
-                excludetilts = ts_info[str(ts)]
-                print(f'Found tilts to exclude in {batch_file}. Will exclude tilts {excludetilts}.')
+        if str(tiltseries.path) in ts_info:
+            excludetilts = ts_info[str(tiltseries.path)]
+            print(f'Found tilts to exclude in {batch_file}. Will exclude tilts {excludetilts}.')
 
         if move:
-            dir = tiltseries.path.stem
-            mkdir(dir)
+            dir = tiltseries.path.with_suffix('')
             print(f'Move files to subdir {dir}')
-            
-            shutil.move(str(tiltseries.path), dir)
-            shutil.move(str(tiltseries.mdoc), dir)
-            
+            dir.mkdir()
+            tiltseries.path = tiltseries.path.rename(dir / tiltseries.path.name)
+            tiltseries.mdoc = tiltseries.mdoc.rename(dir / tiltseries.mdoc.name)
             if tiltseries.is_split:
-                shutil.move(str(tiltseries.evn_path), dir)
-                shutil.move(str(tiltseries.odd_path), dir)
-                tiltseries = TiltSeries(Path(join(dir,tiltseries.path.name))).with_split_files(Path(join(dir,tiltseries.evn_path.name)), Path(join(dir,tiltseries.odd_path.name)))
-            
-            else:
-                tiltseries = TiltSeries(Path(join(dir,tiltseries.path.name)))
+                tiltseries.evn_path = tiltseries.evn_path.rename(dir / tiltseries.evn_path.name)
+                tiltseries.odd_path = tiltseries.odd_path.rename(dir / tiltseries.odd_path.name)
                 
-        # Run newstack to exclude tilts 
+        # Exclude tilts
         if excludetilts is not None:
-            exclude_file = tiltseries.path.with_name(f'{tiltseries.path.stem}_excludetilts.mrc')
-            
-            subprocess.run(['newstack',
-                            '-in', str(tiltseries.path),
-                            '-mdoc',
-                            '-quiet',
-                            '-exclude', excludetilts,
-                            '-ou', str(exclude_file)])
+            exclude_cmd = ['excludeviews', '-views', excludetilts, '-delete']
+            subprocess.run(exclude_cmd + [str(tiltseries.path)])
             print(f'Excluded specified tilts from {tiltseries.path}.')
-            tiltseries.path = exclude_file
-            tiltseries.mdoc = Path(f'{tiltseries.path}.mdoc')
-            
+
             if tiltseries.is_split:
-                exclude_evn = tiltseries.evn_path.with_name(f'{tiltseries.path.stem}_excludetilts_EVN.mrc')
-                exclude_odd = tiltseries.odd_path.with_name(f'{tiltseries.path.stem}_excludetilts_ODD.mrc')
-                
-                subprocess.run(['newstack',
-                                '-in', str(tiltseries.evn_path),
-                                '-quiet',
-                                '-exclude', excludetilts,
-                                '-ou', str(exclude_evn)])
-                subprocess.run(['newstack',
-                                '-in', str(tiltseries.odd_path),
-                                '-quiet',
-                                '-exclude', excludetilts,
-                                '-ou', str(exclude_odd)])
-                
-                tiltseries.evn_path = exclude_evn
-                tiltseries.odd_path = exclude_odd
-                
+                subprocess.run(exclude_cmd + [str(tiltseries.evn_path)])
+                subprocess.run(exclude_cmd + [str(tiltseries.odd_path)])
                 print(f'Excluded specified tilts from EVN and ODD stacks for {tiltseries.path}.')
-        
+                
+            # To clean the directory up a bit, move the excluded views to a separate subdirectory
+            excludedir = join(tiltseries.path.parent, 'excluded_views')
+            if not path.isdir(excludedir):
+                os.mkdir(excludedir)
+            
+            for file in glob(join(tiltseries.path.parent,'*_cutviews0.*')):
+                os.rename(file, join(excludedir,Path(file).name))
+            
+            with open(join(excludedir,'README'), mode = 'w+') as file:
+                file.write('Restore full stack by moving these files back and running command excludeviews -restore')
+                
+                            
         # Align Stack
         # TODO: somehow decide whether imod or AreTomo should be used!
         tiltseries = align_with_areTomo(tiltseries, local, previous, do_evn_odd, gpu)
 
         # Do dose filtration.
-        tiltseries = dose_filter(tiltseries,keep_ali_stack, do_evn_odd)
+        tiltseries = dose_filter(tiltseries, keep_ali_stack, do_evn_odd)
         
         # Get AngPix
-        with mrcfile.mmap(tiltseries.path, mode = 'r') as mrc:
+        with mrcfile.mmap(tiltseries.path, mode='r') as mrc:
            pix_xy = float(mrc.voxel_size.x)
         
         # Perform reconstruction at bin 8 to find pitch / thickness        
@@ -304,6 +293,7 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         # Try to automatically find edges of tomogram
         pitch_mod = tomo_pitch.path.with_name(f'{tiltseries.path.stem}_pitch.mod')
         
+        # The parameters for findsection are taken from the etomo source code
         fs = subprocess.run(['findsection',
                         '-tomo', tomo_pitch.path,
                         '-pitch', pitch_mod,
@@ -341,9 +331,22 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                 z_shift = tomopitch_z[0].split()[-1]
                 thickness = str(int(tomopitch_z[1].split()[-1])+extra_thickness)
                 print(f'{tiltseries.path}: Succesfully estimated tomopitch {x_axis_tilt} and thickness {thickness}.')
+            os.remove(pitch_mod)
         
         os.remove(tomo_pitch.path)
         
         # Perform final reconstruction
         # TODO: if imod alignment is present, use alttomosetup instead for EVN/ODD volumes
         Tomogram.from_tiltseries(tiltseries, bin = bin,thickness = thickness, x_axis_tilt=x_axis_tilt, z_shift = z_shift, sirt = sirt, do_EVN_ODD = do_evn_odd)
+        
+        # Remove intermediate files: dose-filtered stack, tlt file if aligned stack is not kept
+        if str(tiltseries.path).endswith('_filtered.mrc'):
+            os.remove(tiltseries.path)
+        
+        if not keep_ali_stack:
+            os.remove(tiltseries.path.with_name(f'{tiltseries.path.parent}_ali.tlt'))
+
+        # _evn and odd aligned stacks
+        if do_evn_odd and str(tiltseries.evn_path).endswith('_filtered_EVN.mrc'):
+            os.remove(tiltseries.evn_path)
+            os.remove(tiltseries.odd_path)
