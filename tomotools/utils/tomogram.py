@@ -227,6 +227,7 @@ class Tomogram:
                 os.remove(full_rec_odd)
                 return Tomogram(final_rec).with_split_files(final_rec_evn, final_rec_odd)
             
+            os.remove(full_rec)
             return Tomogram(final_rec)
             
         return Tomogram(full_rec)

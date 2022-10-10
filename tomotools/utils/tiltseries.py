@@ -206,7 +206,7 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
     with mrcfile.mmap(ali_stack, mode = 'r+') as mrc:
            mrc.voxel_size = str(angpix)
            mrc.update_header_stats()
-    
+        
     print(f'Done aligning {ts.path.stem} with AreTomo.')
 
     if do_evn_odd and ts.is_split:
@@ -232,9 +232,15 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
         with mrcfile.mmap(ali_stack_odd, mode = 'r+') as mrc:
             mrc.voxel_size = str(angpix)
             mrc.update_header_stats()
-
+        
+        os.remove(tlt_file)
+        os.remove(ali_stack_evn.with_name(f'{ali_stack_evn.stem}.tlt'))
+        os.remove(ali_stack_odd.with_name(f'{ali_stack_odd.stem}.tlt'))
+        
         print(f'Done aligning ENV and ODD stacks for {ts.path.stem} with AreTomo.')
         return TiltSeries(ali_stack).with_split_files(ali_stack_evn, ali_stack_odd).with_mdoc(orig_mdoc)
+    
+    os.remove(tlt_file)
     
     return TiltSeries(ali_stack).with_mdoc(orig_mdoc)
 

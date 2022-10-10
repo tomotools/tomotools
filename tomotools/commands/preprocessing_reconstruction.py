@@ -258,11 +258,24 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
             exclude_cmd = ['excludeviews', '-views', excludetilts, '-delete']
             subprocess.run(exclude_cmd + [str(tiltseries.path)])
             print(f'Excluded specified tilts from {tiltseries.path}.')
+
             if tiltseries.is_split:
                 subprocess.run(exclude_cmd + [str(tiltseries.evn_path)])
                 subprocess.run(exclude_cmd + [str(tiltseries.odd_path)])
                 print(f'Excluded specified tilts from EVN and ODD stacks for {tiltseries.path}.')
-        
+                
+            # To clean the directory up a bit, move the excluded views to a separate subdirectory
+            excludedir = join(tiltseries.path.parent, 'excluded_views')
+            if not path.isdir(excludedir):
+                os.mkdir(excludedir)
+            
+            for file in glob(join(tiltseries.path.parent,'*_cutviews0.*')):
+                os.rename(file, join(excludedir,Path(file).name))
+            
+            with open(join(excludedir,'README'), mode = 'w+') as file:
+                file.write('Restore full stack by moving these files back and running command excludeviews -restore')
+                
+                            
         # Align Stack
         # TODO: somehow decide whether imod or AreTomo should be used!
         tiltseries = align_with_areTomo(tiltseries, local, previous, do_evn_odd, gpu)
@@ -318,9 +331,22 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                 z_shift = tomopitch_z[0].split()[-1]
                 thickness = str(int(tomopitch_z[1].split()[-1])+extra_thickness)
                 print(f'{tiltseries.path}: Succesfully estimated tomopitch {x_axis_tilt} and thickness {thickness}.')
+            os.remove(pitch_mod)
         
         os.remove(tomo_pitch.path)
         
         # Perform final reconstruction
         # TODO: if imod alignment is present, use alttomosetup instead for EVN/ODD volumes
         Tomogram.from_tiltseries(tiltseries, bin = bin,thickness = thickness, x_axis_tilt=x_axis_tilt, z_shift = z_shift, sirt = sirt, do_EVN_ODD = do_evn_odd)
+        
+        # Remove intermediate files: dose-filtered stack, tlt file if aligned stack is not kept
+        if str(tiltseries.path).endswith('_filtered.mrc'):
+            os.remove(tiltseries.path)
+        
+        if not keep_ali_stack:
+            os.remove(tiltseries.path.with_name(f'{tiltseries.path.parent}_ali.tlt'))
+
+        # _evn and odd aligned stacks
+        if do_evn_odd and str(tiltseries.evn_path).endswith('_filtered_EVN.mrc'):
+            os.remove(tiltseries.evn_path)
+            os.remove(tiltseries.odd_path)
