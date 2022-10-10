@@ -2,12 +2,12 @@ import os
 import shutil
 import subprocess
 import warnings
-import mrcfile
-
+from operator import itemgetter
 from os import path
 from pathlib import Path
 from typing import Optional, List
-from operator import itemgetter
+
+import mrcfile
 
 from tomotools.utils import mdocfile, util
 from tomotools.utils.micrograph import Micrograph
@@ -41,11 +41,16 @@ class TiltSeries:
         evn_file = dir.joinpath(f'{stem}_EVN{suffix}')
         odd_file = dir.joinpath(f'{stem}_ODD{suffix}')
         return self.with_split_files(evn_file, odd_file)
-    
+
     def with_mdoc(self, file: Path):
         self.mdoc: Path = file
         return self
-    
+
+    def delete_files(self):
+        for file in (self.path, self.mdoc, self.evn_path, self.odd_path):
+            if file is not None and file.is_file():
+                file.unlink()
+
     # TODO: parse ctffind or ctfplotter files
     def get_defocus(self, output_file: Optional[Path] = None):
         pass
@@ -244,16 +249,16 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
     
     return TiltSeries(ali_stack).with_mdoc(orig_mdoc)
 
-def dose_filter(ts: TiltSeries, keep_ali_stack: bool, do_evn_odd: bool):
+
+def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
     """ Runs mtffilter on the given TiltSeries object with the doses in the associated mdoc file. Will take into account EVN/ODD stacks if do_evn_odd is passed.
     mdoc needs to contain only ExposureDose, as PriorRecordDose is deduced by mtffilter based on the DateTime entry, see mtffilter -help, section "-dtype"
     """
-    mdoc = mdocfile.read(ts.mdoc)    
-      
+    mdoc = mdocfile.read(ts.mdoc)
+
     if any(section['ExposureDose'] == 0 for section in mdoc['sections']):
-            print(f'{ts.mdoc} has no ExposureDose set. Skipping dose-filtration.')
-            return ts
-            
+        print(f'{ts.mdoc} has no ExposureDose set. Skipping dose-filtration.')
+        return ts
     else:
         orig_mdoc = ts.mdoc
         filtered_stack = ts.path.with_name(f'{ts.path.stem}_filtered.mrc')
@@ -269,17 +274,9 @@ def dose_filter(ts: TiltSeries, keep_ali_stack: bool, do_evn_odd: bool):
             subprocess.run(['mtffilter', '-dtype', '4', '-dfile', ts.mdoc, ts.odd_path, filtered_odd],
                            stdout=subprocess.DEVNULL)
             
-            if not keep_ali_stack:
-                os.remove(ts.path)
-                os.remove(ts.evn_path)
-                os.remove(ts.odd_path)
-            
             print(f'Done dose-filtering {ts.path} and EVN/ODD stacks.')
             return TiltSeries(filtered_stack).with_split_files(filtered_evn, filtered_odd).with_mdoc(orig_mdoc)
         
-        if not keep_ali_stack:
-            os.remove(ts.path)
-
         print(f'Done dose-filtering {ts.path}.')
         return TiltSeries(filtered_stack).with_mdoc(orig_mdoc)
 
