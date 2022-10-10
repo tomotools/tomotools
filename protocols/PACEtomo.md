@@ -1,6 +1,6 @@
 # PACEtomo how-to
 ## A step-by-step guide for PACEtomo prep and acquisition.
-> For PACEtomo v1.4, protocol version 220930
+> For PACEtomo v1.4.2, protocol version 221006
 > Benedikt Wimmer, Medalia Lab, UZH
 > Check the official documentation at https://github.com/eisfabian/PACEtomo
 
@@ -10,8 +10,8 @@
 1. Load carbon grid.
 2. Go to eucentric height, perform all all alignments as described in the general tilt-series protocol (section C). **Preferably use the NanoProbe mode** for all high-magnification modes in SerialEM.
 3. In the *Low Dose* panel, make sure to set the focus offset to 0.
-4. After all other alignments have been done, do the *Coma-vs-IS* alignment (*Calibration > Focus & Tuning > Coma vs. Image Shift*). Closing SerialEM might delete this, so make sure to keep it open.
-4. **Set the tilt axis offset for your target magnification** at *Tasks > Eucentricity > Offset*.
+4. After all other alignments have been done, do the *Coma-vs-IS* alignment (*Focus > Coma vs. Image Shift*). Closing SerialEM might delete this, so make sure to keep it open.
+5. **Set the tilt axis offset for your target magnification** at *Tasks > Eucentricity > Offset*.
   - If you have not yet done so, measure it using the measure_offset.py script provided by PACEtomo. The output from the script is always relative to the set offset, so perform a few cycles of measure - set offset - measure - set offset until it converges on a value (± 0.1 µm). Write down the value for future use.
 
 ## B) Map Lamellas and Add Targets
