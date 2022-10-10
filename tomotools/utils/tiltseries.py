@@ -46,8 +46,8 @@ class TiltSeries:
         self.mdoc: Path = file
         return self
 
-    def delete_files(self):
-        for file in (self.path, self.mdoc, self.evn_path, self.odd_path):
+    def delete_files(self, delete_mdoc=True):
+        for file in [self.path, self.evn_path, self.odd_path, self.mdoc if delete_mdoc else None]:
             if file is not None and file.is_file():
                 file.unlink()
 
@@ -164,7 +164,7 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
     ali_stack = ts.path.with_name(f'{ts.path.stem}_ali.mrc')
     aln_file = ts.path.with_suffix('.aln')
     orig_mdoc = ts.mdoc
-    
+
     if gpu is None:
         gpu_id = [int(i) for i in range(0,util.num_gpus())]
  
