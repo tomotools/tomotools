@@ -331,8 +331,9 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                 z_shift = tomopitch_z[0].split()[-1]
                 thickness = str(int(tomopitch_z[1].split()[-1])+extra_thickness)
                 print(f'{tiltseries.path}: Succesfully estimated tomopitch {x_axis_tilt} and thickness {thickness}.')
-            os.remove(pitch_mod)
         
+        if path.isfile(pitch_mod):
+            os.remove(pitch_mod)
         os.remove(tomo_pitch.path)
         
         # Perform final reconstruction
