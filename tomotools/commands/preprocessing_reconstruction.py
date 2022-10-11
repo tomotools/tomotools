@@ -281,8 +281,8 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
         tiltseries = align_with_areTomo(tiltseries, local, previous, do_evn_odd, gpu)
 
         # Do dose filtration.
-        tiltseries = dose_filter(tiltseries, keep_ali_stack, do_evn_odd)
-        
+        tiltseries = dose_filter(tiltseries, do_evn_odd)
+
         # Get AngPix
         with mrcfile.mmap(tiltseries.path, mode='r') as mrc:
            pix_xy = float(mrc.voxel_size.x)
