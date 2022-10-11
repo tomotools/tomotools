@@ -192,12 +192,17 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
 @click.option('--sirt', default=5, show_default=True, help="SIRT-like filter iterations")
 @click.option('--keep-ali-stack/--delete-ali-stack', is_flag=True, default=False, show_default=True,
               help="Keep or delete the non-dose-filtered aligned stack (useful for Relion)")
-@click.option('--previous', is_flag = True, help="Use previous alignment found in the folder.")
+@click.option('--zero-xaxis-tilt', is_flag=True,
+              help='Run tomogram positioning, but keep X-axis tilt at zero. Remember to add some extra thickness if you do this, otherwise you might truncate your tomogram')
+@click.option('--previous', is_flag=True, help="Use previous alignment found in the folder.")
 @click.option('--gpu', type=str, default=None, help="Specify which GPUs to use for AreTomo. Default: all")
-@click.option('--do-evn-odd', is_flag = True, help="Perform alignment, dose-filtration and reconstruction also on EVN/ODD stacks, if present. Needed for later cryoCARE processing. If the EVN/ODD stacks are found, they will be moved and tilts will be excluded as with the original stack regardless of this flag.")
-@click.option('--batch-file', type=click.Path(exists=True, dir_okay=False),help = "You can pass a tab-separated file with tilt series names and views to exclude before alignment and reconstruction.")
+@click.option('--do-evn-odd', is_flag=True,
+              help="Perform alignment, dose-filtration and reconstruction also on EVN/ODD stacks, if present. Needed for later cryoCARE processing. If the EVN/ODD stacks are found, they will be moved and tilts will be excluded as with the original stack regardless of this flag.")
+@click.option('--batch-file', type=click.Path(exists=True, dir_okay=False),
+              help="You can pass a tab-separated file with tilt series names and views to exclude before alignment and reconstruction.")
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
-def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previous, gpu, do_evn_odd, batch_file, input_files):
+def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, zero_xaxis_tilt, previous, gpu, do_evn_odd,
+                batch_file, input_files):
     """Align and reconstruct the given tiltseries. 
     
     Optionally moves tilt series and excludes specified tilts. Then runs AreTomo alignment and ultimately dose-filtration and imod WBP reconstruction.   
@@ -330,6 +335,9 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                     f'{tiltseries.path}: Succesfully estimated tomopitch: thickness {thickness}, z_shift {z_shift}, x_axis_tilt {x_axis_tilt}')
         pitch_mod.unlink(missing_ok=True)
         tomo_pitch.path.unlink(missing_ok=True)
+        if zero_xaxis_tilt:
+            print('Setting X-axis tilt to zero due to --zero-xaxis-tilt option')
+            x_axis_tilt = 0
 
         # Perform final reconstruction
         # TODO: if imod alignment is present, use alttomosetup instead for EVN/ODD volumes
