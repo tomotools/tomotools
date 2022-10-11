@@ -1,11 +1,12 @@
 import os
-import mrcfile
 import subprocess
-
 from pathlib import Path
 from typing import Optional
 
+import mrcfile
+
 from tomotools.utils.tiltseries import TiltSeries
+
 
 class Tomogram:
     def __init__(self, path: Path):
@@ -44,19 +45,20 @@ class Tomogram:
     def dimZYX(self):
         with mrcfile.mmap(self.path,mode = 'r') as mrc:
             self.dimZYX = mrc.data.shape
-    
+
     @staticmethod
-    def from_tiltseries(tiltseries: TiltSeries, bin: int = 1, sirt: int = 5, thickness: Optional[int] = None, x_axis_tilt: int = 0, 
-                        z_shift: int = 0, do_EVN_ODD: bool = False, trim: bool = True) -> 'Tomogram':
-        
+    def from_tiltseries(tiltseries: TiltSeries, bin: int = 1, sirt: int = 5, thickness: Optional[int] = None,
+                        x_axis_tilt: float = 0,
+                        z_shift: float = 0, do_EVN_ODD: bool = False, trim: bool = True) -> 'Tomogram':
+
         ali_stack = tiltseries.path
-        
+
         if do_EVN_ODD and tiltseries.is_split:
             ali_stack_evn = tiltseries.evn_path
             ali_stack_odd = tiltseries.odd_path
-        
+
         # Get stack dimensions to define size of the output tomogram.
-        with mrcfile.mmap(tiltseries.path, mode = 'r') as mrc:
+        with mrcfile.mmap(tiltseries.path, mode='r') as mrc:
             pix_xy = float(mrc.voxel_size.x)
             stack_dimensions = mrc.data.shape 
         

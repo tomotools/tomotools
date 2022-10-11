@@ -278,17 +278,17 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                             
         # Align Stack
         # TODO: somehow decide whether imod or AreTomo should be used!
-        tiltseries = align_with_areTomo(tiltseries, local, previous, do_evn_odd, gpu)
+        tiltseries_ali = align_with_areTomo(tiltseries, local, previous, do_evn_odd, gpu)
 
         # Do dose filtration.
-        tiltseries = dose_filter(tiltseries, do_evn_odd)
+        tiltseries_dosefiltered = dose_filter(tiltseries_ali, do_evn_odd)
 
         # Get AngPix
         with mrcfile.mmap(tiltseries.path, mode='r') as mrc:
             pix_xy = float(mrc.voxel_size.x)
 
         # Perform reconstruction at bin 8 to find pitch / thickness        
-        tomo_pitch = Tomogram.from_tiltseries(tiltseries, bin=8, do_EVN_ODD=False, trim=False,
+        tomo_pitch = Tomogram.from_tiltseries(tiltseries_dosefiltered, bin=8, do_EVN_ODD=False, trim=False,
                                               thickness=round(10000 / pix_xy))
 
         # Try to automatically find edges of tomogram
@@ -328,13 +328,15 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                 thickness = int(thickness_line.split()[-1]) + extra_thickness
                 print(
                     f'{tiltseries.path}: Succesfully estimated tomopitch: thickness {thickness}, z_shift {z_shift}, x_axis_tilt {x_axis_tilt}')
-            pitch_mod.unlink()
+        pitch_mod.unlink()
         tomo_pitch.path.unlink()
 
         # Perform final reconstruction
         # TODO: if imod alignment is present, use alttomosetup instead for EVN/ODD volumes
-        Tomogram.from_tiltseries(tiltseries, bin=bin, thickness=thickness, x_axis_tilt=x_axis_tilt, z_shift=z_shift,
+        Tomogram.from_tiltseries(tiltseries_dosefiltered, bin=bin, thickness=thickness, x_axis_tilt=x_axis_tilt,
+                                 z_shift=z_shift,
                                  sirt=sirt, do_EVN_ODD=do_evn_odd)
 
         if not keep_ali_stack:
-            os.remove(tiltseries.path.with_name(f'{tiltseries.path.stem}_ali.tlt'))
+            tiltseries_ali.delete_files(delete_mdoc=False)
+        tiltseries_dosefiltered.delete_files(delete_mdoc=False)
