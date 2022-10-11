@@ -1,0 +1,89 @@
+# Setup
+## We have IMOD installed in /opt/imod
+setupset.systemTemplate = /opt/imod/IMOD/SystemTemplate/cryoSample.adoc
+setupset.copyarg.userawtlt = 0
+setupset.copyarg.extract = 1
+setupset.copyarg.voltage = 300
+setupset.copyarg.Cs = 2.7
+setupset.copyarg.gold = 0
+setupset.copyarg.defocus = 4000
+setupset.scanHeader = 1
+setupset.copyarg.stackext = mrc
+
+# Pre Processing
+runtime.Preprocessing.any.removeExcludedViews = 1
+runtime.Preprocessing.any.archiveOriginal = 1
+runtime.Excludeviews.any.deleteOldFiles = 1
+runtime.Preprocessing.any.removeXrays = 1
+
+# Coarse Alignment
+# Maybe we could include binning here
+comparam.prenewst.newstack.ModeToOutput = 0
+comparam.prenewst.newstack.BinByFactor = 1
+
+# Fiducial Model (tiltxcorr)
+## Patch tracking with these values works quite well
+runtime.Fiducials.any.trackingMethod = 1
+comparam.xcorr_pt.tiltxcorr.SizeOfPatchesXandY = 1200,700
+comparam.xcorr_pt.tiltxcorr.OverlapOfPatchesXandY = 0.33 0.33
+comparam.xcorr_pt.tiltxcorr.IterateCorrelations = 4
+runtime.PatchTracking.any.contourPieces = 6
+comparam.xcorr_pt.imodchopconts.LengthOfPieces = -1
+
+# Fine Alignment (tiltalign)
+comparam.align.tiltalign.SurfacesToAnalyze = 1
+comparam.align.tiltalign.RobustFitting = 1
+comparam.align.tiltalign.LocalAlignments = 1
+comparam.align.tiltalign.TargetPatchSizeXandY = 700 700
+comparam.align.tiltalign.ResidualReportCriterion = 3
+
+# Global Variables
+comparam.align.tiltalign.RotOption = 1
+comparam.align.tiltalign.MagOption = 1
+comparam.align.tiltalign.TiltOption = 2
+runtime.TiltAlignment.any.enableStretching = 0
+
+# Tomogram Position (tomopitch)
+runtime.Positioning.any.sampleType = 1
+runtime.Positioning.any.binByFactor = 8
+runtime.Positioning.any.thickness = 2000
+comparam.tomopitch.tomopitch.ExtraThickness = 10
+runtime.Positioning.any.hasGoldBeads = 0
+
+# Final Aligned Stack
+runtime.AlignedStack.any.binByFactor = 4
+runtime.AlignedStack.any.linearInterpolation = 0
+runtime.AlignedStack.any.correctCTF = 1
+runtime.AlignedStack.any.filterStack = 1
+
+# Correct CTF
+## autoFitRangeAndStep is very high to fit all tilts
+runtime.CTFplotting.any.autoFitRangeAndStep = -90.0,90.0
+comparam.ctfplotter.ctfplotter.InvertTiltAngles = 0
+comparam.ctfplotter.ctfplotter.FrequencyRangeToFit = 0.05 0.3
+comparam.ctfplotter.ctfplotter.VaryExponentInFit = 1
+comparam.ctfplotter.ctfplotter.BaselineFittingOrder = 4
+comparam.ctfplotter.ctfplotter.SearchAstigmatism = 1
+comparam.ctfplotter.ctfplotter.SearchPhaseShift = 1
+
+# 2D Filter
+comparam.mtffilter.mtffilter.TypeOfDoseFile = 4
+comparam.mtffilter.mtffilter.OptimalDoseScaling = 1
+
+# Tomogram Generation
+## Keeping X-axis tilt at zero which is important for STA
+comparam.tilt.tilt.FakeSIRTiterations = 5
+comparam.align.tiltalign.LocalAlignments = 0
+runtime.Reconstruction.any.extraThickness = 50
+runtime.Reconstruction.any.fallbackThickness = 700
+runtime.Reconstruction.any.noXAxisTilt = 1
+
+# Post Processing
+runtime.Postprocess.any.doTrimvol = 1
+runtime.Trimvol.any.reorient = 2
+runtime.Trimvol.any.scaleFromX = 0.8
+runtime.Trimvol.any.scaleFromY = 0.8
+runtime.Trimvol.any.scaleFromZ = 0.33
+
+# Cleanup
+runtime.Cleanup.any.doCleanup = 1

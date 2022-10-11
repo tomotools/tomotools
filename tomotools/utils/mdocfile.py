@@ -1,5 +1,4 @@
-from os import path
-from os.path import join
+from pathlib import Path
 
 
 def _convert_value_field(field: str):
@@ -25,18 +24,20 @@ def _convert_value_field(field: str):
         return field
 
 
-def find_relative_path(working_dir, abs_path):
-    while not path.isfile(path.join(working_dir, abs_path)):
+def find_relative_path(working_dir: Path, abs_path: Path):
+    while not working_dir.joinpath(abs_path).is_file():
         try:
-            abs_path = abs_path.split(sep=path.sep, maxsplit=1)[1]
+            # Cut off first part
+            abs_path = Path(*abs_path.parts[1:])
         except IndexError:
             return None
-    #print(f'Found subframe path: "{join(working_dir, abs_path)}')
-    return join(working_dir, abs_path)
+    # print(f'Found subframe path: "{join(working_dir, abs_path)}')
+    return working_dir.joinpath(abs_path)
 
 
-def read(file):
+def read(file: Path):
     mdoc = dict()
+    mdoc['path'] = file
     mdoc['titles'] = list()
     mdoc['sections'] = list()
     mdoc['framesets'] = list()

@@ -11,6 +11,11 @@ def _list_append_replace(l: list, index: int, item):
     else:
         raise IndexError('Can only replace items and append one item, not multiple')
 
+def num_gpus():
+    name = subprocess.Popen(['nvidia-smi','--query-gpu=name','--format=csv,noheader'], stdout=subprocess.PIPE)
+    num = subprocess.check_output(['wc','-l'], stdin=name.stdout)
+    name.wait()
+    return int(num)
 
 def gpuinfo():
     def indent_level(line: str):

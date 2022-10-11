@@ -26,7 +26,7 @@ tomotools [subcommand] --help
 - **cryocare-extract**: Extract cryoCARE training data from EVN/ODD reconstructions.
 - **cryocare-train**: Wrapper for cryoCARE training.
 - **cryocare-predict**: Wrapper for cryoCARE prediction.
-- **deconv**: Python implementation of Dimitry Tegunov's tom_deconv.m script.
+- **deconv**: Python implementation of Dimitry Tegunov's _tom_deconv.m_ script.
 
 ### Subtomogram Averaging
 - **merge-dboxes**: Very beta, merges Dynamo DBoxes.
@@ -50,12 +50,13 @@ With tomotools installed into a conda environment, you can then start tomotools 
 conda activate tomotools
 tomotools --help
 ```
-
 ### Notes on sbgrid:
-If you're using an sbgrid environment, make sure to set the following in your .sbgrid.conf file:
+If you're using an sbgrid environment, make sure to set the following in your ```.sbgrid.conf``` file:
 
-> PYTHON_X=3.8.8 (anything > 3.8 works)
-> PRIISM_X=disable (replaces imod-native header command with an old version)
-> ARETOMO_X=1.2.5_cu11.2 (or whatever CUDA version your GPUs support)
+```
+PYTHON_X=3.8.8 (anything > 3.8 works)
+PRIISM_X=disable (replaces imod-native header command with an old version)
+ARETOMO_X=1.2.5_cu11.2 (or whatever CUDA version your GPUs support)
+```
 
 ### Feedback, Bug Reports and Contributions are always welcome!
