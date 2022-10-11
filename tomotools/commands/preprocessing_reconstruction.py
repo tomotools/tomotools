@@ -195,7 +195,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
 @click.option('--zero-xaxis-tilt', is_flag=True,
               help='Run tomogram positioning, but keep X-axis tilt at zero. Remember to add some extra thickness if you do this, otherwise you might truncate your tomogram')
 @click.option('--previous', is_flag=True, help="Use previous alignment found in the folder.")
-@click.option('--gpu', type=str, default=None, help="Specify which GPUs to use for AreTomo. Default: all")
+@click.option('--gpu', type=str, default=None, help="Specify which GPUs to use for AreTomo. Default: GPU 0")
 @click.option('--do-evn-odd', is_flag=True,
               help="Perform alignment, dose-filtration and reconstruction also on EVN/ODD stacks, if present. Needed for later cryoCARE processing. If the EVN/ODD stacks are found, they will be moved and tilts will be excluded as with the original stack regardless of this flag.")
 @click.option('--batch-file', type=click.Path(exists=True, dir_okay=False),
