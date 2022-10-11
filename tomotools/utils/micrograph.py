@@ -172,7 +172,7 @@ class Micrograph:
 def sem2mc2(RotationAndFlip: int = 0):
     ''' Converts SerialEM property RotationAndFlip into MotionCor2-compatibly -RotGain / -FlipGain values.
     Using List on https://bio3d.colorado.edu/SerialEM/hlp/html/setting_up_serialem.htm#cameraOrientation as Reference,
-    For MotionCor2: Rotation = n*90deg, Flip 1 = flip around X, Flip 2 = flip around Y
+    For MotionCor2: Rotation = n*90deg, Flip 1 = flip around horizontal axis, Flip 2 = flip around vertical axis
     Returns a List with first item as rotation and second item as flip.'''
     conv = {0: [0, 0], 1: [3, 0], 2: [2, 0], 3: [1, 0], 4: [0, 2], 5: [1, 2], 6: [2, 2], 7: [3, 2]}
     return conv[RotationAndFlip]

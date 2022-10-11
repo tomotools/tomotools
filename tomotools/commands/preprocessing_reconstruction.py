@@ -328,8 +328,8 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                 thickness = int(thickness_line.split()[-1]) + extra_thickness
                 print(
                     f'{tiltseries.path}: Succesfully estimated tomopitch: thickness {thickness}, z_shift {z_shift}, x_axis_tilt {x_axis_tilt}')
-        pitch_mod.unlink()
-        tomo_pitch.path.unlink()
+        pitch_mod.unlink(missing_ok=True)
+        tomo_pitch.path.unlink(missing_ok=True)
 
         # Perform final reconstruction
         # TODO: if imod alignment is present, use alttomosetup instead for EVN/ODD volumes
