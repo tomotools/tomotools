@@ -187,31 +187,31 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
                         '-AlnFile', aln_file,
                         '-VolZ', '0'],
                         stdout=subprocess.DEVNULL)
-    
+
     if not previous:
         tlt_file = ts.path.with_suffix('.tlt')
-
         subprocess.run(['extracttilts', ts.path, tlt_file],
                        stdout=subprocess.DEVNULL)
 
         mdoc = mdocfile.read(ts.mdoc)
         full_dimensions = mdoc['ImageSize']
-        patch_x, patch_y = [str(round(full_dimensions[0]/1000)), str(round(full_dimensions[1]/1000))]
+        patch_x, patch_y = [str(round(full_dimensions[0] / 1000)), str(round(full_dimensions[1] / 1000))]
 
         subprocess.run([aretomo_executable(),
                         '-InMrc', ts.path,
                         '-OutMrc', ali_stack,
                         '-AngFile', tlt_file,
                         '-VolZ', '0',
-                        '-TiltCor', '1']+
-                        #(['-Gpu'] + [str(i) for i in gpu_id])+
-                        (['-Patch', patch_x, patch_y] if local else []),
-                        stdout=subprocess.DEVNULL)       
-    
-    with mrcfile.mmap(ali_stack, mode = 'r+') as mrc:
-           mrc.voxel_size = str(angpix)
-           mrc.update_header_stats()
-        
+                        '-TiltCor', '1'] +
+                       # (['-Gpu'] + [str(i) for i in gpu_id])+
+                       (['-Patch', patch_x, patch_y] if local else []),
+                       stdout=subprocess.DEVNULL)
+        tlt_file.unlink()
+
+    with mrcfile.mmap(ali_stack, mode='r+') as mrc:
+        mrc.voxel_size = str(angpix)
+        mrc.update_header_stats()
+
     print(f'Done aligning {ts.path.stem} with AreTomo.')
 
     if do_evn_odd and ts.is_split:
@@ -238,15 +238,11 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
             mrc.voxel_size = str(angpix)
             mrc.update_header_stats()
         
-        os.remove(tlt_file)
         os.remove(ali_stack_evn.with_name(f'{ali_stack_evn.stem}.tlt'))
         os.remove(ali_stack_odd.with_name(f'{ali_stack_odd.stem}.tlt'))
         
         print(f'Done aligning ENV and ODD stacks for {ts.path.stem} with AreTomo.')
         return TiltSeries(ali_stack).with_split_files(ali_stack_evn, ali_stack_odd).with_mdoc(orig_mdoc)
-    
-    os.remove(tlt_file)
-    
     return TiltSeries(ali_stack).with_mdoc(orig_mdoc)
 
 
