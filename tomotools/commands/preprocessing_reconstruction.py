@@ -285,32 +285,31 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
 
         # Get AngPix
         with mrcfile.mmap(tiltseries.path, mode='r') as mrc:
-           pix_xy = float(mrc.voxel_size.x)
-        
+            pix_xy = float(mrc.voxel_size.x)
+
         # Perform reconstruction at bin 8 to find pitch / thickness        
-        tomo_pitch = Tomogram.from_tiltseries(tiltseries, bin = 8, do_EVN_ODD = False, trim = False, thickness = str(round(10000 / pix_xy)))
-        
+        tomo_pitch = Tomogram.from_tiltseries(tiltseries, bin=8, do_EVN_ODD=False, trim=False,
+                                              thickness=round(10000 / pix_xy))
+
         # Try to automatically find edges of tomogram
         pitch_mod = tomo_pitch.path.with_name(f'{tiltseries.path.stem}_pitch.mod')
-        
+
         # The parameters for findsection are taken from the etomo source code
         fs = subprocess.run(['findsection',
-                        '-tomo', tomo_pitch.path,
-                        '-pitch', pitch_mod,
-                        '-scales', '2',
-                        '-size', '16,1,16',
-                        '-samples', '5',
-                        '-block', '48'],
-                        stdout=subprocess.DEVNULL)
-
+                             '-tomo', tomo_pitch.path,
+                             '-pitch', pitch_mod,
+                             '-scales', '2',
+                             '-size', '16,1,16',
+                             '-samples', '5',
+                             '-block', '48'],
+                            stdout=subprocess.DEVNULL)
+        x_axis_tilt: float = 0
+        z_shift: float = 0
+        thickness: int = round(6000 / pix_xy) + extra_thickness
         # If it fails, just use default values
         if fs.returncode != 0:
-            x_axis_tilt = '0'
-            tomopitch_z = '0'
-            z_shift = '0'
-            thickness = str(round(6000 / pix_xy)+extra_thickness)
-            print(f'{tiltseries.path}: findsection failed, using default values pitch {tomopitch_z}, thickness {thickness}.')
-
+            print(
+                f'{tiltseries.path}: findsection failed, using default values: thickness {thickness}, z_shift {z_shift}, x_axis_tilt {x_axis_tilt}')
         else:
             # Else, get tomopitch
             tomopitch = subprocess.run([
@@ -320,33 +319,22 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, previou
                 '-scale', str(8)], capture_output=True, text=True).stdout.splitlines()
             # Check for failed process again. 
             if any(l.startswith('ERROR') for l in tomopitch):
-                x_axis_tilt = '0'
-                tomopitch_z = '0'
-                z_shift = '0'
-                thickness = str(round(6000 / pix_xy)+extra_thickness)
-                print(f'{tiltseries.path}: tomopitch failed, using default values pitch {tomopitch_z}, thickness {thickness}.')
+                print(
+                    f'{tiltseries.path}: tomopitch failed, using default values: thickness {thickness}, z_shift {z_shift}, x_axis_tilt {x_axis_tilt}')
             else:
-                x_axis_tilt = tomopitch[-3].split()[-1]
-                tomopitch_z = tomopitch[-1].split(';')
-                z_shift = tomopitch_z[0].split()[-1]
-                thickness = str(int(tomopitch_z[1].split()[-1])+extra_thickness)
-                print(f'{tiltseries.path}: Succesfully estimated tomopitch {x_axis_tilt} and thickness {thickness}.')
-            os.remove(pitch_mod)
-        
-        os.remove(tomo_pitch.path)
-        
+                x_axis_tilt = float(tomopitch[-3].split()[-1])
+                z_shift_line, thickness_line = tomopitch[-1].split(';')
+                z_shift = z_shift_line.split()[-1]
+                thickness = int(thickness_line.split()[-1]) + extra_thickness
+                print(
+                    f'{tiltseries.path}: Succesfully estimated tomopitch: thickness {thickness}, z_shift {z_shift}, x_axis_tilt {x_axis_tilt}')
+            pitch_mod.unlink()
+        tomo_pitch.path.unlink()
+
         # Perform final reconstruction
         # TODO: if imod alignment is present, use alttomosetup instead for EVN/ODD volumes
-        Tomogram.from_tiltseries(tiltseries, bin = bin,thickness = thickness, x_axis_tilt=x_axis_tilt, z_shift = z_shift, sirt = sirt, do_EVN_ODD = do_evn_odd)
-        
-        # Remove intermediate files: dose-filtered stack, tlt file if aligned stack is not kept
-        if str(tiltseries.path).endswith('_filtered.mrc'):
-            os.remove(tiltseries.path)
-        
-        if not keep_ali_stack:
-            os.remove(tiltseries.path.with_name(f'{tiltseries.path.parent}_ali.tlt'))
+        Tomogram.from_tiltseries(tiltseries, bin=bin, thickness=thickness, x_axis_tilt=x_axis_tilt, z_shift=z_shift,
+                                 sirt=sirt, do_EVN_ODD=do_evn_odd)
 
-        # _evn and odd aligned stacks
-        if do_evn_odd and str(tiltseries.evn_path).endswith('_filtered_EVN.mrc'):
-            os.remove(tiltseries.evn_path)
-            os.remove(tiltseries.odd_path)
+        if not keep_ali_stack:
+            os.remove(tiltseries.path.with_name(f'{tiltseries.path.stem}_ali.tlt'))
