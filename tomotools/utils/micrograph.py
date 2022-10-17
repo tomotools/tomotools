@@ -74,12 +74,14 @@ class Micrograph:
             if len(gain_refs) != 1:
                 raise Exception(
                     f'Only zero or one unique gain refs are supported, yet {len(gain_refs)} were found in the MDOC files:\n{", ".join(gain_refs)}')
-            # The gain ref should be in the same folder as the input file(s), so check if it's there
-            gain_ref_dm4 = movies[0].path.parent.joinpath(gain_refs.pop())
+            gain_ref_dm4 = gain_refs.pop()
+            if gain_ref_dm4 is not None:
+                # The gain ref should be in the same folder as the input file(s), so check if it's there
+                gain_ref_dm4 = movies[0].path.parent.joinpath(gain_refs.pop())
+                if not gain_ref_dm4.is_file():
+                    raise FileNotFoundError(f'Expected gain reference at {gain_ref_dm4}, aborting')
 
         if gain_ref_dm4 is not None and gain_ref_mrc is None:
-            if not gain_ref_dm4.is_file():
-                raise FileNotFoundError(f'Expected gain reference at {gain_ref_dm4}, aborting')
             # The gain ref is saved in dm4 format, convert to MRC for MotionCor2
             # Write to a separate directory to prevent MotionCor2 from trying to open it.
             temp_gain = output_dir.joinpath('motioncor2_gain')
