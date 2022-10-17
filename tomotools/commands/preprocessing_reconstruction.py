@@ -159,17 +159,20 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
         print(f'Subframes were found for {input_file}, will run MotionCor2 on them')
         # Get rotation and flip of Gain reference from mdoc file property
         mcrot, mcflip = None, None
-        if rotationandflip is None:
-            mdoc_rotflip = mdoc['sections'][0].get('RotationAndFlip', None)
+        if rotationandflip is not None:
+            mcrot, mcflip = sem2mc2(rotationandflip)
+        elif 'RotationAndFlip' in mdoc['sections'][0]:
+            mdoc_rotflip = mdoc['sections'][0]['RotationAndFlip']
             mcrot, mcflip = sem2mc2(mdoc_rotflip)
-            
+
         # Grab frame size to estimate appropriate patch numbers
-        patch_x, patch_y = [str(round(mdoc['ImageSize'][0]/800)), str(round(mdoc['ImageSize'][1]/800))]
+        patch_x, patch_y = [str(round(mdoc['ImageSize'][0] / 800)), str(round(mdoc['ImageSize'][1] / 800))]
 
         frames_corrected_dir = output_dir.joinpath('frames_corrected')
         micrographs = Micrograph.from_movies(movies, frames_corrected_dir,
                                              splitsum=splitsum, binning=mcbin, mcrot=mcrot, mcflip=mcflip,
-                                             group=group, override_gainref=gainref, gpus=gpus, patch_x = patch_x, patch_y = patch_y)
+                                             group=group, override_gainref=gainref, gpus=gpus, patch_x=patch_x,
+                                             patch_y=patch_y)
 
         if stack:
             tilt_series = TiltSeries.from_micrographs(micrographs, output_dir / input_file.name,
