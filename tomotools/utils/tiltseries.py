@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional, List
 
 import mrcfile
+import csv
 
 from tomotools.utils import mdocfile, util
 from tomotools.utils.micrograph import Micrograph
@@ -214,6 +215,9 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
         mrc.update_header_stats()
 
     print(f'Done aligning {ts.path.stem} with AreTomo.')
+    
+    if not path.isfile(ali_stack.with_suffix('.tlt')):
+        aln_to_tlt(aln_file)
 
     if do_evn_odd and ts.is_split:
         ali_stack_evn = ts.evn_path.with_name(f'{ts.path.stem}_ali_EVN.mrc')
@@ -277,6 +281,33 @@ def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
         print(f'Done dose-filtering {ts.path}.')
         return TiltSeries(filtered_stack).with_mdoc(orig_mdoc)
 
-def align_with_imod(ts: TiltSeries, excludetilts: Optional[Path]):
-    # implement batch alignment with imod adoc here!
-    pass
+def align_with_imod(ts: TiltSeries, excludetilts: Optional[Path], previous: bool, do_evn_odd: bool):
+    
+    if previous:
+        pass
+        
+    
+    if not previous:
+        # TODO: implement batch alignment with imod adoc here!
+        raise NotImplementedError('Batch Alignment with imod is not implemented yet. You can align manually and then return using the --previous.')
+
+def aln_to_tlt(aln_file: Path):
+    '''Generate imod-compatible tlt file from AreTomo-generated aln file'''
+    tilts = list()
+    
+    with open(aln_file) as f:
+        reader = csv.reader(f, delimiter = ' ')
+        for row in reader:
+            if row[0].startswith('#'):
+                pass
+            else:
+                row_cleaned = [entry for i,entry in enumerate(row) if entry !='']
+                (sec, rot, gmag, tx, ty, smean, sfit, scale, base, tilt) = row_cleaned
+                tilts.append(tilt)
+    
+    tlt_out = aln_file.with_name(f'{aln_file.stem}_ali.tlt')
+    
+    with open(tlt_out, mode = 'w+') as f:
+        f.write('\n'.join(tilts))
+        
+    return tlt_out
