@@ -54,7 +54,7 @@ tomotools --help
 If you're using an sbgrid environment, make sure to set the following in your ```.sbgrid.conf``` file:
 
 ```
-PYTHON_X=3.8.8 (anything > 3.8 works)
+PYTHON_X=3.8.8 (anything > 3.8 works)  
 ```
 
 ### Feedback, Bug Reports and Contributions are always welcome!
