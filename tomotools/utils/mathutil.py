@@ -1,7 +1,7 @@
 import numpy as np
 
 def tom_ctf1d(length, pixelsize, voltage, cs, defocus, amplitude, phaseshift, bfactor):
-    '''  A Python port of tom_ctf1d 
+    '''  A Python port of tom_ctf1d.m 
     Input length of ctf, pixelsize in m, voltage in V, cs in m, defocus in m, amplitude contrast, phaseshift in rad, bfactor'''
     
     ny = 1 / pixelsize
@@ -38,6 +38,6 @@ def wiener(angpix, defocus, snrfalloff, deconvstrength, hpnyquist, phaseflipped,
     if phaseflipped:
         ctf = np.abs(ctf)
     
-    wiener = ctf/(ctf*ctf+1/snr)
+    wiener = np.divide(ctf,(np.power(ctf, 2)+1/snr))
     
     return wiener
