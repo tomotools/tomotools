@@ -55,8 +55,6 @@ If you're using an sbgrid environment, make sure to set the following in your ``
 
 ```
 PYTHON_X=3.8.8 (anything > 3.8 works)
-PRIISM_X=disable (replaces imod-native header command with an old version)
-ARETOMO_X=1.2.5_cu11.2 (or whatever CUDA version your GPUs support)
 ```
 
 ### Feedback, Bug Reports and Contributions are always welcome!
