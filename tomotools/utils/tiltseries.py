@@ -284,10 +284,11 @@ def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
 def align_with_imod(ts: TiltSeries, excludetilts: Optional[Path], previous: bool, do_evn_odd: bool):
     
     if previous:
-        pass
+        # Generate new stack with alignment files
         
+        pass
     
-    if not previous:
+    elif not previous:
         # TODO: implement batch alignment with imod adoc here!
         raise NotImplementedError('Batch Alignment with imod is not implemented yet. You can align manually and then return using the --previous.')
 
