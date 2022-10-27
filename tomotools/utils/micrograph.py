@@ -161,6 +161,8 @@ class Micrograph:
             with open(join(output_dir, 'motioncor2.log'), 'r') as log:
                 if any(l.startswith('Warning: Gain ref not found.') for l in log):
                     raise Exception('Gain reference was specified, but not applied by MotionCor2. Check log file!')
+            
+        if gain_ref_dm4 is not None:
             shutil.rmtree(temp_gain)
         
         output_micrographs = [
