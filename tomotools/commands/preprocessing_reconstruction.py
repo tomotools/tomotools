@@ -253,14 +253,14 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, zero_xa
 
         if move:
             dir = tiltseries.path.with_suffix('')
-            print(f'Move files to subdir {dir}')
             dir.mkdir()
+            print(f'Move files to subdir {dir}')
             tiltseries.path = tiltseries.path.rename(dir / tiltseries.path.name)
             tiltseries.mdoc = tiltseries.mdoc.rename(dir / tiltseries.mdoc.name)
             if tiltseries.is_split:
                 tiltseries.evn_path = tiltseries.evn_path.rename(dir / tiltseries.evn_path.name)
                 tiltseries.odd_path = tiltseries.odd_path.rename(dir / tiltseries.odd_path.name)
-                
+                    
         # Exclude tilts
         if excludetilts is not None:
             exclude_cmd = ['excludeviews', '-views', excludetilts, '-delete']

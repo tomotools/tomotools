@@ -181,6 +181,12 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
     with mrcfile.mmap(ts.path) as mrc:
         angpix = float(mrc.voxel_size.x)
 
+    tlt_file = ts.path.with_suffix('.tlt')
+    
+    if not path.isfile(tlt_file):
+        subprocess.run(['extracttilts', ts.path, tlt_file],
+                       stdout=subprocess.DEVNULL) 
+
     if previous: 
         if not path.isfile(aln_file):
             raise FileNotFoundError(f'{ts.path}: --previous was passed, but no previous alignment was found at {aln_file}.')
@@ -188,15 +194,12 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
         subprocess.run([aretomo_executable(),
                         '-InMrc', ts.path,
                         '-OutMrc', ali_stack,
+                        '-AngFile', tlt_file,
                         '-AlnFile', aln_file,
                         '-VolZ', '0'],
                         stdout=subprocess.DEVNULL)
 
     if not previous:
-        tlt_file = ts.path.with_suffix('.tlt')
-        subprocess.run(['extracttilts', ts.path, tlt_file],
-                       stdout=subprocess.DEVNULL)
-
         mdoc = mdocfile.read(ts.mdoc)
         full_dimensions = mdoc['ImageSize']
         patch_x, patch_y = [str(round(full_dimensions[0] / 1000)), str(round(full_dimensions[1] / 1000))]
@@ -210,7 +213,6 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
                        (['-Gpu'] + [str(i) for i in gpu_id])+
                        (['-Patch', patch_x, patch_y] if local else []),
                        stdout=subprocess.DEVNULL)
-        tlt_file.unlink()
 
     with mrcfile.mmap(ali_stack, mode='r+') as mrc:
         mrc.voxel_size = str(angpix)
@@ -227,6 +229,7 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
         subprocess.run([aretomo_executable(),
                         '-InMrc', ts.evn_path,
                         '-OutMrc', ali_stack_evn,
+                        '-AngFile', tlt_file,
                         '-AlnFile', aln_file,
                         '-VolZ', '0'],
                        stdout=subprocess.DEVNULL)
@@ -234,6 +237,7 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
         subprocess.run([aretomo_executable(),
                         '-InMrc', ts.odd_path,
                         '-OutMrc', ali_stack_odd,
+                        '-AngFile', tlt_file,
                         '-AlnFile', aln_file,
                         '-VolZ', '0'],
                        stdout=subprocess.DEVNULL)
@@ -245,11 +249,13 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
             mrc.voxel_size = str(angpix)
             mrc.update_header_stats()
         
-        os.remove(ali_stack_evn.with_name(f'{ali_stack_evn.stem}.tlt'))
-        os.remove(ali_stack_odd.with_name(f'{ali_stack_odd.stem}.tlt'))
+        try:
+            os.remove(ali_stack_evn.with_name(f'{ali_stack_evn.stem}.tlt'))
+            os.remove(ali_stack_odd.with_name(f'{ali_stack_odd.stem}.tlt'))
+        finally:        
+            print(f'Done aligning ENV and ODD stacks for {ts.path.stem} with AreTomo.')
+            return TiltSeries(ali_stack).with_split_files(ali_stack_evn, ali_stack_odd).with_mdoc(orig_mdoc)
         
-        print(f'Done aligning ENV and ODD stacks for {ts.path.stem} with AreTomo.')
-        return TiltSeries(ali_stack).with_split_files(ali_stack_evn, ali_stack_odd).with_mdoc(orig_mdoc)
     return TiltSeries(ali_stack).with_mdoc(orig_mdoc)
 
 
