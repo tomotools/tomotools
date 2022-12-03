@@ -364,3 +364,34 @@ def aln_to_tlt(aln_file: Path):
         f.write('\n'.join(tilts))
         
     return tlt_out
+
+def run_ctfplotter(ts: Path):
+    ''' Run imod ctfplotter on given TiltSeries object'''
+    
+    with mrcfile.mmap(ts.path) as mrc:
+        nmpix = str(float(mrc.voxel_size.x)/10)
+        header = str(mrc.header)
+        header = header.split('Tilt axis angle = ',1)
+        axis_angle = header[1][0:4]
+    
+    mdoc = mdocfile.read(ts.mdoc)
+    expected_defocus = str(abs(mdoc['sections'][0]['TargetDefocus'])*1000)
+    
+    kV = 300
+    cs = 2.7
+    
+    with open(path.join(ts.path.parent, 'ctfplotter.log'), 'a') as out:
+        subprocess.run(['ctfplotter',
+                        '-InputStack', ts.path,
+                        '-angleFn', ts.path.with_suffix('.tlt'),
+                        '-defFn', ts.path.with_name(f'{ts.path.stem}_ctfplotter.txt'),
+                        '-pixelSize', nmpix,
+                        '-crop', '0.3',
+                        '-volt', str(kV),
+                        '-cs', str(cs),
+                        '-am', str(0.07),
+                        '-degPhase', str(0),
+                        '-AxisAngle', axis_angle,
+                        '-expDef', expected_defocus,
+                        '-autoFit', '3,1'],
+                        stdout = out)    
