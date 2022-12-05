@@ -9,6 +9,7 @@ from tomotools.utils.serialem_navigator import SEMNavigator
 @click.command()
 @click.argument('path', type=click.Path(exists=True, dir_okay=False))
 def semnavigator(path):
+    """Open a SerialEM navigator (.nav) file in a small graphical browser"""
     nav = SEMNavigator.read(path)
     fig, ax = plt.subplots()
     all_ptsx, all_ptsy = list(), list()
