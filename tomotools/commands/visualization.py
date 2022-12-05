@@ -16,10 +16,10 @@ from tomotools.utils import mathutil
 @click.argument('input_files', nargs=-1, required=True)
 
 def deconv(defocus,snrfalloff,deconvstrength,hpnyquist,phaseshift,phaseflipped,input_files):
-    """Deconvolute your tomogram or list of tomograms. Python implementation Dimitri Tegunovs tom_deconv.m.
+    """Deconvolve your tomogram or list of tomograms. Python implementation Dimitri Tegunovs tom_deconv.m.
     
     The input file should be a reconstructed tomogram. AngPix is automatically read from the header.
-    Output file will be an mrc in the same folder, with added _deconv suffix.
+    Output file will be a mrc in the same folder, with added _deconv suffix.
     
     Original Script at https://github.com/dtegunov/tom_deconv/.
     """

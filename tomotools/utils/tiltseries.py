@@ -129,7 +129,7 @@ class TiltSeries:
                 if key in section:
                     del section[key]
         mdocfile.write(stack_mdoc, str(ts_path) + '.mdoc')
-        
+
         if all(micrograph.is_split for micrograph in micrographs):
             micrograph_evn_paths = [str(micrograph.evn_path) for micrograph in micrographs]
             micrograph_odd_paths = [str(micrograph.odd_path) for micrograph in micrographs]
@@ -157,6 +157,7 @@ def aretomo_executable() -> Optional[Path]:
                 f'ARETOMO_EXECUTABLE is set to "{aretomo_exe}", but the file does not exist. Falling back to PATH')
     return shutil.which('AreTomo')
 
+
 def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: bool, gpu: str):
     ''' Takes a TiltSeries as input and runs AreTomo on it, if desired with local alignment. 
     If previous is True, respect previous alignment in folder.
@@ -170,34 +171,34 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
 
     if gpu is None:
         gpu_id = [0]
-        #gpu_id = [int(i) for i in range(0,util.num_gpus())]
- 
+        # gpu_id = [int(i) for i in range(0,util.num_gpus())]
+
     else:
         # Turn GPU list into list of integers
         gpu_id = gpu.split(',')
         gpu_id = [int(gpu) for gpu in gpu_id]
 
-    
     with mrcfile.mmap(ts.path) as mrc:
         angpix = float(mrc.voxel_size.x)
 
     tlt_file = ts.path.with_suffix('.tlt')
-    
+
     if not path.isfile(tlt_file):
         subprocess.run(['extracttilts', ts.path, tlt_file],
-                       stdout=subprocess.DEVNULL) 
+                       stdout=subprocess.DEVNULL)
 
-    if previous: 
+    if previous:
         if not path.isfile(aln_file):
-            raise FileNotFoundError(f'{ts.path}: --previous was passed, but no previous alignment was found at {aln_file}.')
-        
+            raise FileNotFoundError(
+                f'{ts.path}: --previous was passed, but no previous alignment was found at {aln_file}.')
+
         subprocess.run([aretomo_executable(),
                         '-InMrc', ts.path,
                         '-OutMrc', ali_stack,
                         '-AngFile', tlt_file,
                         '-AlnFile', aln_file,
                         '-VolZ', '0'],
-                        stdout=subprocess.DEVNULL)
+                       stdout=subprocess.DEVNULL)
 
     if not previous:
         mdoc = mdocfile.read(ts.mdoc)
@@ -210,7 +211,7 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
                         '-AngFile', tlt_file,
                         '-VolZ', '0',
                         '-TiltCor', '1'] +
-                       (['-Gpu'] + [str(i) for i in gpu_id])+
+                       (['-Gpu'] + [str(i) for i in gpu_id]) +
                        (['-Patch', patch_x, patch_y] if local else []),
                        stdout=subprocess.DEVNULL)
 
@@ -219,7 +220,7 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
         mrc.update_header_stats()
 
     print(f'Done aligning {ts.path.stem} with AreTomo.')
-    
+
     if not path.isfile(ali_stack.with_suffix('.tlt')):
         aln_to_tlt(aln_file)
 
@@ -241,21 +242,21 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
                         '-AlnFile', aln_file,
                         '-VolZ', '0'],
                        stdout=subprocess.DEVNULL)
-        with mrcfile.mmap(ali_stack_evn, mode = 'r+') as mrc:
+        with mrcfile.mmap(ali_stack_evn, mode='r+') as mrc:
             mrc.voxel_size = str(angpix)
             mrc.update_header_stats()
-               
-        with mrcfile.mmap(ali_stack_odd, mode = 'r+') as mrc:
+
+        with mrcfile.mmap(ali_stack_odd, mode='r+') as mrc:
             mrc.voxel_size = str(angpix)
             mrc.update_header_stats()
-        
+
         try:
             os.remove(ali_stack_evn.with_name(f'{ali_stack_evn.stem}.tlt'))
             os.remove(ali_stack_odd.with_name(f'{ali_stack_odd.stem}.tlt'))
-        finally:        
+        finally:
             print(f'Done aligning ENV and ODD stacks for {ts.path.stem} with AreTomo.')
             return TiltSeries(ali_stack).with_split_files(ali_stack_evn, ali_stack_odd).with_mdoc(orig_mdoc)
-        
+
     return TiltSeries(ali_stack).with_mdoc(orig_mdoc)
 
 
@@ -274,21 +275,22 @@ def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
         filtered_stack = ts.path.with_name(f'{ts.path.stem}_filtered.mrc')
         subprocess.run(['mtffilter', '-dtype', '4', '-dfile', ts.mdoc, ts.path, filtered_stack],
                        stdout=subprocess.DEVNULL)
-        
+
         if ts.is_split and do_evn_odd:
             filtered_evn = ts.path.with_name(f'{ts.path.stem}_filtered_EVN.mrc')
             filtered_odd = ts.path.with_name(f'{ts.path.stem}_filtered_ODD.mrc')
-        
+
             subprocess.run(['mtffilter', '-dtype', '4', '-dfile', ts.mdoc, ts.evn_path, filtered_evn],
                            stdout=subprocess.DEVNULL)
             subprocess.run(['mtffilter', '-dtype', '4', '-dfile', ts.mdoc, ts.odd_path, filtered_odd],
                            stdout=subprocess.DEVNULL)
-            
+
             print(f'Done dose-filtering {ts.path} and EVN/ODD stacks.')
             return TiltSeries(filtered_stack).with_split_files(filtered_evn, filtered_odd).with_mdoc(orig_mdoc)
-        
+
         print(f'Done dose-filtering {ts.path}.')
         return TiltSeries(filtered_stack).with_mdoc(orig_mdoc)
+
 
 def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool):
     ''' Aligns given TiltSeries with imod. 
@@ -296,90 +298,95 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool):
     "De-novo" batch alignment still needs to be implemented...
     '''
     orig_mdoc = ts.mdoc
-        
+
     if previous:
         # Generate new stack with alignment files
         if not path.isfile(ts.path.with_suffix('.xf')):
-            raise FileNotFoundError(f'--previous flagged passed, required transformation file {ts.path.with_suffix(".xf")} not found! ')
-        
+            raise FileNotFoundError(
+                f'--previous flagged passed, required transformation file {ts.path.with_suffix(".xf")} not found! ')
+
         ali_stack = ts.path.with_name(f'{ts.path.stem}_ali.mrc')
-        
+
         # Copy the imod-generated tlt-file to _ali.tlt to keep compatibility w/ AreTomo approach
-        shutil.copyfile(ts.path.with_suffix('.tlt'), ali_stack.with_suffix('.tlt'))        
-        
+        shutil.copyfile(ts.path.with_suffix('.tlt'), ali_stack.with_suffix('.tlt'))
+
         subprocess.run(['newstack',
-                       '-InputFile', ts.path,
-                       '-OutputFile', ali_stack,
-                       '-TransformFile', ts.path.with_suffix('.xf'),
-                       '-TaperAtFill', '1,1',
-                       '-AdjustOrigin'],
+                        '-InputFile', ts.path,
+                        '-OutputFile', ali_stack,
+                        '-TransformFile', ts.path.with_suffix('.xf'),
+                        '-TaperAtFill', '1,1',
+                        '-AdjustOrigin'],
                        stdout=subprocess.DEVNULL)
-        
+
         if do_evn_odd:
             ali_stack_evn = ts.evn_path.with_name(f'{ts.path.stem}_ali_EVN.mrc')
             ali_stack_odd = ts.odd_path.with_name(f'{ts.path.stem}_ali_ODD.mrc')
-            
+
             subprocess.run(['newstack',
-                           '-InputFile', ts.evn_path,
-                           '-OutputFile', ali_stack_evn,
-                           '-TransformFile', ts.path.with_suffix('.xf'),
-                           '-TaperAtFill', '1,1',
-                           '-AdjustOrigin'],
+                            '-InputFile', ts.evn_path,
+                            '-OutputFile', ali_stack_evn,
+                            '-TransformFile', ts.path.with_suffix('.xf'),
+                            '-TaperAtFill', '1,1',
+                            '-AdjustOrigin'],
                            stdout=subprocess.DEVNULL)
 
             subprocess.run(['newstack',
-                           '-InputFile', ts.odd_path,
-                           '-OutputFile', ali_stack_odd,
-                           '-TransformFile', ts.path.with_suffix('.xf'),
-                           '-TaperAtFill', '1,1',
-                           '-AdjustOrigin'],
+                            '-InputFile', ts.odd_path,
+                            '-OutputFile', ali_stack_odd,
+                            '-TransformFile', ts.path.with_suffix('.xf'),
+                            '-TaperAtFill', '1,1',
+                            '-AdjustOrigin'],
                            stdout=subprocess.DEVNULL)
-            print(f'Finished aligning {ts.path} and associated EVN/ODD stacks with imod.')        
+            print(f'Finished aligning {ts.path} and associated EVN/ODD stacks with imod.')
             return TiltSeries(ali_stack).with_split_files(ali_stack_evn, ali_stack_odd).with_mdoc(orig_mdoc)
 
-        print(f'Finished aligning {ts.path} with imod.')        
+        print(f'Finished aligning {ts.path} with imod.')
         return TiltSeries(ali_stack).with_mdoc(orig_mdoc)
-    
+
     elif not previous:
         # TODO: implement batch alignment with imod adoc here!
-        raise NotImplementedError('Batch Alignment with imod is not implemented yet. You can align manually and then return using the --previous.')
+        raise NotImplementedError(
+            'Batch Alignment with imod is not implemented yet. You can align manually and then return using the --previous.')
 
+
+# TODO: Remove views according to AreTomo output!!
 def aln_to_tlt(aln_file: Path):
     '''Generate imod-compatible tlt file from AreTomo-generated aln file'''
     tilts = list()
-    
+
     with open(aln_file) as f:
-        reader = csv.reader(f, delimiter = ' ')
+        reader = csv.reader(f, delimiter=' ')
         for row in reader:
             if row[0].startswith('#'):
                 pass
             else:
-                row_cleaned = [entry for i,entry in enumerate(row) if entry !='']
+                row_cleaned = [entry for i, entry in enumerate(row) if entry != '']
                 (sec, rot, gmag, tx, ty, smean, sfit, scale, base, tilt) = row_cleaned
                 tilts.append(tilt)
-    
+
     tlt_out = aln_file.with_name(f'{aln_file.stem}_ali.tlt')
-    
-    with open(tlt_out, mode = 'w+') as f:
+
+    with open(tlt_out, mode='w+') as f:
         f.write('\n'.join(tilts))
-        
+
     return tlt_out
 
+
 def run_ctfplotter(ts: Path):
-    ''' Run imod ctfplotter on given TiltSeries object'''
-    
+    ''' Run imod ctfplotter on given TiltSeries object. Returns path to defocus file.'''
+
     with mrcfile.mmap(ts.path) as mrc:
-        nmpix = str(float(mrc.voxel_size.x)/10)
+        nmpix = str(float(mrc.voxel_size.x) / 10)
         header = str(mrc.header)
-        header = header.split('Tilt axis angle = ',1)
+        header = header.split('Tilt axis angle = ', 1)
         axis_angle = header[1][0:4]
-    
+
     mdoc = mdocfile.read(ts.mdoc)
-    expected_defocus = str(abs(mdoc['sections'][0]['TargetDefocus'])*1000)
-    
+    expected_defocus = str(abs(mdoc['sections'][0]['TargetDefocus']) * 1000)
+
     kV = 300
     cs = 2.7
-    
+
     with open(path.join(ts.path.parent, 'ctfplotter.log'), 'a') as out:
         subprocess.run(['ctfplotter',
                         '-InputStack', ts.path,
@@ -394,4 +401,14 @@ def run_ctfplotter(ts: Path):
                         '-AxisAngle', axis_angle,
                         '-expDef', expected_defocus,
                         '-autoFit', '3,1'],
-                        stdout = out)    
+                       stdout=out)
+
+    return ts.path.with_name(f'{ts.path.stem}_ctfplotter.txt')
+
+def parse_ctfplotter():
+    """Takes path to ctfplotter output. Returns pandas dataframe"""
+    # TODO
+    pass
+# TODO!
+def convert_input_to_TiltSeries(input_files:[]):
+    pass
