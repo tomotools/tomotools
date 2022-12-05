@@ -16,7 +16,7 @@ tomotools [subcommand] --help
   - Example: ```tomotools blend-montages MMM*.mrc montages-blended```
 - **batch-prepare-tiltseries**: Prepare tiltseries for reconstruction.
   - Takes data directory from SerialEM as input and writes the final stacks to the target directory.
-  - Frames are aligned using MotionCor2 and reordered if desired. Supports GainRef conversion from dm4 to mrc2 and the SerialEM-generated defects.txt.
+  - Frames are aligned using MotionCor2 and reordered if desired. Supports GainRef conversion from dm4 to mrc and the SerialEM-generated defects.txt.
   - Example: ```tomotools batch-prepare-tiltseries --mcbin 1 --gainref frames/GainRef.dm4 *.mrc ts-aligned```
 - **reconstruct**: Perform batch reconstruction using AreTomo and imod.
   - Takes tiltseries and their associated mdoc files as input, automatically identified associated EVN/ODD stacks. Finds alignment using AreTomo, then applies it to EVN/ODD stacks. Reconstruction is done using imod's ```tilt```.
@@ -35,7 +35,7 @@ tomotools [subcommand] --help
 - **semnavigator**: Display SerialEM navigator files to find back you tomogram positions
 - **create-movie**: Create a movie from a series of image files.
 - **nff-to-amiramesh**
-- **update**: Automatically pulls the most recent version from GitHub and runs pip install --upgrade on it.
+- **update**: Automatically pulls the most recent version from GitHub and runs ```pip install --upgrade``` on it.
 
 ## Installation
 We suggest installing tomotools into its own conda / mamba environment.
@@ -55,9 +55,7 @@ tomotools --help
 If you're using an sbgrid environment, make sure to set the following in your ```.sbgrid.conf``` file:
 
 ```
-PYTHON_X=3.8.8 (anything > 3.8 works)
-PRIISM_X=disable (replaces imod-native header command with an old version)
-ARETOMO_X=1.2.5_cu11.2 (or whatever CUDA version your GPUs support)
+PYTHON_X=3.8.8 (anything > 3.8 works)  
 ```
 
 ### Feedback, Bug Reports and Contributions are always welcome!

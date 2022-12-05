@@ -161,6 +161,8 @@ class Micrograph:
             with open(join(output_dir, 'motioncor2.log'), 'r') as log:
                 if any(l.startswith('Warning: Gain ref not found.') for l in log):
                     raise Exception('Gain reference was specified, but not applied by MotionCor2. Check log file!')
+            
+        if gain_ref_dm4 is not None:
             shutil.rmtree(temp_gain)
         
         output_micrographs = [
@@ -173,10 +175,11 @@ class Micrograph:
 
 def sem2mc2(RotationAndFlip: int = 0):
     ''' Converts SerialEM property RotationAndFlip into MotionCor2-compatibly -RotGain / -FlipGain values.
-    Using List on https://bio3d.colorado.edu/SerialEM/hlp/html/setting_up_serialem.htm#cameraOrientation as Reference,
-    For MotionCor2: Rotation = n*90deg, Flip 1 = flip around horizontal axis, Flip 2 = flip around vertical axis
+    According to https://bio3d.colorado.edu/SerialEM/betaHlp/html/about_properties.htm#per_camera_properties,
+    RotationAndFlip is defined as n+m where n*90° is CCW rotation and m is 0 for no flip and 4 for flip around Y (=vertical axis)
+    For MotionCor2: Rotation = n*90deg CCW, Flip 1 = flip around horizontal (X) axis, Flip 2 = flip around vertical (Y) axis
     Returns a List with first item as rotation and second item as flip.'''
-    conv = {0: [0, 0], 1: [3, 0], 2: [2, 0], 3: [1, 0], 4: [0, 2], 5: [1, 2], 6: [2, 2], 7: [3, 2]}
+    conv = {0: [0, 0], 1: [1, 0], 2: [2, 0], 3: [3, 0], 4: [0, 1], 5: [1, 2], 6: [2, 2], 7: [3, 2]}
     return conv[RotationAndFlip]
 
 

@@ -7,12 +7,12 @@ import click
 from tomotools.utils import mathutil
 
 @click.command()
-@click.option('--defocus', help = '(Central) defocus in um. Positive values denote underfocus. If not given, will be automatically determined.')
-@click.option('--snrfalloff', default=1, show_default=True, help='How fast the SNR falls off - 1.0 or 1.2 usually')
-@click.option('--deconvstrength', default=1, show_default=True, help='Overall deconvolution strength, depends on SNR. 1 for SNR 1000, 0.67 for SNR 100, etc.')
+@click.option('--defocus', help = '(Central) defocus in um. Positive values denote underfocus. If not given, will try to find corresponding ctfplotter files [not yet implemented!].')
+@click.option('--snrfalloff', default=1.0, show_default=True, help='How fast the SNR falls off - 1.0 or 1.2 usually')
+@click.option('--deconvstrength', default=1.0, show_default=True, help='Overall deconvolution strength, depends on SNR. 1 for SNR 1000, 0.67 for SNR 100, etc.')
 @click.option('--hpnyquist', default = 0.02, show_default=True, help='Fraction of Nyquist frequency to be cut off on the lower end.')
 @click.option('--phaseshift', default = 0, show_default= True, help='Phase shift in degrees')
-@click.option('--phaseflipped', default = False, show_default = True, help='Is data already phase-flipped?')
+@click.option('--phaseflipped', is_flag=True, help='Data has been phase-flipped')
 @click.argument('input_files', nargs=-1, required=True)
 
 def deconv(defocus,snrfalloff,deconvstrength,hpnyquist,phaseshift,phaseflipped,input_files):
@@ -25,6 +25,8 @@ def deconv(defocus,snrfalloff,deconvstrength,hpnyquist,phaseshift,phaseflipped,i
     """
     
     # TODO: automatically determine defocus / read it out of ctfplotter or ctffind diagnostic files?
+    if defocus is None:
+        raise NotImplementedError('Automated defocus determination not yet implemented. explicitly pass the defocus in um using the --defocus flag.')
     
     for input_file in input_files:
         
@@ -45,6 +47,10 @@ def deconv(defocus,snrfalloff,deconvstrength,hpnyquist,phaseshift,phaseflipped,i
         fz = sz + volume_in.shape[0] -1
                 
         gridz,gridy,gridx = np.mgrid[sz:fz+1,sy:fy+1,sx:fx+1]
+        
+        gridx = np.divide(gridx,np.abs(sx))
+        gridy = np.divide(gridy,np.abs(sy))
+        gridz = np.divide(gridz,np.maximum(1, np.abs(sz)))        
 
         # Create input array with Euclidean distance from the center as cell value
         r = np.sqrt(np.square(gridx)+np.square(gridy)+np.square(gridz))

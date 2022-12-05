@@ -14,7 +14,7 @@ import mrcfile
 from tomotools.utils import mdocfile
 from tomotools.utils.micrograph import Micrograph, sem2mc2
 from tomotools.utils.movie import Movie
-from tomotools.utils.tiltseries import TiltSeries, align_with_areTomo, dose_filter
+from tomotools.utils.tiltseries import TiltSeries, align_with_areTomo, align_with_imod, dose_filter
 from tomotools.utils.tomogram import Tomogram
 
 
@@ -253,14 +253,14 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, zero_xa
 
         if move:
             dir = tiltseries.path.with_suffix('')
-            print(f'Move files to subdir {dir}')
             dir.mkdir()
+            print(f'Move files to subdir {dir}')
             tiltseries.path = tiltseries.path.rename(dir / tiltseries.path.name)
             tiltseries.mdoc = tiltseries.mdoc.rename(dir / tiltseries.mdoc.name)
             if tiltseries.is_split:
                 tiltseries.evn_path = tiltseries.evn_path.rename(dir / tiltseries.evn_path.name)
                 tiltseries.odd_path = tiltseries.odd_path.rename(dir / tiltseries.odd_path.name)
-                
+                    
         # Exclude tilts
         if excludetilts is not None:
             exclude_cmd = ['excludeviews', '-views', excludetilts, '-delete']
@@ -285,8 +285,14 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, zero_xa
                 
                             
         # Align Stack
-        # TODO: somehow decide whether imod or AreTomo should be used!
-        tiltseries_ali = align_with_areTomo(tiltseries, local, previous, do_evn_odd, gpu)
+        # If previous is passed and imod alignment file .xf is found, use imod. Otherwise, use AreTomo.
+        # TODO: Once imod batch alignment is implemented, figure out a better way of doing this, eg. with a flag (--imod / --aretomo)
+        
+        if previous and path.isfile(tiltseries.path.with_suffix('.xf')):
+            tiltseries_ali = align_with_imod(tiltseries, previous, do_evn_odd)     
+            
+        else:
+            tiltseries_ali = align_with_areTomo(tiltseries, local, previous, do_evn_odd, gpu)
 
         # Do dose filtration.
         tiltseries_dosefiltered = dose_filter(tiltseries_ali, do_evn_odd)
@@ -343,7 +349,6 @@ def reconstruct(move, local, extra_thickness, bin, sirt, keep_ali_stack, zero_xa
             x_axis_tilt = 0
 
         # Perform final reconstruction
-        # TODO: if imod alignment is present, use alttomosetup instead for EVN/ODD volumes
         Tomogram.from_tiltseries(tiltseries_dosefiltered, bin=bin, thickness=thickness, x_axis_tilt=x_axis_tilt,
                                  z_shift=z_shift,
                                  sirt=sirt, do_EVN_ODD=do_evn_odd)
