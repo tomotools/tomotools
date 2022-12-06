@@ -6,6 +6,7 @@ from operator import itemgetter
 from os import path
 from pathlib import Path
 from typing import Optional, List
+from glob import glob
 
 import mrcfile
 import csv
@@ -349,15 +350,18 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool):
             'Batch Alignment with imod is not implemented yet. You can align manually and then return using the --previous.')
 
 
-# TODO: Remove views according to AreTomo output!!
 def aln_to_tlt(aln_file: Path):
-    '''Generate imod-compatible tlt file from AreTomo-generated aln file'''
+    '''Generate imod-compatible tlt file from AreTomo-generated aln file.'''
+
     tilts = list()
 
     with open(aln_file) as f:
         reader = csv.reader(f, delimiter=' ')
         for row in reader:
-            if row[0].startswith('#'):
+            
+            if row[1].startswith('Local'):
+                break
+            elif row[0].startswith('#'):
                 pass
             else:
                 row_cleaned = [entry for i, entry in enumerate(row) if entry != '']
@@ -372,7 +376,7 @@ def aln_to_tlt(aln_file: Path):
     return tlt_out
 
 
-def run_ctfplotter(ts: Path):
+def run_ctfplotter(ts: TiltSeries):
     ''' Run imod ctfplotter on given TiltSeries object. Returns path to defocus file.'''
 
     with mrcfile.mmap(ts.path) as mrc:
@@ -409,6 +413,43 @@ def parse_ctfplotter():
     """Takes path to ctfplotter output. Returns pandas dataframe"""
     # TODO
     pass
-# TODO!
+
+def parse_darkimgs(ts: TiltSeries):
+    ''' Parses AreTomo-generated _DarkImgs.txt file for a given tiltseries, returns list of excluded tilts'''
+    dark_txt = ts.path.with_name(f'{ts.path.stem}_DarkImgs.txt')
+    dark_tilts = list()
+
+    if not path.isfile(dark_txt):
+        print(f'Could not find dark tilts output from AreTomo corresponding to {ts.path.name}.')
+    
+    with open(dark_txt, mode = 'r') as txt:
+        for line in txt:
+            if line.startswith('#'):
+                pass
+            else:
+                line = line.strip()
+                dark_tilts.append(line)
+            
+    return dark_tilts
+
 def convert_input_to_TiltSeries(input_files:[]):
-    pass
+    ''' Takes list of input files or folders from Click. Returns list of TiltSeries objects with or without split frames. 
+    If a folder ist given, identify it by corresponding mdoc file.'''
+    
+    return_list = list()
+    
+    for input_file in input_files:
+        input_file = Path(input_file)
+        if input_file.is_file():
+            return_list.append(TiltSeries(Path(input_file)))
+        elif input_file.is_dir():
+            return_list += ([TiltSeries(Path(Path(file).with_suffix(''))) for file in glob(path.join(input_file, '*.mdoc'))])
+            
+    for file in return_list:
+        if path.isfile(file.path.with_name(f'{file.path.stem}_EVN.mrc')) and path.isfile(file.path.with_name(f'{file.path.stem}_ODD.mrc')):
+            file = file.with_split_files(file.path.with_name(f'{file.path.stem}_EVN.mrc'), file.path.with_name(f'{file.path.stem}_ODD.mrc'))
+            print(f'Found TiltSeries {file.path} with EVN and ODD stacks.')
+        else:
+            print(f'Found TiltSeries {file.path}.')
+            
+    return return_list

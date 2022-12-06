@@ -2,6 +2,9 @@ import os
 import subprocess
 from pathlib import Path
 from typing import Optional
+from os import path
+from glob import glob
+from os.path import join, isdir, isfile 
 
 import mrcfile
 
@@ -233,3 +236,24 @@ class Tomogram:
             return Tomogram(final_rec)
             
         return Tomogram(full_rec)
+
+def convert_input_to_Tomogram(input_files:[]):
+    ''' Takes list of input files or folders from Click. Returns list of TiltSeries objects with or without split frames. '''
+    input_tomo = list()
+    
+    for input_file in input_files:
+        input_file = Path(input_file)
+        if input_file.is_file():
+            input_tomo.append(Tomogram(Path(input_file)))
+        elif input_file.is_dir():
+            input_tomo += ([Tomogram(Path(file))for file in glob(path.join(input_file, '*_rec_bin_[0-9].mrc'))])
+            
+    for tomo in input_tomo:
+        if path.isfile(tomo.path.with_name(f'{tomo.path.stem}_EVN.mrc')) and path.isfile(tomo.path.with_name(f'{tomo.path.stem}_ODD.mrc')):
+            tomo = tomo.with_split_files(tomo.path.with_name(f'{tomo.path.stem}_EVN.mrc'), tomo.path.with_name(f'{tomo.path.stem}_ODD.mrc'))
+            print(f'Found reconstruction {tomo.path} with EVN and ODD stacks.')
+        else:
+            tomo = tomo
+            print(f'Found reconstruction {tomo.path}.')
+            
+    return input_tomo

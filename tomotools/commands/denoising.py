@@ -9,7 +9,7 @@ from os.path import isdir, join
 from pathlib import Path
 from glob import glob
 
-from tomotools.utils.tomogram import Tomogram
+from tomotools.utils.tomogram import Tomogram, convert_input_to_Tomogram
 from tomotools.utils.util import num_gpus
 
 @click.command()

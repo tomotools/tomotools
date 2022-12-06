@@ -1,12 +1,17 @@
-import os
 import click
 
-from pathlib import Path
-
-from tomotools.utils.tiltseries import TiltSeries, align_with_areTomo, run_ctfplotter
+from tomotools.utils.tiltseries import run_ctfplotter, convert_input_to_TiltSeries
 
 @click.command()
 @click.argument('input_files', nargs=-1)
-def run_ctfplotter(input_files):
-    pass
+def fit_ctf(input_files):
+    """ Performs interactive CTF-Fitting. 
+    
+    Takes tiltseries or folders containing them as input. Runs imod ctfplotter interactively. Saves results to folder.  
+    
+    """
 
+    tiltseries = convert_input_to_TiltSeries(input_files)
+    
+    for ts in tiltseries:
+        run_ctfplotter(ts)
