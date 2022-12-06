@@ -1,5 +1,5 @@
 import os
-import Click
+import click
 
 from pathlib import Path
 
