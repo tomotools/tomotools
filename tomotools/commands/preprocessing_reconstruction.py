@@ -169,6 +169,9 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
         patch_x, patch_y = [str(round(mdoc['ImageSize'][0] / 800)), str(round(mdoc['ImageSize'][1] / 800))]
 
         frames_corrected_dir = output_dir.joinpath('frames_corrected')
+        if frames_corrected_dir.is_dir():
+            print(f'Temporary motioncor2 directory already exists, will overwrite it')
+            shutil.rmtree(frames_corrected_dir)
         micrographs = Micrograph.from_movies(movies, frames_corrected_dir,
                                              splitsum=splitsum, binning=mcbin, mcrot=mcrot, mcflip=mcflip,
                                              group=group, override_gainref=gainref, gpus=gpus, patch_x=patch_x,
