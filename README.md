@@ -32,12 +32,13 @@ tomotools [subcommand] --help
 - **merge-dboxes**: Very beta, merges Dynamo DBoxes.
 
 ### Other
+- **semnavigator**: Display SerialEM navigator files to find back you tomogram positions
 - **create-movie**: Create a movie from a series of image files.
 - **nff-to-amiramesh**
 - **update**: Automatically pulls the most recent version from GitHub and runs ```pip install --upgrade``` on it.
 
 ## Installation
-We suggest installing tomotools into its own conda / mamba environment.
+We suggest installing tomotools into its own conda / mamba environment. If you can only access your userspace, consider using [micromamba](https://mamba.readthedocs.io/en/latest/installation.html).
 
 ### Install via:
 ```
@@ -55,6 +56,11 @@ If you're using an sbgrid environment, make sure to set the following in your ``
 
 ```
 PYTHON_X=3.8.8 (anything > 3.8 works)  
+```
+Additionally, try ```pip --version``` to make sure it's correctly working. This is required for ```tomotools update```. Else, you can add the following line to your ```.bashrc```:
+
+```
+alias pip='python -m pip'
 ```
 
 ### Feedback, Bug Reports and Contributions are always welcome!
