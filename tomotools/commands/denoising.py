@@ -31,7 +31,6 @@ def cryocare_extract(num_slices, split, patch_shape, tilt_axis, n_normalization_
     
     from cryocare.internals.CryoCAREDataModule import CryoCARE_DataModule
     
-    input_tomo = list()
     input_evn = list()
     input_odd = list()
     
@@ -39,16 +38,10 @@ def cryocare_extract(num_slices, split, patch_shape, tilt_axis, n_normalization_
         os.mkdir(output_path)
     
     # Convert all input_files into a list of Tomogram objects
-    for input_file in input_files:
-        input_file = Path(input_file)
-        if input_file.is_file():
-            input_tomo.append(Tomogram(Path(input_file)))
-        elif input_file.is_dir():
-            input_tomo += ([Tomogram(Path(file))for file in glob(join(input_file, '*_rec_bin_[0-9].mrc'))])
+    input_tomo = convert_input_to_Tomogram(input_files)
             
     for tomo in input_tomo:
-        if path.isfile(tomo.path.with_name(f'{tomo.path.stem}_EVN.mrc')) and path.isfile(tomo.path.with_name(f'{tomo.path.stem}_ODD.mrc')):
-            tomo = tomo.with_split_files(tomo.path.with_name(f'{tomo.path.stem}_EVN.mrc'), tomo.path.with_name(f'{tomo.path.stem}_ODD.mrc'))
+        if tomo.is_split:
             input_evn.append(tomo.evn_path)
             input_odd.append(tomo.odd_path)
             print(f'Found reconstruction {tomo.path} with EVN and ODD stacks.')
@@ -148,30 +141,22 @@ def cryocare_predict(tiles, gpu, model_path, input_files, output):
     from cryocare.scripts.cryoCARE_predict import set_gpu_id, denoise
 
     # Parse input tomogram        
-    input_tomo = list()
     input_evn = list()
     input_odd = list()
     
     # Convert all input_files into a list of Tomogram objects
-    for input_file in input_files:
-        input_file = Path(input_file)
-        if input_file.is_file():
-            input_tomo.append(Tomogram(Path(input_file)))
-        elif input_file.is_dir():
-            input_tomo += ([Tomogram(Path(file))for file in glob(join(input_file, '*_rec_bin_[0-9].mrc'))])
+    input_tomo = convert_input_to_Tomogram(input_files)
             
     for tomo in input_tomo:
-        if path.isfile(tomo.path.with_name(f'{tomo.path.stem}_EVN.mrc')) and path.isfile(tomo.path.with_name(f'{tomo.path.stem}_ODD.mrc')):
-            tomo = tomo.with_split_files(tomo.path.with_name(f'{tomo.path.stem}_EVN.mrc'), tomo.path.with_name(f'{tomo.path.stem}_ODD.mrc'))
+        if tomo.is_split:
             input_evn.append(tomo.evn_path)
             input_odd.append(tomo.odd_path)
             print(f'Found reconstruction {tomo.path} with EVN and ODD stacks.')
         else:
             print(f'No EVN/ODD reconstructions found for {tomo.path}. Skipping.')
-    
-    # Create output directory
-    if not path.isdir(output):
-        os.mkdir(output)
+        # Create output directory
+        if not path.isdir(output):
+            os.mkdir(output)
         
     # Take care of GPU stuff
     if gpu is None:

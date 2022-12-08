@@ -2,6 +2,8 @@ import os
 import shutil
 import subprocess
 import warnings
+import pandas as pd
+
 from operator import itemgetter
 from os import path
 from pathlib import Path
@@ -54,13 +56,12 @@ class TiltSeries:
                 file.unlink()
 
     # TODO: parse ctffind or ctfplotter files
-    def get_defocus(self, output_file: Optional[Path] = None):
+    def parse_defocus(self):
         pass
 
     @staticmethod
-    # TODO: run ctffind
-    def find_defocus(self):
-        pass
+    def run_ctfplotter(self):
+        run_ctfplotter(self)
 
     @staticmethod
     def _update_mrc_header_from_mdoc(path: Path, mdoc: dict):
@@ -409,10 +410,21 @@ def run_ctfplotter(ts: TiltSeries):
 
     return ts.path.with_name(f'{ts.path.stem}_ctfplotter.txt')
 
-def parse_ctfplotter():
-    """Takes path to ctfplotter output. Returns pandas dataframe"""
-    # TODO
-    pass
+def parse_ctfplotter(file: Path):
+    """Takes path to ctfplotter output. Returns pandas dataframe."""
+    
+    df_file = pd.DataFrame({'view_start': [],'view_end': [],'tilt_start': [],'tilt_end': [],'df_1_nm': [],'df_2_nm': [], 'astig_ang': []}, dtype = int)
+    
+    with open(file, "r") as f:
+        reader = csv.reader(f, delimiter = '\t')
+        for row in reader:
+            if row[1] == '0':
+                pass
+            else:
+                df_temp = pd.DataFrame({'view_start': [row[0]],'view_end': [row[1]],'tilt_start': [row[2]],'tilt_end': [row[3]],'df_1_nm': [row[4]],'df_2_nm': [row[5]], 'astig_ang': [row[6]]})
+                df_file = pd.concat([df_file,df_temp])
+                
+    return df_file
 
 def parse_darkimgs(ts: TiltSeries):
     ''' Parses AreTomo-generated _DarkImgs.txt file for a given tiltseries, returns list of excluded tilts'''
