@@ -77,7 +77,7 @@ class Micrograph:
             gain_ref_dm4 = gain_refs.pop()
             if gain_ref_dm4 is not None:
                 # The gain ref should be in the same folder as the input file(s), so check if it's there
-                gain_ref_dm4 = movies[0].path.parent.joinpath(gain_refs.pop())
+                gain_ref_dm4 = movies[0].path.parent / gain_ref_dm4
                 if not gain_ref_dm4.is_file():
                     raise FileNotFoundError(f'Expected gain reference at {gain_ref_dm4}, aborting')
 
