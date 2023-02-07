@@ -1,5 +1,33 @@
-from pathlib import Path
+import csv
 
+from os import path
+from pathlib import Path
+from operator import itemgetter
+
+def convert_to_order_list(mdoc: dict, out_dir: Path):
+    ''' Writers order_list.csv required for Relion4
+    
+    Takes mdoc as dict (via mdocfile.read) and path for output. Returns path to output file.
+    '''
+    
+      
+    # Sorte by DateTime to get order of acquisition
+    mdoc['sections'] = sorted(mdoc['sections'], key=itemgetter('DateTime'))
+    
+    tilt_list = [int(section['TiltAngle']) for section in mdoc['sections']]
+    
+    # Generate output file path
+    output_file = path.join(out_dir, (out_dir.stem + '_order.csv'))
+    
+    with open(output_file, 'w+') as f:
+        writer = csv.writer(f)
+        i = 1
+        
+        for tilt in tilt_list:
+            writer.writerow([i, tilt])
+            i = i + 1
+    
+    return output_file
 
 def _convert_value_field(field: str):
     if ' ' in field:

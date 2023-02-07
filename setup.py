@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='Tomotools',
-    version='0.2.2',
+    version='0.2.5',
     packages=['tomotools', 'tomotools.commands', 'tomotools.utils'],
     install_requires=[
         'Click',
@@ -14,6 +14,7 @@ setup(
         'tensorflow==2.4',
         'cryoCARE',
         'packaging',
+        'starfile'
     ],
     entry_points={
         'console_scripts': [
