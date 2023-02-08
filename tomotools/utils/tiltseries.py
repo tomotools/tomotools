@@ -206,13 +206,15 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
         mdoc = mdocfile.read(ts.mdoc)
         full_dimensions = mdoc['ImageSize']
         patch_x, patch_y = [str(round(full_dimensions[0] / 1000)), str(round(full_dimensions[1] / 1000))]
+        alignZ = str(round(1500 / angpix))
 
         subprocess.run([aretomo_executable(),
                         '-InMrc', ts.path,
                         '-OutMrc', ali_stack,
                         '-AngFile', tlt_file,
                         '-VolZ', '0',
-                        '-TiltCor', '1'] +
+                        '-TiltCor', '-1',
+                        '-AlignZ', alignZ] +
                        (['-Gpu'] + [str(i) for i in gpu_id]) +
                        (['-Patch', patch_x, patch_y] if local else []),
                        stdout=subprocess.DEVNULL)
@@ -376,37 +378,37 @@ def aln_to_tlt(aln_file: Path):
 
     return tlt_out
 
-
-def run_ctfplotter(ts: TiltSeries):
+def run_ctfplotter(ts: TiltSeries, overwrite: bool):
     ''' Run imod ctfplotter on given TiltSeries object. Returns path to defocus file.'''
 
-    with mrcfile.mmap(ts.path) as mrc:
-        nmpix = str(float(mrc.voxel_size.x) / 10)
-        header = str(mrc.header)
-        header = header.split('Tilt axis angle = ', 1)
-        axis_angle = header[1][0:4]
-
-    mdoc = mdocfile.read(ts.mdoc)
-    expected_defocus = str(abs(mdoc['sections'][0]['TargetDefocus']) * 1000)
-
-    kV = 300
-    cs = 2.7
-
-    with open(path.join(ts.path.parent, 'ctfplotter.log'), 'a') as out:
-        subprocess.run(['ctfplotter',
-                        '-InputStack', ts.path,
-                        '-angleFn', ts.path.with_suffix('.tlt'),
-                        '-defFn', ts.path.with_name(f'{ts.path.stem}_ctfplotter.txt'),
-                        '-pixelSize', nmpix,
-                        '-crop', '0.3',
-                        '-volt', str(kV),
-                        '-cs', str(cs),
-                        '-am', str(0.07),
-                        '-degPhase', str(0),
-                        '-AxisAngle', axis_angle,
-                        '-expDef', expected_defocus,
-                        '-autoFit', '3,1'],
-                       stdout=out)
+    if path.exists(ts.path.with_name(f'{ts.path.stem}_ctfplotter.txt')) and overwrite:
+        with mrcfile.mmap(ts.path) as mrc:
+            nmpix = str(float(mrc.voxel_size.x) / 10)
+            header = str(mrc.header)
+            header = header.split('Tilt axis angle = ', 1)
+            axis_angle = header[1][0:4]
+    
+        mdoc = mdocfile.read(ts.mdoc)
+        expected_defocus = str(abs(mdoc['sections'][0]['TargetDefocus']) * 1000)
+    
+        kV = 300
+        cs = 2.7
+    
+        with open(path.join(ts.path.parent, 'ctfplotter.log'), 'a') as out:
+            subprocess.run(['ctfplotter',
+                            '-InputStack', ts.path,
+                            '-angleFn', ts.path.with_suffix('.tlt'),
+                            '-defFn', ts.path.with_name(f'{ts.path.stem}_ctfplotter.txt'),
+                            '-pixelSize', nmpix,
+                            '-crop', '0.3',
+                            '-volt', str(kV),
+                            '-cs', str(cs),
+                            '-am', str(0.07),
+                            '-degPhase', str(0),
+                            '-AxisAngle', axis_angle,
+                            '-expDef', expected_defocus,
+                            '-autoFit', '3,1'],
+                           stdout=out)
 
     return ts.path.with_name(f'{ts.path.stem}_ctfplotter.txt')
 
@@ -426,21 +428,52 @@ def parse_ctfplotter(file: Path):
                 
     return df_file
 
-def parse_darkimgs(ts: TiltSeries):
-    ''' Parses AreTomo-generated _DarkImgs.txt file for a given tiltseries, returns list of excluded tilts'''
-    dark_txt = ts.path.with_name(f'{ts.path.stem}_DarkImgs.txt')
-    dark_tilts = list()
-
-    if not path.isfile(dark_txt):
-        print(f'Could not find dark tilts output from AreTomo corresponding to {ts.path.name}.')
+def write_ctfplotter(df: pd.DataFrame(), file: Path):
+    """Writes Pandas dataframe as ctfplotter file"""
+        
+    # Somehow this header is present in ctfplotter files, so also add here.
+    header = pd.DataFrame(['1', '0', '0.0', '0.0', '0.0', '3']).T
     
-    with open(dark_txt, mode = 'r') as txt:
-        for line in txt:
-            if line.startswith('#'):
-                pass
-            else:
-                line = line.strip()
-                dark_tilts.append(line)
+    temp_header = header.to_csv(sep="\t", header = False, index=False)
+    temp = df.to_csv(sep="\t", header = False, index=False)
+
+    with open(file, 'w+') as f: f.write(temp_header + temp + "\n")
+
+    return file
+
+def parse_darkimgs(ts: TiltSeries):
+    ''' Parses AreTomo-generated _DarkImgs.txt file for a given tiltseries, returns list of excluded tilts (Zero-Indexed)
+    
+    If _DarkImgs is not found, check in the .aln file (as of version 1.3).
+    '''
+    
+    dark_tilts = []
+    
+    dark_txt = ts.path.with_name(f'{ts.path.stem}_DarkImgs.txt')
+    aln_file = ts.path.with_suffix('.aln')
+
+    if path.isfile(dark_txt):
+        with open(dark_txt, mode = 'r') as txt:
+            for line in txt:
+                if line.startswith('#'):
+                    pass
+                else:
+                    line = line.strip()
+                    dark_tilts.append(int(line))
+                    
+    else:
+        with open(aln_file) as f:
+            reader = csv.reader(f, delimiter=' ')
+            for row in reader:
+                
+                if row[1].startswith('Local'):
+                    break
+                elif row[1].startswith('DarkFrame'):
+                    row_cleaned = [entry for i, entry in enumerate(row) if entry != '']
+                    (hash, title, equal, view, view2, ang) = row_cleaned
+                    dark_tilts.append(int(view))
+                else:
+                    pass
             
     return dark_tilts
 
