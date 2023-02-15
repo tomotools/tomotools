@@ -48,10 +48,10 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
     
     # Parse input files
     if batch_input:
-        input_files_parsed = []
-        with open(input_files, "r+") as f:
-            for line in f.lines:
-                input_files_parsed.append(line)
+        input_files_parsed = list()
+        with open(input_files[0], "r+") as f:
+            for line in f:
+                input_files_parsed.append(line.strip("\n"))
                 
     else:
         input_files_parsed = input_files
@@ -84,7 +84,7 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
         
         if path.isdir(tomo_folder):
             raise FileExistsError("This tomogram seems to already exist in the target relion project. Maybe names are non-unique?")
-                
+                           
         # TODO: deal with imod alignments
         
         # Run AreTomo based on previous alignment file to create additional outputs
@@ -109,20 +109,20 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
                         '-OutImod','3'],
                        stdout=subprocess.DEVNULL)
         
-        ali_st = TiltSeries(Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
+        ali_stack_imod = TiltSeries(Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
         
         with mrcfile.mmap(ali_stack, mode='r+') as mrc:
             mrc.voxel_size = str(angpix)
             mrc.update_header_stats()
             
-        with mrcfile.mmap(ali_st.path, mode='r+') as mrc:
+        with mrcfile.mmap(ali_stack_imod.path, mode='r+') as mrc:
             mrc.voxel_size = str(angpix)
             mrc.update_header_stats()
         
         print(f'Performed AreTomo export of {ts.path.stem}.')
         
         # Make reconstruction for picking
-        ali_rec = Tomogram.from_tiltseries(ali_st, bin = bin, sirt = sirt)
+        ali_rec = Tomogram.from_tiltseries(ali_stack_imod, bin = bin, sirt = sirt)
         
         print(f'Created reconstruction for particle picking at {ali_rec.path.name}.')
                 
@@ -131,7 +131,7 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
 
         mdoc_cleaned = mdoc  
         mdoc_cleaned['sections'] = [ele for idx, ele in enumerate(mdoc['sections']) if idx not in exclude]
-        mdocfile.write(mdoc_cleaned, ali_st.mdoc)
+        mdocfile.write(mdoc_cleaned, ali_stack_imod.mdoc)
         
         # If required run ctfplotter or just return results of previous run - this is done on the original tiltseries to avoid artifacts from alignment
         ctffile = parse_ctfplotter(run_ctfplotter(ts, False))
@@ -158,16 +158,16 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
                     ctffile_cleaned = pd.concat([ctffile_cleaned, df_temp])
             
         
-        ctf_out = write_ctfplotter(ctffile_cleaned, Path(path.join(tomo_folder,(f'{ali_st.path.stem}_ctfplotter.txt'))))
+        ctf_out = write_ctfplotter(ctffile_cleaned, Path(path.join(ali_stack_imod.path.parent,(f'{ali_stack_imod.path.stem}_ctfplotter.txt'))))
         
         # Create or symlink all relevant files: pre-alignment stack, post-alignment stack, tlt, xf, tilt.com, newst.com, ctfplotter
         os.symlink(imod_dir, tomo_folder, target_is_directory=True)
         
-        print(f'Successfully created tomograms folder for {ts.name}.')
+        print(f'Successfully created tomograms folder for {ts.path.name}.')
 
         df_temp = pd.DataFrame(data = {'rlnTomoName': ts.path.stem, 
                                        'rlnTomoImportImodDir': tomo_folder,
-                                        'rlnTomoTiltSeriesName': path.join(tomo_folder, (f'{ali_st.path.name}:mrc')),
+                                        'rlnTomoTiltSeriesName': path.join(tomo_folder, (f'{ali_stack_imod.path.name}:mrc')),
                                         'rlnTomoImportOrderList': mdocfile.convert_to_order_list(mdoc_cleaned, tomo_folder),
                                         'rlnTomoImportCtfPlotterFile': ctf_out,
                                         'rlnTomoImportFractionalDose': mdoc_cleaned['sections'][0]['ExposureDose'],
