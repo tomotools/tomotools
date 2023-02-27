@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 
 from tomotools.utils import mdocfile
-from tomotools.utils.tiltseries import run_ctfplotter, convert_input_to_TiltSeries, aretomo_executable, TiltSeries, parse_ctfplotter, parse_darkimgs, write_ctfplotter
+from tomotools.utils.tiltseries import run_ctfplotter, dose_filter, convert_input_to_TiltSeries, aretomo_executable, TiltSeries, parse_ctfplotter, parse_darkimgs, write_ctfplotter
 from tomotools.utils.tomogram import Tomogram
 
 @click.command()
@@ -30,7 +30,7 @@ def fit_ctf(input_files):
         
 @click.command()
 @click.option('--bin', default=4, show_default=True, help="Binning for reconstruction used to pick particles.")
-@click.option('--sirt', default=5, show_default=True, help="SIRT-like filter for reconstruction used to pick particles.")
+@click.option('--sirt', default=0, show_default=True, help="SIRT-like filter for reconstruction used to pick particles.")
 @click.option('-b', '--batch-input', is_flag=True, default=False, show_default=True,
               help="Read input files as text, each line is a tiltseries (folder)")
 @click.argument('input_files', nargs=-1)
@@ -67,11 +67,11 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
         print(f'Created Relion root directory at {relion_root}')
     
     # Prepare tomogram folders
-    tomo_root = path.join(relion_root, 'tomograms')
+    tomo_root = path.join(relion_root, 'Tomograms')
     
     if not path.isdir(tomo_root):
         os.mkdir(tomo_root)
-        print(f'Created ./tomograms directory at {tomo_root}.')
+        print(f'Created ./Tomograms directory at {tomo_root}.')
     
     df = pd.DataFrame()
     
@@ -105,6 +105,7 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
                         '-OutMrc', ali_stack,
                         '-AngFile', tlt_file,
                         '-AlnFile', aln_file,
+                        '-TiltCor', '-1',
                         '-VolZ', '0',
                         '-OutImod','3'],
                        stdout=subprocess.DEVNULL)
@@ -121,17 +122,21 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
         
         print(f'Performed AreTomo export of {ts.path.stem}.')
         
-        # Make reconstruction for picking
-        ali_rec = Tomogram.from_tiltseries(ali_stack_imod, bin = bin, sirt = sirt)
-        
-        print(f'Created reconstruction for particle picking at {ali_rec.path.name}.')
-                
         # Get view exclusion list and create appropriate mdoc
         exclude = parse_darkimgs(ts)
 
         mdoc_cleaned = mdoc  
         mdoc_cleaned['sections'] = [ele for idx, ele in enumerate(mdoc['sections']) if idx not in exclude]
         mdocfile.write(mdoc_cleaned, ali_stack_imod.mdoc)
+        
+        # Make reconstruction for picking
+        ali_stack_filtered = dose_filter(ali_stack_imod, False)
+        
+        ali_rec = Tomogram.from_tiltseries(ali_stack_filtered, bin = bin, sirt = sirt)
+        
+        ali_stack_filtered.delete_files(delete_mdoc=False)
+        
+        print(f'Created reconstruction for particle picking at {ali_rec.path.name}.')
         
         # If required run ctfplotter or just return results of previous run - this is done on the original tiltseries to avoid artifacts from alignment
         ctffile = parse_ctfplotter(run_ctfplotter(ts, False))
