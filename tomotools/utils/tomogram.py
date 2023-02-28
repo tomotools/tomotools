@@ -52,7 +52,7 @@ class Tomogram:
     @staticmethod
     def from_tiltseries(tiltseries: TiltSeries, bin: int = 1, sirt: int = 5, thickness: Optional[int] = None,
                         x_axis_tilt: float = 0,
-                        z_shift: float = 0, do_EVN_ODD: bool = False, trim: bool = True) -> 'Tomogram':
+                        z_shift: float = 0, do_EVN_ODD: bool = False, trim: bool = True, convert_to_byte: bool = True) -> 'Tomogram':
 
         ali_stack = tiltseries.path
 
@@ -182,16 +182,16 @@ class Tomogram:
             
             final_rec = tiltseries.path.with_name(f'{tiltseries.path.stem}_rec_bin_{bin}.mrc')
     
-            tr = subprocess.run(['trimvol',
-                            '-x', f'1,{full_rec_dim[2]}',
-                            '-y', f'1,{full_rec_dim[0]}',
-                            '-z', f'1,{full_rec_dim[1]}',
-                            '-sx', f'1,{full_rec_dim[2]}',
-                            '-sy', f'1,{full_rec_dim[0]}',
-                            '-sz', f'{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}',
-                            '-f', '-rx',
-                            full_rec, final_rec],
-                            stdout=subprocess.DEVNULL)
+            tr =subprocess.run(['trimvol',
+                                '-x', f'1,{full_rec_dim[2]}',
+                                '-y', f'1,{full_rec_dim[0]}',
+                                '-z', f'1,{full_rec_dim[1]}',
+                                '-f', '-rx'] +
+                               (['-sx', f'1,{full_rec_dim[2]}',
+                                 '-sy', f'1,{full_rec_dim[0]}',
+                                 '-sz', f'{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}'] if convert_to_byte else []) +
+                               [full_rec, final_rec],
+                               stdout=subprocess.DEVNULL)
             
             if tr.returncode != 0:
                 print(f'{tiltseries.path}: Trimming failed, keeping full_rec file.')
@@ -208,22 +208,22 @@ class Tomogram:
                                 '-x', f'1,{full_rec_dim[2]}',
                                 '-y', f'1,{full_rec_dim[0]}',
                                 '-z', f'1,{full_rec_dim[1]}',
-                                '-sx', f'1,{full_rec_dim[2]}',
-                                '-sy', f'1,{full_rec_dim[0]}',
-                                '-sz', f'{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}',
-                                '-f', '-rx',
-                                full_rec_evn, final_rec_evn],
+                                '-f', '-rx'] +
+                               (['-sx', f'1,{full_rec_dim[2]}',
+                                 '-sy', f'1,{full_rec_dim[0]}',
+                                 '-sz', f'{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}'] if convert_to_byte else []) +
+                               [full_rec_evn, final_rec_evn],
                                 stdout=subprocess.DEVNULL)
                 
                 subprocess.run(['trimvol',
                                 '-x', f'1,{full_rec_dim[2]}',
                                 '-y', f'1,{full_rec_dim[0]}',
                                 '-z', f'1,{full_rec_dim[1]}',
-                                '-sx', f'1,{full_rec_dim[2]}',
-                                '-sy', f'1,{full_rec_dim[0]}',
-                                '-sz', f'{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}',
-                                '-f', '-rx',
-                                full_rec_odd, final_rec_odd],
+                                '-f', '-rx'] +
+                               (['-sx', f'1,{full_rec_dim[2]}',
+                                 '-sy', f'1,{full_rec_dim[0]}',
+                                 '-sz', f'{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}'] if convert_to_byte else []) +
+                               [full_rec_odd, final_rec_odd],
                                 stdout=subprocess.DEVNULL)
                 
                 print(f'{tiltseries.path}: Finished trimming.')

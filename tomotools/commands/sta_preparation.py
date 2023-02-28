@@ -132,7 +132,7 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
         # Make reconstruction for picking
         ali_stack_filtered = dose_filter(ali_stack_imod, False)
         
-        ali_rec = Tomogram.from_tiltseries(ali_stack_filtered, bin = bin, sirt = sirt)
+        ali_rec = Tomogram.from_tiltseries(ali_stack_filtered, bin = bin, sirt = sirt, convert_to_byte=False)
         
         ali_stack_filtered.delete_files(delete_mdoc=False)
         
