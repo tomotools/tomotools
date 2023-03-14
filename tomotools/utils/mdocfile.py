@@ -123,3 +123,13 @@ def write(mdoc, path):
             file.write(f'[FrameSet = {i}]\n')
             for key, value in frameset.items():
                 _write_key_value(file, key, value)
+                
+def downgrade_DateTime(mdoc: dict):
+    """
+    Downgrades DateTime from YYYY to YY (behaviour SerialEM < 4)
+    """
+    
+    for section in mdoc['sections']:
+        section['DateTime'] = section['DateTime'][0:7]+section['DateTime'][9::]
+
+    return mdoc

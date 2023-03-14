@@ -8,7 +8,6 @@ import shutil
 import pandas as pd
 
 from os import path
-from datetime import date
 from pathlib import Path
 from glob import glob
 
@@ -54,6 +53,8 @@ def tomotools2warp(batch_input, name, input_files, project_dir):
         ./m/
     
     """
+    
+    # TODO: also implement for AreTomo-aligned stacks
     
     out_dir = path.join(project_dir, name)
     
@@ -125,6 +126,8 @@ def tomotools2warp(batch_input, name, input_files, project_dir):
         
         for i in range(0,len(mdoc['sections'])):
             mdoc['sections'][i]['SubFramePath'] = subframelist[i]
+
+        mdoc = mdocfile.downgrade_DateTime(mdoc)
         
         mdocfile.write(mdoc, path.join(out_dir,"mdoc",ts.path.name+".mdoc"))
         
