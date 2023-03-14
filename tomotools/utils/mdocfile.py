@@ -128,7 +128,9 @@ def downgrade_DateTime(mdoc: dict):
     """
     Downgrades DateTime from YYYY to YY (behaviour SerialEM < 4)
     """
-    
+    #TODO: implement check that the date is really in old format
+
+
     for section in mdoc['sections']:
         section['DateTime'] = section['DateTime'][0:7]+section['DateTime'][9::]
 

@@ -105,7 +105,8 @@ def tomotools2warp(batch_input, name, input_files, project_dir):
         # Create imod subdirectory and copy alignment files (to protect against later modification)
         ts_dir = path.join(out_dir,"imod",ts.path.name)
         os.mkdir(ts_dir)
-        
+
+        # TODO: files should be stem.ending (eg. ts01.mrc.xf)
         [shutil.copy(file,ts_dir) for file in required_files[2:6]]
                 
         # tilt images go to warp root directory
@@ -123,7 +124,8 @@ def tomotools2warp(batch_input, name, input_files, project_dir):
         # Check that mdoc has as many sections as there are tilt images
         if not len(mdoc['sections']) == len(subframelist):
             raise FileNotFoundError(f"There are {len(mdoc['sections'])} mdoc entries but {len(subframelist)} exported frames.")
-        
+
+        # TODO: use backslash
         for i in range(0,len(mdoc['sections'])):
             mdoc['sections'][i]['SubFramePath'] = subframelist[i]
 
