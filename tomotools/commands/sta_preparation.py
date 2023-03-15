@@ -10,6 +10,7 @@ import pandas as pd
 from os import path
 from pathlib import Path
 from glob import glob
+from datetime import date
 
 from tomotools.utils import mdocfile
 from tomotools.utils.tiltseries import run_ctfplotter, dose_filter, convert_input_to_TiltSeries, aretomo_executable, TiltSeries, parse_ctfplotter, parse_darkimgs, write_ctfplotter
@@ -210,9 +211,9 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
                         '-OutMrc', ali_stack,
                         '-AngFile', tlt_file,
                         '-AlnFile', aln_file,
-                        '-TiltCor', '-1',
+                        '-TiltCor', '0',
                         '-VolZ', '0',
-                        '-OutImod','3'],
+                        '-OutImod','1'],
                        stdout=subprocess.DEVNULL)
         
         ali_stack_imod = TiltSeries(Path(path.join(imod_dir, (ali_stack.stem + ".st"))))

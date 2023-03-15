@@ -29,7 +29,8 @@ tomotools [subcommand] --help
 - **deconv**: Python implementation of Dimitry Tegunov's _tom_deconv.m_ script.
 
 ### Subtomogram Averaging
-- **tomotools2relion**: Takes a list of tiltseries or a file listing them and prepares everything for Relion4 import.
+- **tomotools2relion**: Takes a list of tiltseries or a file listing them and prepares everything for Relion4 import. Currently only works with AreTomo, ignores global alignment.
+- **tomotools2warp**: Takes a list of tiltseries or a file listing them and prepares everything for Warp processing. Currently only works with imod.
 - **fit-ctf**: Run imod ctfplotter on a set of tiltseries and save results to their folder.
 - **merge-dboxes**: Very beta, merges Dynamo DBoxes.
 
