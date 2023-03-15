@@ -131,7 +131,7 @@ def downgrade_DateTime(mdoc: dict):
 
     for section in mdoc['sections']:
         #Check that date is really in DD-MMM-YYYY (= 11 chars)
-        if len(section) == 11:
+        if len(section['DateTime'].split()[0]) == 11:
             section['DateTime'] = section['DateTime'][0:7]+section['DateTime'][9::]
         else:
             continue
