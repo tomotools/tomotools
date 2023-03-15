@@ -103,10 +103,9 @@ def tomotools2warp(batch_input, name, input_files, project_dir):
             
         
         # Create imod subdirectory and copy alignment files (to protect against later modification)
-        ts_dir = path.join(out_dir,"imod",ts.path.name)
+        ts_dir = path.join(out_dir,"imod",ts.path.stem)
         os.mkdir(ts_dir)
 
-        # TODO: files should be stem.ending (eg. ts01.mrc.xf)
         [shutil.copy(file,ts_dir) for file in required_files[2:6]]
                 
         # tilt images go to warp root directory
@@ -125,13 +124,12 @@ def tomotools2warp(batch_input, name, input_files, project_dir):
         if not len(mdoc['sections']) == len(subframelist):
             raise FileNotFoundError(f"There are {len(mdoc['sections'])} mdoc entries but {len(subframelist)} exported frames.")
 
-        # TODO: use backslash
         for i in range(0,len(mdoc['sections'])):
-            mdoc['sections'][i]['SubFramePath'] = subframelist[i]
+            mdoc['sections'][i]['SubFramePath'] = 'X:\\WarpDir\\' + Path(subframelist[i]).name
 
         mdoc = mdocfile.downgrade_DateTime(mdoc)
         
-        mdocfile.write(mdoc, path.join(out_dir,"mdoc",ts.path.name+".mdoc"))
+        mdocfile.write(mdoc, path.join(out_dir,"mdoc",ts.path.stem+".mdoc"))
         
         print(f"Warp files prepared for {ts.path.name}. \n")
         
