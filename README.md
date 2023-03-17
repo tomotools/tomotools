@@ -31,6 +31,7 @@ tomotools [subcommand] --help
 ### Subtomogram Averaging
 - **tomotools2relion**: Takes a list of tiltseries or a file listing them and prepares everything for Relion4 import. Currently only works with AreTomo, ignores global alignment.
 - **tomotools2warp**: Takes a list of tiltseries or a file listing them and prepares everything for Warp processing. Currently only works with imod.
+- **project-particles**: Takes a Relion or Warp-generated .star file with (pseudo-)subtomograms. Performs projection along Z (optionally only central coordinates), generates files for Relion 2D classification (>3.1 style).
 - **fit-ctf**: Run imod ctfplotter on a set of tiltseries and save results to their folder.
 - **merge-dboxes**: Very beta, merges Dynamo DBoxes.
 
