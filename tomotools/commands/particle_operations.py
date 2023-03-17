@@ -61,6 +61,10 @@ def project_particles(z_thickness, radius, input_star):
     particles_2d['rlnCoordinateX'] = particles['rlnCoordinateX']
     particles_2d['rlnCoordinateY'] = particles['rlnCoordinateY']
     particles_2d['rlnCoordinateZ'] = particles['rlnCoordinateZ']
+    particles_2d['rlnAngleRot'] = particles['rlnAngleRot']
+    particles_2d['rlnAngleTilt'] = particles['rlnAngleTilt']
+    particles_2d['rlnAnglePsi'] = particles['rlnAnglePsi']
+
     particles_2d['rlnImageName'] = [f'{i}@preprocessed.mrcs' for i in range(1,len(particles.index)+1)]
     particles_2d['rlnOpticsGroup'] = '1'
 
