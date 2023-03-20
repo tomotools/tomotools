@@ -287,6 +287,7 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
                                
         df = pd.concat([df_temp.astype(object), df])
                 
+        #TODO: fix thickness!
     
     # Write out import_tomos.star file w/ current date for easy ID
     
