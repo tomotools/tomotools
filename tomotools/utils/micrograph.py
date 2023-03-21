@@ -87,8 +87,8 @@ class Micrograph:
             temp_gain = output_dir.joinpath('motioncor2_gain')
             temp_gain.mkdir()
             gain_ref_mrc = temp_gain.joinpath(gain_ref_dm4.stem + '.mrc')
-            print(f'Found unique gain reference {gain_ref_dm4}, converting to MRC at {gain_ref_mrc}')
-            subprocess.run(['dm2mrc', gain_ref_dm4, gain_ref_mrc])
+            print(f'Found unique gain reference {gain_ref_dm4}, converting to MRC.')
+            subprocess.run(['dm2mrc', gain_ref_dm4, gain_ref_mrc], stdout = subprocess.DEVNULL)
 
         if gain_ref_mrc is not None:
             if not gain_ref_mrc.is_file():

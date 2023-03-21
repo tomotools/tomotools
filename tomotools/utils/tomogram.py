@@ -1,12 +1,11 @@
 import os
 import subprocess
+import mrcfile
+
 from pathlib import Path
 from typing import Optional
 from os import path
 from glob import glob
-from os.path import join, isdir, isfile 
-
-import mrcfile
 
 from tomotools.utils.tiltseries import TiltSeries
 
@@ -33,21 +32,17 @@ class Tomogram:
     def with_split_dir(self, dir: Path) -> 'Tomogram':
         if not dir.is_dir():
             raise NotADirectoryError(f'{dir} is not a directory!')
-        stem = self.path.stem
-        suffix = self.path.suffix
-        evn_file = dir.joinpath(f'{stem}_EVN{suffix}')
-        odd_file = dir.joinpath(f'{stem}_ODD{suffix}')
-        return self.with_split_files(evn_file, odd_file)
+        return find_Tomogram_halves(self, dir)
     
-    @property
     def angpix(self):
         with mrcfile.mmap(self.path,mode = 'r') as mrc:
             self.angpix = float(mrc.voxel_size.x)
+        return self.angpix
 
-    @property
     def dimZYX(self):
         with mrcfile.mmap(self.path,mode = 'r') as mrc:
             self.dimZYX = mrc.data.shape
+        return self.dimZYX
 
     @staticmethod
     def from_tiltseries(tiltseries: TiltSeries, bin: int = 1, sirt: int = 5, thickness: Optional[int] = None,
@@ -102,7 +97,7 @@ class Tomogram:
                         '-OutputFile', full_rec,
                         '-IMAGEBINNED', str(bin),
                         '-XAXISTILT', str(x_axis_tilt),
-                        '-TILTFILE', f'{list(tiltseries.path.parent.glob("*_ali.tlt"))[0]}',
+                        '-TILTFILE', f'{list(tiltseries.path.parent.glob("*.tlt"))[0]}',
                         '-THICKNESS', str(thickness),
                         '-RADIAL', '0.35,0.035',
                         '-FalloffIsTrueSigma', '1',
@@ -120,6 +115,7 @@ class Tomogram:
 
         if bin != 1:        
             os.remove(binned_stack)
+        
         print(f'{tiltseries.path}: Finished reconstruction.')
         
         if do_EVN_ODD and tiltseries.is_split:
@@ -132,7 +128,7 @@ class Tomogram:
                             '-OutputFile', full_rec_evn,
                             '-IMAGEBINNED', str(bin),
                             '-XAXISTILT', str(x_axis_tilt),
-                            '-TILTFILE', f'{list(tiltseries.path.parent.glob("*_ali.tlt"))[0]}',
+                            '-TILTFILE', f'{list(tiltseries.path.parent.glob("*.tlt"))[0]}',
                             '-THICKNESS', str(thickness),
                             '-RADIAL', '0.35,0.035',
                             '-FalloffIsTrueSigma', '1',
@@ -154,7 +150,7 @@ class Tomogram:
                             '-OutputFile', full_rec_odd,
                             '-IMAGEBINNED', str(bin),
                             '-XAXISTILT', str(x_axis_tilt),
-                            '-TILTFILE', f'{list(tiltseries.path.parent.glob("*_ali.tlt"))[0]}',
+                            '-TILTFILE', f'{list(tiltseries.path.parent.glob("*.tlt"))[0]}',
                             '-THICKNESS', str(thickness),
                             '-RADIAL', '0.35,0.035',
                             '-FalloffIsTrueSigma', '1',
@@ -173,6 +169,7 @@ class Tomogram:
             if bin != 1:            
                 os.remove(binned_stack_evn)
                 os.remove(binned_stack_odd)
+            
             print(f'{tiltseries.path}: Finished reconstruction of EVN/ODD stacks.')
         
         if trim:
@@ -237,8 +234,31 @@ class Tomogram:
             
         return Tomogram(full_rec)
 
+def find_Tomogram_halves(tomo: Tomogram, split_dir: Path = None):
+    ''' Check whether tomogram has EVN/ODD halves. Optionally, you can pass a directory where the split reconstructions are.'''
+    
+    if split_dir is None:
+        parent_dir = tomo.path.parent
+        
+    else:
+        parent_dir = split_dir
+        
+    # Generate plausible filenames either after MotionCor2 or imod notation:
+    EVN_file = parent_dir / f'{tomo.path.stem}_EVN.mrc'
+    ODD_file = parent_dir / f'{tomo.path.stem}_ODDS.mrc'
+    
+    even_file = parent_dir / f'{tomo.path.stem[:-3]}even.mrc'
+    odd_file = parent_dir / f'{tomo.path.stem[:-3]}odd.mrc'
+    
+    if path.isfile(EVN_file) and path.isfile(ODD_file):
+        return tomo.with_split_files(EVN_file, ODD_file)
+    elif path.isfile(even_file) and path.isfile(odd_file):
+        return tomo.with_split_files(even_file, odd_file)
+    else:
+        return tomo
+
 def convert_input_to_Tomogram(input_files:[]):
-    ''' Takes list of input files or folders from Click. Returns list of TiltSeries objects with or without split frames. '''
+    ''' Takes list of input files or folders from Click. Returns list of Tomogram objects with or without split reconstructions. '''
     input_tomo = list()
     
     for input_file in input_files:
@@ -247,10 +267,12 @@ def convert_input_to_Tomogram(input_files:[]):
             input_tomo.append(Tomogram(Path(input_file)))
         elif input_file.is_dir():
             input_tomo += ([Tomogram(Path(file))for file in glob(path.join(input_file, '*_rec_bin_[0-9].mrc'))])
+            # Do not include full_rec, even_rec and odd_rec
+            input_tomo += ([Tomogram(Path(Path(file))) for file in list(set(glob(path.join(input_file, '*_rec.mrc')))-set(glob(path.join(input_file,'*even_rec.mrc')))-set(glob(path.join(input_file,'*_odd_rec.mrc')))-set(glob(path.join(input_file,'*_full_rec.mrc'))))])
             
     for tomo in input_tomo:
-        if path.isfile(tomo.path.with_name(f'{tomo.path.stem}_EVN.mrc')) and path.isfile(tomo.path.with_name(f'{tomo.path.stem}_ODD.mrc')):
-            tomo = tomo.with_split_files(tomo.path.with_name(f'{tomo.path.stem}_EVN.mrc'), tomo.path.with_name(f'{tomo.path.stem}_ODD.mrc'))
+        tomo = find_Tomogram_halves(tomo)
+        if tomo.is_split:
             print(f'Found reconstruction {tomo.path} with EVN and ODD stacks.')
         else:
             tomo = tomo
