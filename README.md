@@ -18,8 +18,8 @@ tomotools [subcommand] --help
   - Takes data directory from SerialEM as input and writes the final stacks to the target directory.
   - Frames are aligned using MotionCor2 and reordered if desired. Supports GainRef conversion from dm4 to mrc and the SerialEM-generated defects.txt.
   - Example: ```tomotools batch-prepare-tiltseries --mcbin 1 --gainref frames/GainRef.dm4 *.mrc ts-aligned```
-- **reconstruct**: Perform batch reconstruction using AreTomo and imod.
-  - Takes tiltseries and their associated mdoc files as input, automatically identified associated EVN/ODD stacks. Finds alignment using AreTomo, then applies it to EVN/ODD stacks. Reconstruction is done using imod's ```tilt```.
+- **reconstruct**: Perform batch reconstruction using AreTomo or imod.
+  - Takes tiltseries and their associated mdoc files as input, automatically identified associated EVN/ODD stacks. Finds alignment using AreTomo, then applies it to EVN/ODD stacks. Alternatively, can move files and then open ```etomo```. Reconstruction is done using imod's ```tilt```.
   - Example: ```tomotools reconstruct --move --bin 4 --sirt 12 --do-evn-odd *.mrc```
 
 ### Denoising & Deconvolution
@@ -29,9 +29,10 @@ tomotools [subcommand] --help
 - **deconv**: Python implementation of Dimitry Tegunov's _tom_deconv.m_ script.
 
 ### Subtomogram Averaging
-- **tomotools2relion**: Takes a list of tiltseries or a file listing them and prepares everything for Relion4 import. Currently only works with AreTomo, ignores global alignment.
-- **tomotools2warp**: Takes a list of tiltseries or a file listing them and prepares everything for Warp processing. Currently only works with imod.
-- **project-particles**: Takes a Relion or Warp-generated .star file with (pseudo-)subtomograms. Performs projection along Z (optionally only central coordinates), generates files for Relion 2D classification (>3.1 style).
+- **imod2relion**: Takes a list of imod directories or a file listing them and prepares everything for Relion4 import.
+- **imod2warp**: Takes a list of imod directories or a file listing them and prepares everything for Warp.
+- **aretomo2relion**: Takes a list of directories with AreTomo-aligned tiltseries or a file listing them and prepares everything for Relion4 import.
+- **aretomo2warp**: Takes a list of directories with AreTomo-aligned tiltseries or a file listing them and prepares everything for Warp.
 - **fit-ctf**: Run imod ctfplotter on a set of tiltseries and save results to their folder.
 - **merge-dboxes**: Very beta, merges Dynamo DBoxes.
 

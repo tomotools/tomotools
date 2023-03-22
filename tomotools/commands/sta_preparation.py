@@ -3,17 +3,15 @@ import click
 import starfile
 import subprocess
 import mrcfile
-import shutil
 
 import pandas as pd
 
 from os import path
 from pathlib import Path
-from glob import glob
 from datetime import date
 
-from tomotools.utils import mdocfile
-from tomotools.utils.tiltseries import run_ctfplotter, dose_filter, convert_input_to_TiltSeries, aretomo_executable, TiltSeries, parse_ctfplotter, parse_darkimgs, write_ctfplotter
+from tomotools.utils import mdocfile, sta_util
+from tomotools.utils.tiltseries import run_ctfplotter, dose_filter, convert_input_to_TiltSeries, TiltSeries, parse_ctfplotter, write_ctfplotter
 from tomotools.utils.tomogram import Tomogram
 
 @click.command()
@@ -37,7 +35,7 @@ def fit_ctf(input_files):
               help="Warp working directory will be created as project_dir/name. Maybe put microscope session here?")
 @click.argument('input_files', nargs=-1)
 @click.argument('project_dir', nargs=1)
-def tomotools2warp(batch_input, name, input_files, project_dir):
+def imod2warp(batch_input, name, input_files, project_dir):
     """ Prepares Warp/M project. 
     
     Takes as input several tiltseries (folders) or a file listing them (with -b) obtained after processing with tomotools batch-prepare-tiltseries and reconstructed in subdirectories using imod.
@@ -53,10 +51,7 @@ def tomotools2warp(batch_input, name, input_files, project_dir):
         ./relion/
         ./m/
     
-    """
-    
-    # TODO: also implement for AreTomo-aligned stacks
-    
+    """    
     out_dir = path.join(project_dir, name)
     
     if not path.isdir(project_dir):
@@ -84,53 +79,76 @@ def tomotools2warp(batch_input, name, input_files, project_dir):
     # Convert to list of tiltseries
     ts_list = convert_input_to_TiltSeries(input_files_parsed)
     
-    print(f'Found {len(ts_list)} TiltSeries to work on.')
+    print(f'Found {len(ts_list)} TiltSeries to work on. \n')
     
     for ts in ts_list:
         print(f"Now working on {ts.path.name}")
         
-        required_files = [ts.path,
-                          ts.mdoc,
-                          ts.path.with_name("taSolution.log"),
-                          ts.path.with_suffix(".rawtlt"),
-                          ts.path.with_suffix(".xf")]
+        sta_util.make_warp_dir(ts, out_dir)
         
-        # Check that all files are present
-        if all([path.isfile(req) for req in required_files]):
-            print("All required alignment files found.")
-            
-        else:
-            raise FileNotFoundError(f"Not all alignment files found for {ts.path.name}.")
-            
+        print(f"Warp files prepared for {ts.path.name}. \n")
         
-        # Create imod subdirectory and copy alignment files (to protect against later modification)
-        ts_dir = path.join(out_dir,"imod",ts.path.stem)
-        os.mkdir(ts_dir)
+@click.command()
+@click.option('-b', '--batch-input', is_flag=True, default=False, show_default=True,
+              help="Read input files as text, each line is a tiltseries (folder)")
+@click.option('-n', '--name', default='warp', show_default=True, 
+              help="Warp working directory will be created as project_dir/name. Maybe put microscope session here?")
+@click.argument('input_files', nargs=-1)
+@click.argument('project_dir', nargs=1)
+def aretomo2warp(batch_input, name, input_files, project_dir):
+    """ Prepares Warp/M project. 
+    
+    Takes as input several tiltseries (folders) or a file listing them (with -b) obtained after processing with tomotools batch-prepare-tiltseries and reconstructed in subdirectories using AreTomo.
+    
+    Provide the root folder for the averaging project and a name for this export. This will be the Warp working directory. Both will be created if non-existent.
+    
+    Suggested structure is something like this:
+        
+    project_dir/
+        ./warpdir1/
+        ./warpdir2/
+        ./warpdir3/
+        ./relion/
+        ./m/
+    
+    """    
+    out_dir = path.join(project_dir, name)
+    
+    if not path.isdir(project_dir):
+        os.mkdir(project_dir)
+        
+    if path.isdir(out_dir):
+        input(f'Exporting to existing directory {out_dir}. Are you sure you want to continue?')
 
-        [shutil.copy(file,ts_dir) for file in required_files[2:6]]
+    else:
+        os.mkdir(out_dir)
+        os.mkdir(path.join(out_dir,'imod'))
+        os.mkdir(path.join(out_dir,'mdoc'))
+        print(f"Created Warp folder at {out_dir}.")
+        
+    # Parse input files
+    if batch_input:
+        input_files_parsed = list()
+        with open(input_files[0], "r+") as f:
+            for line in f:
+                input_files_parsed.append(line.strip("\n"))
                 
-        # tilt images go to warp root directory
-        subprocess.run(['newstack','-quiet',
-                       '-split','0',
-                       '-append','mrc',
-                       '-in',ts.path,
-                       path.join(out_dir,(ts.path.stem+"_sec_"))])
+    else:
+        input_files_parsed = input_files
         
-        # Create mdoc with SubFramePath and save it to the mdoc subdirectory
-        mdoc = mdocfile.read(ts.mdoc)
+    # Convert to list of tiltseries
+    ts_list = convert_input_to_TiltSeries(input_files_parsed)
+    
+    print(f'Found {len(ts_list)} TiltSeries to work on. \n')
+    
+    for ts in ts_list:
+        print(f"Now working on {ts.path.name}")
         
-        subframelist = glob(path.join(out_dir,(ts.path.stem+"_sec_*.mrc")))
+        ts_out_imod = sta_util.aretomo_export(ts)
         
-        # Check that mdoc has as many sections as there are tilt images
-        if not len(mdoc['sections']) == len(subframelist):
-            raise FileNotFoundError(f"There are {len(mdoc['sections'])} mdoc entries but {len(subframelist)} exported frames.")
-
-        for i in range(0,len(mdoc['sections'])):
-            mdoc['sections'][i]['SubFramePath'] = 'X:\\WarpDir\\' + Path(subframelist[i]).name
-
-        mdoc = mdocfile.downgrade_DateTime(mdoc)
+        print(f'Performed AreTomo export of {ts.path.stem}.')
         
-        mdocfile.write(mdoc, path.join(out_dir,"mdoc",ts.path.stem+".mdoc"))
+        sta_util.make_warp_dir(ts_out_imod, out_dir)
         
         print(f"Warp files prepared for {ts.path.name}. \n")
         
@@ -287,7 +305,7 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
                                
         df = pd.concat([df_temp.astype(object), df])
                 
-        #TODO: fix thickness!
+        #TODO: fix thickness! utils.comfile
     
     # Write out import_tomos.star file w/ current date for easy ID
     
