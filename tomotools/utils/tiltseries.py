@@ -323,8 +323,8 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool):
                        stdout=subprocess.DEVNULL)
 
         if do_evn_odd:
-            ali_stack_evn = ts.evn_path.with_name(f'{ts.path.stem}_ali_EVN.mrc')
-            ali_stack_odd = ts.odd_path.with_name(f'{ts.path.stem}_ali_ODD.mrc')
+            ali_stack_evn = ts.evn_path.with_name(f'{ts.path.stem}_ali_even.mrc')
+            ali_stack_odd = ts.odd_path.with_name(f'{ts.path.stem}_ali_odd.mrc')
 
             subprocess.run(['newstack',
                             '-InputFile', ts.evn_path,
@@ -350,7 +350,7 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool):
     elif not previous:
         # TODO: implement batch alignment with imod adoc here!
         raise NotImplementedError(
-            'Batch Alignment with imod is not implemented yet. You can align manually and then return using the --previous.')
+            'Batch Alignment with imod is not implemented yet. You can align in etomo and then return using the --previous.')
 
 
 def aln_to_tlt(aln_file: Path):
