@@ -196,7 +196,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
 @click.option('-b', '--bin', default=1, show_default=True, help="Final reconstruction binning")
 @click.option('--sirt', default=5, show_default=True, help="SIRT-like filter iterations")
 @click.option('--skip-positioning', is_flag=True,
-              help='Skip tomogram positioning.')
+              help='Skip tomogram positioning. Useful for STA.')
 @click.option('--previous', is_flag=True, help="Use previous alignment found in the folder. Will follow --imod / --aretomo flag.")
 @click.option('--gpu', type=str, default=None, help="Specify which GPUs to use for AreTomo. Default: All GPUs")
 @click.option('--do-evn-odd', is_flag=True,
@@ -354,3 +354,6 @@ def reconstruct(move, local, aretomo, extra_thickness, bin, sirt, skip_positioni
         
         tiltseries_ali.delete_files(delete_mdoc=False)
         tiltseries_dosefiltered.delete_files(delete_mdoc=False)
+
+    if not aretomo and not previous:
+        subprocess.run('etomo')
