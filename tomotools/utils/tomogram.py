@@ -245,7 +245,7 @@ def find_Tomogram_halves(tomo: Tomogram, split_dir: Path = None):
         
     # Generate plausible filenames either after MotionCor2 or imod notation:
     EVN_file = parent_dir / f'{tomo.path.stem}_EVN.mrc'
-    ODD_file = parent_dir / f'{tomo.path.stem}_ODDS.mrc'
+    ODD_file = parent_dir / f'{tomo.path.stem}_ODD.mrc'
     
     even_file = parent_dir / f'{tomo.path.stem[:-3]}even.mrc'
     odd_file = parent_dir / f'{tomo.path.stem[:-3]}odd.mrc'

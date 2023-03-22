@@ -398,7 +398,7 @@ def run_ctfplotter(ts: TiltSeries, overwrite: bool):
             subprocess.run(['ctfplotter',
                             '-InputStack', ts.path,
                             '-angleFn', ts.path.with_suffix('.tlt'),
-                            '-defFn', ts.path.with_name(f'{ts.path.stem}_ctfplotter.txt'),
+                            '-defFn', ts.path.with_name(f'{ts.path.stem}.defocus'),
                             '-pixelSize', nmpix,
                             '-crop', '0.3',
                             '-volt', str(kV),
