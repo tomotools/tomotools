@@ -184,6 +184,8 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
                 micrograph.path.rename(output_dir.joinpath(micrograph.path.name))
             shutil.rmtree(frames_corrected_dir)
             print(f'Successfully created micrograph images in {output_dir}. \n')
+    
+        print("\n")
 
 
 @click.command()
@@ -354,6 +356,7 @@ def reconstruct(move, local, aretomo, extra_thickness, bin, sirt, skip_positioni
         
         tiltseries_ali.delete_files(delete_mdoc=False)
         tiltseries_dosefiltered.delete_files(delete_mdoc=False)
+        print("\n")
 
     if not aretomo and not previous:
         subprocess.run('etomo')
