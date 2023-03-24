@@ -1,8 +1,6 @@
 import os
 import click
 import starfile
-import subprocess
-import mrcfile
 
 import pandas as pd
 
@@ -10,8 +8,8 @@ from os import path
 from pathlib import Path
 from datetime import date
 
-from tomotools.utils import mdocfile, sta_util
-from tomotools.utils.tiltseries import run_ctfplotter, dose_filter, convert_input_to_TiltSeries, TiltSeries, parse_ctfplotter, write_ctfplotter
+from tomotools.utils import sta_util
+from tomotools.utils.tiltseries import run_ctfplotter, dose_filter, convert_input_to_TiltSeries
 from tomotools.utils.tomogram import Tomogram
 
 @click.command()
@@ -155,11 +153,12 @@ def aretomo2warp(batch_input, name, input_files, project_dir):
 @click.command()
 @click.option('--bin', default=4, show_default=True, help="Binning for reconstruction used to pick particles.")
 @click.option('--sirt', default=0, show_default=True, help="SIRT-like filter for reconstruction used to pick particles.")
+@click.option('-d','--thickness', default=3000, show_default=True, help="Thickness for reconstruction. Needs to be set so relion is not confused.")
 @click.option('-b', '--batch-input', is_flag=True, default=False, show_default=True,
               help="Read input files as text, each line is a tiltseries (folder)")
 @click.argument('input_files', nargs=-1)
 @click.argument('relion_root', nargs=1)
-def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
+def aretomo2relion(bin, sirt, thickness, batch_input, input_files, relion_root):
     """ Prepares Relion4 project. 
     
     Takes as input several tiltseries (folders) obtained after processing with tomotools batch-prepare-tiltseries and tomotools reconstruct.
@@ -170,6 +169,17 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
     
     """
     
+    # Prepare folders    
+    if not path.isdir(relion_root):
+        os.mkdir(relion_root)
+        print(f'Created Relion root directory at {relion_root}')
+        
+    tomo_root = path.join(relion_root, 'Tomograms')
+    
+    if not path.isdir(tomo_root):
+        os.mkdir(tomo_root)
+        print(f'Created ./Tomograms directory at {tomo_root}.')
+        
     # Parse input files
     if batch_input:
         input_files_parsed = list()
@@ -183,130 +193,36 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
     # Convert to list of tiltseries
     ts_list = convert_input_to_TiltSeries(input_files_parsed)
     
-    print(f'Found {len(ts_list)} TiltSeries to work on.')
-    
-    # Create Relion directory    
-    if not path.isdir(relion_root):
-        os.mkdir(relion_root)
-        print(f'Created Relion root directory at {relion_root}')
-    
-    # Prepare tomogram folders
-    tomo_root = path.join(relion_root, 'Tomograms')
-    
-    if not path.isdir(tomo_root):
-        os.mkdir(tomo_root)
-        print(f'Created ./Tomograms directory at {tomo_root}.')
-    
+    # Initialize dataframe for starfile 
     df = pd.DataFrame()
     
+    print(f'Found {len(ts_list)} TiltSeries to work on. \n')
+    
     for ts in ts_list:
-        
-        print(f'Now working on {ts.path.name}.')
-        
+        print(f"Now working on {ts.path.name}")
         tomo_folder = Path(path.join(tomo_root, ts.path.stem))
-        mdoc = mdocfile.read(ts.mdoc)
-        
+
         if path.isdir(tomo_folder):
             raise FileExistsError("This tomogram seems to already exist in the target relion project. Maybe names are non-unique?")
-                           
-        # TODO: deal with imod alignments
         
-        # Run AreTomo based on previous alignment file to create additional outputs
-        
-        angpix = mdoc['PixelSpacing']
-        
-        aln_file = ts.path.with_suffix('.aln')
-        tlt_file = ts.path.with_suffix('.tlt')
-        ali_stack = ts.path.with_name(f'{ts.path.stem}_ali.mrc')
-        imod_dir = path.join(ts.path.parent, (ali_stack.stem + "_Imod"))
-        
-        if not path.isfile(aln_file):
-            raise FileNotFoundError(
-                f'{ts.path}: No previous alignment was found at {aln_file}. You need to first run alignments using tomotools reconstruct.')
-
-        subprocess.run([aretomo_executable(),
-                        '-InMrc', ts.path,
-                        '-OutMrc', ali_stack,
-                        '-AngFile', tlt_file,
-                        '-AlnFile', aln_file,
-                        '-TiltCor', '0',
-                        '-VolZ', '0',
-                        '-OutImod','1'],
-                       stdout=subprocess.DEVNULL)
-        
-        ali_stack_imod = TiltSeries(Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
-        
-        with mrcfile.mmap(ali_stack, mode='r+') as mrc:
-            mrc.voxel_size = str(angpix)
-            mrc.update_header_stats()
-            
-        with mrcfile.mmap(ali_stack_imod.path, mode='r+') as mrc:
-            mrc.voxel_size = str(angpix)
-            mrc.update_header_stats()
+        ts_out_imod = sta_util.aretomo_export(ts)
         
         print(f'Performed AreTomo export of {ts.path.stem}.')
-        
-        # Get view exclusion list and create appropriate mdoc
-        exclude = parse_darkimgs(ts)
-
-        mdoc_cleaned = mdoc  
-        mdoc_cleaned['sections'] = [ele for idx, ele in enumerate(mdoc['sections']) if idx not in exclude]
-        mdocfile.write(mdoc_cleaned, ali_stack_imod.mdoc)
-        
+    
         # Make reconstruction for picking
-        ali_stack_filtered = dose_filter(ali_stack_imod, False)
-        
-        ali_rec = Tomogram.from_tiltseries(ali_stack_filtered, bin = bin, sirt = sirt, convert_to_byte=False)
+        ali_stack_filtered = dose_filter(ts_out_imod, False)        
+        ali_rec = Tomogram.from_tiltseries(ali_stack_filtered, bin = bin, sirt = sirt, thickness = thickness, convert_to_byte=False)
         
         ali_stack_filtered.delete_files(delete_mdoc=False)
         
         print(f'Created reconstruction for particle picking at {ali_rec.path.name}.')
         
-        # If required run ctfplotter or just return results of previous run - this is done on the original tiltseries to avoid artifacts from alignment
-        ctffile = parse_ctfplotter(run_ctfplotter(ts, False))
-        ctffile_cleaned = ctffile[~ctffile.view_start.isin([str(ele) for ele in exclude])]
-        
-        # Relion4 requires a line for each tilt in the ctfplotter file; if overlapping spectra were fit, duplicate the lines here:
-        if len(mdoc_cleaned['sections']) != len(ctffile_cleaned):
-            
-            # Figure out which tilts are missing
-            for section in mdoc_cleaned['sections']:
-                tilt = round(section['TiltAngle'])
+        df_temp = sta_util.make_relion_dir(ts, tomo_folder, override_thickness=thickness)
                 
-                if not tilt in [int(ele) for ele in pd.to_numeric(ctffile_cleaned['tilt_start']).to_list()]:
-                    df_subset = ctffile_cleaned.loc[((pd.to_numeric(ctffile_cleaned['tilt_start']) < tilt) & (pd.to_numeric(ctffile_cleaned['tilt_end']) > tilt))]
-                    
-                    df_temp = pd.DataFrame({'view_start': pd.to_numeric(df_subset['view_start'])+1,
-                                            'view_end': df_subset.view_end,
-                                            'tilt_start': tilt,
-                                            'tilt_end': tilt,
-                                            'df_1_nm': df_subset.df_1_nm,
-                                            'df_2_nm': df_subset.df_2_nm,
-                                            'astig_ang': df_subset.astig_ang})
-                    
-                    ctffile_cleaned = pd.concat([ctffile_cleaned, df_temp])
-            
-        
-        ctf_out = write_ctfplotter(ctffile_cleaned, Path(path.join(ali_stack_imod.path.parent,(f'{ali_stack_imod.path.stem}_ctfplotter.txt'))))
-        
-        # Create or symlink all relevant files: pre-alignment stack, post-alignment stack, tlt, xf, tilt.com, newst.com, ctfplotter
-        os.symlink(imod_dir, tomo_folder, target_is_directory=True)
-        
-        print(f'Successfully created tomograms folder for {ts.path.name}.')
-
-        df_temp = pd.DataFrame(data = {'rlnTomoName': ts.path.stem, 
-                                       'rlnTomoImportImodDir': tomo_folder,
-                                        'rlnTomoTiltSeriesName': path.join(tomo_folder, (f'{ali_stack_imod.path.name}:mrc')),
-                                        'rlnTomoImportOrderList': mdocfile.convert_to_order_list(mdoc_cleaned, tomo_folder),
-                                        'rlnTomoImportCtfPlotterFile': ctf_out,
-                                        'rlnTomoImportFractionalDose': mdoc_cleaned['sections'][0]['ExposureDose'],
-                                        'rlnOpticsGroupName': mdoc_cleaned['sections'][0]['DateTime'].split()[0]},
-                               dtype = str, index=[0])
-                               
         df = pd.concat([df_temp.astype(object), df])
-                
-        #TODO: fix thickness! utils.comfile
-    
+
+        print(f'Successfully created tomograms folder for {ts.path.name}. \n')
+
     # Write out import_tomos.star file w/ current date for easy ID
     
     today = date.today()
@@ -317,3 +233,8 @@ def tomotools2relion(bin, sirt, batch_input, input_files, relion_root):
     starfile.write(df, starfile_path)
     
     print(f'Wrote out file for Relion import at {starfile_path}.')
+    
+@click.command()
+@click.argument('input_files', nargs=-1)
+def imod2relion(input_files):    
+    raise NotImplementedError("imod -> relion export is not implemented yet, sorry!")

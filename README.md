@@ -28,13 +28,18 @@ tomotools [subcommand] --help
 - **cryocare-predict**: Wrapper for cryoCARE prediction.
 - **deconv**: Python implementation of Dimitry Tegunov's _tom_deconv.m_ script.
 
-### Subtomogram Averaging
+### Subtomogram Averaging Preparation
 - **imod2relion**: Takes a list of imod directories or a file listing them and prepares everything for Relion4 import.
 - **imod2warp**: Takes a list of imod directories or a file listing them and prepares everything for Warp.
 - **aretomo2relion**: Takes a list of directories with AreTomo-aligned tiltseries or a file listing them and prepares everything for Relion4 import.
 - **aretomo2warp**: Takes a list of directories with AreTomo-aligned tiltseries or a file listing them and prepares everything for Warp.
 - **fit-ctf**: Run imod ctfplotter on a set of tiltseries and save results to their folder.
 - **merge-dboxes**: Very beta, merges Dynamo DBoxes.
+
+## Subtomogram Averaging Particle Operations
+- **project-particles**: Takes star-file with subtomograms, projects along Z and runs ```relion_preprocess``` on them. Writes out .star file for 2D classification in Relion.
+- **subset-selection**: Apply subset-selection on projected particles to the original particle .star.
+- **upgrade-star**: Upgrade Warp-generated .star file to those expected by Relion >= 3.1
 
 ### Other
 - **create-movie**: Create a movie from a series of image files.

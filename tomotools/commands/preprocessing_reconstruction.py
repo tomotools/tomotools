@@ -257,7 +257,7 @@ def reconstruct(move, local, aretomo, extra_thickness, bin, sirt, skip_positioni
             # Check for Tilts to exclude
             excludetilts = None
             if tiltseries.path.name in ts_info:
-                excludetilts = ts_info[str(tiltseries.path)]
+                excludetilts = ts_info[str(tiltseries.path.name)]
                 print(f'Found tilts to exclude in {batch_file}. Will exclude tilts {excludetilts}.')
     
             if excludetilts is not None:
