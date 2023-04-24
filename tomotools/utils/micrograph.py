@@ -44,11 +44,11 @@ class Micrograph:
 
     @staticmethod
     def from_movies(movies: List[Movie], output_dir: Path,
-                    splitsum: bool = False, binning: int = 2,
-                    group: int = 1, patch_x: int = 5, patch_y: int = 7, 
+                    splitsum: bool = False, binning: int = 1,
+                    group: int = 2, patch: bool = False, patch_x: int = 5, patch_y: int = 7, 
                     mcrot: Optional[int] = None, mcflip: Optional[int] = None,
                     override_gainref: Optional[Path] = None,
-                    gpus: Optional[str] = None) -> 'List[Micrograph]':
+                    gpu: Optional[str] = None) -> 'List[Micrograph]':
         tempdir = output_dir.joinpath('motioncor2_temp')
         tempdir.mkdir(parents=True)
         gain_ref_dm4 = None
@@ -77,7 +77,7 @@ class Micrograph:
             gain_ref_dm4 = gain_refs.pop()
             if gain_ref_dm4 is not None:
                 # The gain ref should be in the same folder as the input file(s), so check if it's there
-                gain_ref_dm4 = movies[0].path.parent.joinpath(gain_refs.pop())
+                gain_ref_dm4 = movies[0].path.parent / gain_ref_dm4
                 if not gain_ref_dm4.is_file():
                     raise FileNotFoundError(f'Expected gain reference at {gain_ref_dm4}, aborting')
 
@@ -104,23 +104,18 @@ class Micrograph:
         for movie in movies:
             tempdir.joinpath(movie.path.name).symlink_to(movie.path.absolute())
 
-        # TODO: here, -Bft should probably be zero to prevent high-pass filtering from later frames -> will be done during reconstruction?
         command = [mc2_exe,
                    '-OutMrc', str(output_dir.absolute()) + os.path.sep,
-                   '-Patch', str(patch_x), str(patch_y),
-                   '-Iter', '10',
-                   '-Tol', '0.5',
                    '-FtBin', str(binning),
-                   '-Group', str(group),
                    '-Serial', '1']
         if movies[0].is_mrc:
             command += ['-InMrc', str(tempdir.absolute()) + '/']
         elif movies[0].is_tiff:
             command += ['-InTiff', str(tempdir.absolute()) + '/']
-        if gpus is None:
+        if gpu is None:
             command += ['-Gpu'] + [str(i) for i in range(util.num_gpus())] if util.num_gpus() > 0 else []
         else:
-            command += ['-Gpu', gpus]
+            command += ['-Gpu', gpu]
         if splitsum:
             command += ['-SplitSum', '1']
         
@@ -133,6 +128,13 @@ class Micrograph:
 
         if gain_ref_dm4 is not None and check_defects(gain_ref_dm4) is not None:
             command += ['-DefectMap', defects_tif(gain_ref_dm4, tempdir, movies[0].path).absolute()]
+            
+        # Patch alignment takes two groupings, for global and local alignments. Default are 1 and 4.
+        if patch:
+            command += ['-Patch', str(patch_x), str(patch_y),
+                        '-Group', f'{group} {4*group}']
+        else:
+            command += ['-Group', str(group)]
 
         with open(join(output_dir, 'motioncor2.log'), 'a') as out, open(join(output_dir, 'motioncor2.err'), 'a') as err:
             subprocess.run(command, cwd=tempdir, stdout=out, stderr=err)
