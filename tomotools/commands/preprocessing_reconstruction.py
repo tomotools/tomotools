@@ -60,16 +60,18 @@ def blend_montages(cpus, input_files, output_dir):
 @click.option('--rotationandflip', type=int, default=None,
               help='Override RotationAndFlip for the gain reference (useful if it\'s not in the mdoc file)')
 @click.option('--group', type=int, default=1, show_default=True,
-              help='Group frames, useful for low-dose frames. Also see motioncor2 manual')
-@click.option('--gpus', type=str, default=None,
-              help='GPUs list, comma separated (e.g. 0,1), determined automatically if not passed')
+              help='Group frames, useful for low-dose frames. Also see motioncor2 manual.')
+@click.option('--patch/--global', is_flag=True, default=False, show_default=True,
+              help="Perform full-frame or patch alignment. Local alignment may lead to overfitting.")
+@click.option('--gpu', type=str, default=None,
+              help='Which GPUs to use, passed as comma-separated list eg. 0,1. Default: all available')
 @click.option('--exposuredose', type=float, default=None,
               help='Pass ExposureDose per tilt to override value in mdoc file.')
 @click.option('--stack/--nostack', is_flag=True, default=True,
               help='Create a tilt-series stack or keep the motion-corrected frames as they are.')
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
 @click.argument('output_dir', type=click.Path(writable=True))
-def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotationandflip, group, gpus, exposuredose,
+def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotationandflip, group, gpu, patch, exposuredose,
                              stack, input_files, output_dir):
     """Prepare tilt-series for reconstruction.
 
@@ -165,16 +167,17 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
             mdoc_rotflip = mdoc['sections'][0]['RotationAndFlip']
             mcrot, mcflip = sem2mc2(mdoc_rotflip)
 
-        # Grab frame size to estimate appropriate patch numbers
+        # Grab frame size to estimate appropriate patch numbers (will only be used if --patch is specified)
         patch_x, patch_y = [str(round(mdoc['ImageSize'][0] / 800)), str(round(mdoc['ImageSize'][1] / 800))]
 
         frames_corrected_dir = output_dir.joinpath('frames_corrected')
         if frames_corrected_dir.is_dir():
-            print(f'Temporary motioncor2 directory already exists, will overwrite it')
+            print('Temporary motioncor2 directory already exists, will overwrite it')
             shutil.rmtree(frames_corrected_dir)
+            
         micrographs = Micrograph.from_movies(movies, frames_corrected_dir,
                                              splitsum=splitsum, binning=mcbin, mcrot=mcrot, mcflip=mcflip,
-                                             group=group, override_gainref=gainref, gpus=gpus, patch_x=patch_x,
+                                             group=group, override_gainref=gainref, gpu=gpu, patch=patch, patch_x=patch_x,
                                              patch_y=patch_y)
 
         if stack:
