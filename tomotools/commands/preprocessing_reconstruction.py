@@ -111,8 +111,11 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
             print(f'Skipping {input_file} because it is a montage. \n')
             continue
         # Identify batch / anchoring files, as they all should have an abs tilt angle < 1 for all sections -> feels a bit hacky
-        if all(abs(section['TiltAngle']) < 1 for section in mdoc['sections']):
-            print(f'{input_file} is not a tilt series, as all TiltAngles are near zero. Skipping. \n')
+        elif len(mdoc['sections']) < 3:
+            print(f'{input_file} has fewer than three sections. Skipping.')
+            continue        
+        elif all(abs(section['TiltAngle']) < 1 for section in mdoc['sections']):
+            print(f'{input_file} is not a tilt series, as all TiltAngles are near zero. Skipping.')
             continue
 
         # File is a tilt-series.
