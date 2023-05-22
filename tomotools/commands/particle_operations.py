@@ -8,13 +8,16 @@ import numpy as np
 import pandas as pd
 
 from pathlib import Path
+from tqdm import tqdm
 
 @click.command()
+@click.option('--ctf', is_flag=True, default=False, show_default=True, 
+              help = 'Perform CTF correction prior to projection using the ctf_volume given in .star file.')
 @click.option('-z', '--z-thickness', default = None, show_default=True, 
                help = 'If given, project only central number of pixels.')
-@click.option('-r', '--radius', help = 'Radius of particle, for background normalization.')
+@click.option('-r', '--radius', help = 'Radius of particle in pixels, for background normalization.')
 @click.argument('input_star', nargs=1)
-def project_particles(z_thickness, radius, input_star):
+def project_particles(ctf, z_thickness, radius, input_star):
     """ Project subtomograms to 2D. 
     
     Takes starfile from Warp etc as input. Performs projection of all subtomograms listed. Writes out starfile to be used for 2D cleaning.
@@ -25,7 +28,8 @@ def project_particles(z_thickness, radius, input_star):
     
     particles = starfile.read(input_star)
     
-    if len(particles) == 2:
+    # Check if starfile is Relion >3.1 format.
+    if "particles" in particles:
         particles = particles['particles']
             
     print(f"Found {len(particles.index)} Particles to project.")
@@ -38,21 +42,38 @@ def project_particles(z_thickness, radius, input_star):
     # Preallocate for mrcs
     projections = np.empty(shape=(len(particles.index),dim[1],dim[2]), dtype= np.float32)
     
-    for index, row in particles.iterrows():
-        
-        subtomo = mrcfile.read(row['rlnImageName'])
-                
-        if z_thickness is not None:
-            z_thickness = int(z_thickness)
-            z_upper = int(np.floor(subtomo.shape[0]/2+z_thickness/2))
-            z_lower = int(np.floor(subtomo.shape[0]/2-z_thickness/2))
+    with tqdm(total = len(particles.index)) as pbar:
+        for index, row in particles.iterrows():
             
-            projections[index] = np.sum(subtomo[z_lower:z_upper], axis = 0)
+            subtomo = mrcfile.read(row['rlnImageName'])
                     
-        else:#mrcfile reads as ZYX
-            projections[index] = np.sum(subtomo.data, axis = 0)
+            if ctf:
+                subtomo_in = subtomo
+                ctf_volume = mrcfile.read(row['rlnCtfImage'])
+            
+                # Check how the CTF volume is stored
+                # Warp stores it in a FFTW-like way, which allows use of fast rfftn
+                if not ctf_volume.shape == dim:
+                    subtomo = np.fft.irfftn(np.fft.rfftn(subtomo_in)*ctf_volume, dim)
+                    
+                # Legacy approaches might store full array, use fftn
+                else:
+                    subtomo = np.real(np.fft.ifftn(np.fft.fftn(subtomo)*ctf_volume))    
+            
+            if z_thickness is not None:
+                z_thickness = int(z_thickness)
+                z_upper = int(np.floor(dim[0]/2+z_thickness/2))
+                z_lower = int(np.floor(dim[0]/2-z_thickness/2))
+                
+                projections[index] = np.sum(subtomo[z_lower:z_upper], axis = 0)
+                        
+            else:#mrcfile reads as ZYX
+                projections[index] = np.sum(subtomo.data, axis = 0)
+                
+            pbar.update(1)
         
-    # Image Stack Space group 0     
+    # TODO: Write Image Stack Space group 0
+    print('Particles projected, writing out stack.')     
     mrcfile.write(input_star.with_name("temp.mrcs"),data=projections, voxel_size=angpix, overwrite=True)
 
     # make particles star
