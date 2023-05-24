@@ -39,16 +39,17 @@ def project_particles(ctf, z_thickness, radius, input_star):
         dim = mrc.data.shape
         angpix = mrc.voxel_size.x
     
-    # Preallocate for mrcs
-    projections = np.empty(shape=(len(particles.index),dim[1],dim[2]), dtype= np.float32)
+    # Preallocate array to store results
+    projections = np.empty((len(particles.index),dim[1],dim[2]), dtype = np.float32)
     
     with tqdm(total = len(particles.index)) as pbar:
         for index, row in particles.iterrows():
             
             subtomo = mrcfile.read(row['rlnImageName'])
-                    
+            
+            # Apply CTF as convolution with 
             if ctf:
-                subtomo_in = subtomo
+                subtomo_in = subtomo.copy()
                 ctf_volume = mrcfile.read(row['rlnCtfImage'])
             
                 # Check how the CTF volume is stored
@@ -60,32 +61,43 @@ def project_particles(ctf, z_thickness, radius, input_star):
                 else:
                     subtomo = np.real(np.fft.ifftn(np.fft.fftn(subtomo)*ctf_volume))    
             
+            # Use np.mean instead of np.sum to prevent overflow issues -> will anyways be followed up by normalization
             if z_thickness is not None:
                 z_thickness = int(z_thickness)
-                z_upper = int(np.floor(dim[0]/2+z_thickness/2))
-                z_lower = int(np.floor(dim[0]/2-z_thickness/2))
+                z_upper = int(np.floor(dim[0]/2+z_thickness/2)-1)
+                z_lower = int(np.floor(dim[0]/2-z_thickness/2)-1)
                 
-                projections[index] = np.sum(subtomo[z_lower:z_upper], axis = 0)
+                projections[index] = np.mean(subtomo[z_lower:z_upper], axis = 0)
                         
             else:#mrcfile reads as ZYX
-                projections[index] = np.sum(subtomo.data, axis = 0)
+                projections[index] = np.mean(subtomo.data, axis = 0)
                 
             pbar.update(1)
         
-    # TODO: Write Image Stack Space group 0
-    print('Particles projected, writing out stack.')     
-    mrcfile.write(input_star.with_name("temp.mrcs"),data=projections, voxel_size=angpix, overwrite=True)
+    print('Particles projected, writing out stack. \n')
 
+    mrcs = mrcfile.new('temp.mrcs', overwrite = True)
+    mrcs.set_data(projections)
+    mrcs.set_image_stack()
+    mrcs.voxel_size = angpix
+    mrcs.close()
+    
     # make particles star
+    # Micrograph Name and XYZ are assumed to always be present
     particles_2d = pd.DataFrame()
     particles_2d['rlnMicrographName'] = particles['rlnMicrographName']
     particles_2d['rlnCoordinateX'] = particles['rlnCoordinateX']
     particles_2d['rlnCoordinateY'] = particles['rlnCoordinateY']
     particles_2d['rlnCoordinateZ'] = particles['rlnCoordinateZ']
-    particles_2d['rlnAngleRot'] = particles['rlnAngleRot']
-    particles_2d['rlnAngleTilt'] = particles['rlnAngleTilt']
-    particles_2d['rlnAnglePsi'] = particles['rlnAnglePsi']
+    
+    # Angles are only sometimes there, eg. after template matching
+    # Assume that they all come together
+    if 'rlnAngleRot' in particles:
+        particles_2d['rlnAngleRot'] = particles['rlnAngleRot']
+        particles_2d['rlnAngleTilt'] = particles['rlnAngleTilt']
+        particles_2d['rlnAnglePsi'] = particles['rlnAnglePsi']
 
+    # New Info     
     particles_2d['rlnImageName'] = [f'{i}@{input_star.with_name(input_star.stem)}_projected.mrcs' for i in range(1,len(particles.index)+1)]
     particles_2d['rlnOpticsGroup'] = '1'
 
