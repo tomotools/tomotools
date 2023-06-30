@@ -54,8 +54,10 @@ def project_particles(ctf, z_thickness, radius, input_star):
             
                 # Check how the CTF volume is stored
                 # Warp stores it in a FFTW-like way, which allows use of fast rfftn
+                # rfftn returns the zero-frequency as the first item
+                
                 if not ctf_volume.shape == dim:
-                    subtomo = np.fft.irfftn(np.fft.rfftn(subtomo_in)*ctf_volume, dim)
+                    subtomo = np.fft.irfftn(np.fft.rfftn(subtomo_in)*ctf_volume, s = subtomo_in.shape)
                     
                 # Legacy approaches might store full array, use fftn
                 else:
@@ -119,7 +121,7 @@ def project_particles(ctf, z_thickness, radius, input_star):
                     '--bg_radius', str(radius),
                     '--operate_out', f"{input_star.with_name(input_star.stem)}_projected.mrcs"])    
    
-    os.unlink('temp.mrcs')
+    #os.unlink('temp.mrcs')
 
 @click.command()
 @click.argument('star', nargs=1)
