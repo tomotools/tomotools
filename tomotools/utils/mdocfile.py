@@ -123,17 +123,36 @@ def write(mdoc, path):
             file.write(f'[FrameSet = {i}]\n')
             for key, value in frameset.items():
                 _write_key_value(file, key, value)
-                
+
+
 def downgrade_DateTime(mdoc: dict):
     """
     Downgrades DateTime from YYYY to YY (behaviour SerialEM < 4)
     """
 
     for section in mdoc['sections']:
-        #Check that date is really in DD-MMM-YYYY (= 11 chars)
+        # Check that date is really in DD-MMM-YYYY (= 11 chars)
         if len(section['DateTime'].split()[0]) == 11:
             section['DateTime'] = section['DateTime'][0:7]+section['DateTime'][9::]
         else:
             continue
         
+    return mdoc
+
+def insert_prior_dose(mdoc: dict):
+    """
+    Add PriorRecordDose according to DateTime
+
+    """
+    # Sorte by DateTime to get order of acquisition
+    mdoc['sections'] = sorted(mdoc['sections'], key=itemgetter('DateTime'))
+    
+    acc_dose = 0
+    
+    for section in mdoc['sections']:
+        section['PriorRecordDose'] = acc_dose
+        acc_dose += section['ExposureDose']
+    
+    mdoc['sections'] = sorted(mdoc['sections'], key=itemgetter('TiltAngle'))
+    
     return mdoc
