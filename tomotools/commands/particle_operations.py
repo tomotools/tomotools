@@ -154,7 +154,7 @@ def upgrade_star(star):
                    'rlnImageSize': dim[2],
                    'rlnVoltage': '300',
                    'rlnSphericalAberration': '2.7',
-                   'rlnAmplitudeContrast': '0.1',
+                   'rlnAmplitudeContrast': '0.07',
                    'rlnImageDimensionality': '3'}])
     
     starfile.write({'optics': star_optics, 'particles': particles}, f"{star.with_name(star.stem)}_upgraded.star")

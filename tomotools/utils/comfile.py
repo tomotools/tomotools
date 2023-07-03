@@ -23,6 +23,8 @@ def modify_value(path, key, value):
     with open(path, 'w') as file:
         file.writelines(lines)
 
+    return
+
 
 def remove_value(path, key):
     lines = list()
@@ -37,9 +39,11 @@ def remove_value(path, key):
             continue
         else:
             lines_cleaned.append(line)
-        
+
     with open(path, 'w') as file:
         file.writelines(lines_cleaned)
+
+    return
 
 
 def fake_ctfcom(ts: TiltSeries, binning: int):
@@ -54,11 +58,11 @@ def fake_ctfcom(ts: TiltSeries, binning: int):
                '# Created with tomotools',
                '$setenv IMOD_OUTPUT_FORMAT MRC',
                '$ctfphaseflip -StandardInput',
-               f'InputStack  {ts.path.stem}_ali.mrc',
-               f'AngleFile   {ts.path.with_suffix(".tlt").name}',
-               f'OutputFileName	{ts.path.with_name(ts.path.stem).name}_ctfcorr.mrc',
-               f'TransformFile   {ts.path.with_suffix(".tlt").name}',
-               f'DefocusFile    {ts.path.with_suffix(".defocus").name}',
+               f'InputStack  {ts.path.name}',
+               f'AngleFile   {ts.mdoc.with_suffix("").stem}.tlt',
+               f'OutputFileName	{ts.mdoc.with_suffix("").stem}_ctfcorr.mrc',
+               f'TransformFile   {ts.mdoc.with_suffix("").stem}.xf',
+               f'DefocusFile    {ts.mdoc.with_suffix("").stem}.defocus',
                'Voltage 300',
                'SphericalAberration 2.7',
                'DefocusTol	50',
@@ -68,9 +72,11 @@ def fake_ctfcom(ts: TiltSeries, binning: int):
                'ActionIfGPUFails	1,2',
                '$if (-e ./savework) ./savework']
 
-    with open(ts.path.with_name("ctfcorrection.com"), 'w') as file:
+    with open(ts.path.with_name("ctfcorrection.com"), 'w+') as file:
         file.truncate(0)
         file.write('\n'.join(content))
+
+    return
 
 
 def fix_tiltcom(ts: TiltSeries, thickness: int, fsirt: int, bin: int):
@@ -90,3 +96,5 @@ def fix_tiltcom(ts: TiltSeries, thickness: int, fsirt: int, bin: int):
     
     if get_value(ts.path.with_name("tilt.com"), 'LOCALFILE') == ts.path.with_suffix(".xf").name:
         remove_value(ts.path.with_name('tilt.com'), 'LOCALFILE')
+        
+    return
