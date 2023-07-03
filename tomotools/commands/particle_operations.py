@@ -72,6 +72,7 @@ def project_particles(ctf, z_thickness, radius, input_star):
                 projections[index] = np.mean(subtomo[z_lower:z_upper], axis = 0)
                         
             else:#mrcfile reads as ZYX
+
                 projections[index] = np.mean(subtomo.data, axis = 0)
                 
             pbar.update(1)
