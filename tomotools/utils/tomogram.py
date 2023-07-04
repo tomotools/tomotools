@@ -8,6 +8,7 @@ from os import path
 from glob import glob
 
 from tomotools.utils.tiltseries import TiltSeries
+from tomotools.utils import comfile
 
 
 class Tomogram:
@@ -233,6 +234,62 @@ class Tomogram:
             return Tomogram(final_rec)
             
         return Tomogram(full_rec)
+
+    @staticmethod
+    def from_tiltseries_3dctf(tiltseries: TiltSeries, binning = 1, thickness = 3000, z_slices_nm = 25) -> 'Tomogram':
+        '''
+        Calculate Tomogram with imod ctf3d
+
+        As ctf3d requires tilt.com and ctfcorrection.com, provide imod-aligned
+        stack as input (either from etomo or AreTomo + export).
+        Stack is assumed to be at the desired binning level and dose-filtered.
+        
+        This is only useful for STA, so the following options are unavailable:
+        - fSIRT
+        - EVN/ODD
+        - x_axis_tilt
+        - convert_to_byte
+        '''
+                
+        # Check necessary files are there
+        if not path.isfile(tiltseries.path.with_name("ctfcorrection.com")):
+            raise FileNotFoundError("ctfcorrection.com not found.")
+        
+        if not path.isfile(tiltseries.path.with_name("tilt.com")):
+            raise FileNotFoundError("tilt.com not found")
+        
+        # Fix tilt.com
+        comfile.fix_tiltcom(tiltseries, thickness, 0, binning)
+        
+        print(f'Fixed tilt.com file for {tiltseries.path.parent.name}.')
+                
+        # Set up files
+        subprocess.run(['ctf3dsetup',
+                        '-th', str(z_slices_nm),
+                        '-pa','tilt'], cwd = tiltseries.path.parent)
+        
+        print(f'Now performing 3D CTF reconstruction for {tiltseries.path.parent.name}.')
+
+        # Perform actual reconstruction
+        subprocess.run(['processchunks',
+                        'localhost',
+                        'ctf3d'], cwd = tiltseries.path.parent,
+                       stdout = subprocess.DEVNULL)
+        
+        print(f'Reconstruction of {tiltseries.path.parent.name} done.')
+
+        # Clean up
+        tiltseries.delete_files(False)
+
+        # Rotate tomogram to default
+        subprocess.run(['clip','rotx',
+                        tiltseries.path.parent / f'{tiltseries.path.stem}_3dctf_rec.mrc',
+                        tiltseries.path.parent / f'{tiltseries.mdoc.with_suffix("").stem}_3dctf_rec_rot.mrc'])
+        print(f'Rotation of {tiltseries.path.parent.name} done.')
+
+        os.remove(tiltseries.path.parent / f'{tiltseries.path.stem}_3dctf_rec.mrc')
+
+        return Tomogram(tiltseries.path.parent / f'{tiltseries.mdoc.with_suffix("").stem}_3dctf_rec_rot.mrc')
 
 def find_Tomogram_halves(tomo: Tomogram, split_dir: Path = None):
     ''' Check whether tomogram has EVN/ODD halves. Optionally, you can pass a directory where the split reconstructions are.'''

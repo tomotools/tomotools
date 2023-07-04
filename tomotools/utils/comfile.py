@@ -87,14 +87,22 @@ def fix_tiltcom(ts: TiltSeries, thickness: int, fsirt: int, bin: int):
 
     '''
 
-    modify_value(ts.path.with_name('tilt.com'), 'IMAGEBINNED', str(bin))
-    modify_value(ts.path.with_name('tilt.com'), 'THICKNESS', str(thickness))
-    modify_value(ts.path.with_name('tilt.com'), 'InputProjections', f'{ts.path.stem}_ali.mrc')
-    
-    if get_value(ts.path.with_name("tilt.com"), 'FakeSIRTiterations') is not None:
-        modify_value(ts.path.with_name('tilt.com'), 'FakeSIRTiterations', str(fsirt))
-    
-    if get_value(ts.path.with_name("tilt.com"), 'LOCALFILE') == ts.path.with_suffix(".xf").name:
+    modify_value(ts.path.with_name('tilt.com'),
+                 'IMAGEBINNED', str(bin))
+    modify_value(ts.path.with_name('tilt.com'),
+                 'THICKNESS', str(thickness))
+    modify_value(ts.path.with_name('tilt.com'),
+                 'InputProjections', f'{ts.path.stem}_ali.mrc')
+    modify_value(ts.path.with_name('tilt.com'),
+                 'OutputFile', f'{ts.path.parent.name}_full_rec.mrc')
+
+    if get_value(ts.path.with_name("tilt.com"),
+                 'FakeSIRTiterations') is not None:
+        modify_value(ts.path.with_name('tilt.com'),
+                     'FakeSIRTiterations', str(fsirt))
+
+    if get_value(ts.path.with_name("tilt.com"),
+                 'LOCALFILE') == ts.path.with_suffix(".xf").name:
         remove_value(ts.path.with_name('tilt.com'), 'LOCALFILE')
-        
+
     return
