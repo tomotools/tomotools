@@ -177,6 +177,10 @@ def make_relion_dir(ts: TiltSeries, tomo_folder, override_thickness: Optional[in
 def batch_parser(input_files: [], batch: bool):
 
     input_files_parsed = []
+    
+    # Check whether you already received a correctly formatted list of TiltSeries
+    if type(input_files[0]) == TiltSeries:
+        return input_files
 
     # Parse input files
     if batch:
@@ -233,7 +237,10 @@ def prep_stopgap(ts: TiltSeries, bin: int, thickness: int):
     
     with open(ts.path.with_suffix(".tlt")) as file:
         for line in file:
-            tilts.append(float(line.strip()))
+            if line.startswith('\n'):
+                continue
+            else:
+                tilts.append(float(line.strip()))
     
     ctf_file = parse_ctfplotter(ts.defocus_file())    
     mdoc = mdocfile.insert_prior_dose(mdocfile.read(ts.mdoc))
@@ -265,4 +272,19 @@ def prep_stopgap(ts: TiltSeries, bin: int, thickness: int):
         
 
     return ts_ali_filt, df_temp_tomo
-        
+
+
+def ctfplotter_aretomo_export(ts: TiltSeries):
+    
+    exclude = parse_darkimgs(ts)
+    
+    # If required run ctfplotter or just return results of previous run.
+    # Perform on original TiltSeries to avoid interpolation artefacts.
+    ctffile = parse_ctfplotter(run_ctfplotter(ts, False))
+    ctffile_cleaned = ctffile[~ctffile.view_start.isin(
+        [str(ele) for ele in exclude])]
+    
+    # Write to AreTomo export folder
+    ctf_out = write_ctfplotter(ctffile_cleaned, 
+                               ts.path.parent / f'{ts.path.stem}_ali_Imod' / 
+                               f'{ts.path.stem}_ali.defocus')

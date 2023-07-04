@@ -460,7 +460,9 @@ def parse_ctfplotter(file: Path):
     with open(file, "r") as f:
         reader = csv.reader(f, delimiter='\t')
         for row in reader:
-            if row[1] == '0':
+            if row == []:
+                pass            
+            elif row[1] == '0':
                 pass
             else:
                 df_temp = pd.DataFrame({'view_start': [row[0]], 'view_end': [row[1]], 'tilt_start': [
