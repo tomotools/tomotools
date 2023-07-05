@@ -98,6 +98,7 @@ def imod2warp(batch_input, name, input_files, project_dir):
 @click.argument('input_files', nargs=-1)
 @click.argument('project_dir', nargs=1)
 def aretomo2warp(batch_input, name, input_files, project_dir):
+    # TODO: Simplify by just calling imod2warp?
     """ Prepares Warp/M project. 
 
     Takes as input several tiltseries (folders) or a file listing them (with -b) obtained after processing with tomotools batch-prepare-tiltseries and reconstructed in subdirectories using AreTomo.
@@ -255,78 +256,17 @@ def imod2relion(input_files):
 @click.argument('input_files', nargs=-1)
 @click.argument('stopgap_dir', nargs=1)
 def imod2stopgap(batch, bin, thickness, input_files, stopgap_dir):
-
     # Get input files
     ts_list = sta_util.batch_parser(input_files, batch)
 
-    # Create target folder
-    stopgap_dir = Path(stopgap_dir)
-    target_dir = stopgap_dir / f"tomos_bin{bin}"
+    sta_util.list2stopgap(bin, thickness, ts_list, stopgap_dir)
 
-    # If folder does not exist, initialise
-    if not path.isdir(stopgap_dir / f"tomos_bin{bin}"):
-
-        os.mkdir(target_dir)
-
-        wedgelist = pd.DataFrame()
-
-        tomo_num = 1
-
-        subprocess.run(['touch',
-                        target_dir / "tomo_dict.txt"])
-
-    else:
-        # read previous wedgelist
-        wedgelist = starfile.read(target_dir / "wedgelist.star")
-        # set tomo index to avoid clashed
-        tomo_num = max(wedgelist['tomo_num']) + 1
-
-    # First, check that all required files are there
-
-    rec_todo = {}
-    tomo_dict = {}
-    
-    print(f'Exporting {len(ts_list)} tomograms to STOPGAP. \n')
-
-
-    for ts in ts_list:
-
-        print(f'\n Working on {ts.path.name}, tomo_num {tomo_num}.')        
-
-        # Save index assignment for later
-        tomo_dict[tomo_num] = str(ts.path.absolute())
-
-        # Get stack for reconstruction and wedge list
-        final_stack, wedgelist_temp = sta_util.prep_stopgap(ts, bin, thickness)
-
-        rec_todo[tomo_num] = final_stack
-        wedgelist_temp['tomo_num'] = tomo_num
-
-        wedgelist = pd.concat([wedgelist, wedgelist_temp])
-
-        tomo_num += 1
-
-    print('\n')
-    print(
-        f'STOPGAP files have been prepared for {len(ts_list)} tiltseries. Now starting reconstruction. \n')
-
-    # Write wedgelist and dictionary to map tomogram identity
-    starfile.write({'stopgap_wedgelist': wedgelist},
-                   target_dir / "wedgelist.star", overwrite=True)
-
-    with open(target_dir / "tomo_dict.txt", 'a') as file:
-        for tomo_num in tomo_dict:
-            file.write(f'{tomo_num} {tomo_dict[tomo_num]}\n')
-
-    for tomo_num in rec_todo:
-        rec = Tomogram.from_tiltseries_3dctf(
-            rec_todo[tomo_num], binning=bin, thickness=thickness, z_slices_nm=25)
-        os.symlink(rec.path.absolute(), target_dir / f'{tomo_num}.rec')
 
 @click.command()
 @click.option('-b', '--batch', is_flag=True, default=False, show_default=True,
-              help="Read input files as text, each line is a tiltseries (folder)")
-@click.option('--bin', default=4, show_default=True, help="Binning for reconstruction used to pick particles.")
+              help="Input is a file with a tiltseries on each line.")
+@click.option('--bin', default=4, show_default=True,
+              help="Binning for reconstruction.")
 @click.option('-d', '--thickness', default=3000, show_default=True,
               help="Thickness for reconstruction.")
 @click.argument('input_files', nargs=-1)
@@ -334,10 +274,10 @@ def imod2stopgap(batch, bin, thickness, input_files, stopgap_dir):
 def aretomo2stopgap(batch, bin, thickness, input_files, stopgap_dir):
     # Get input files
     ts_list = sta_util.batch_parser(input_files, batch)
-    
+
     # Process aretomo -> imod
     print(f'Found {len(ts_list)} TiltSeries to work on. \n')
-    
+
     ts_imodlike = []
 
     for ts in ts_list:
@@ -345,4 +285,5 @@ def aretomo2stopgap(batch, bin, thickness, input_files, stopgap_dir):
         ts_imodlike.append(sta_util.aretomo_export(ts))
         sta_util.ctfplotter_aretomo_export(ts)
 
-    imod2stopgap(batch, bin, thickness, ts_imodlike, stopgap_dir)
+    # Process as normal imod-aligned TS
+    sta_util.list2stopgap(bin, thickness, ts_imodlike, stopgap_dir)

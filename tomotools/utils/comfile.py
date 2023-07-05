@@ -92,7 +92,7 @@ def fix_tiltcom(ts: TiltSeries, thickness: int, fsirt: int, bin: int):
     modify_value(ts.path.with_name('tilt.com'),
                  'THICKNESS', str(thickness))
     modify_value(ts.path.with_name('tilt.com'),
-                 'InputProjections', f'{ts.path.stem}_ali.mrc')
+                 'InputProjections', f'{ts.path.name}.mrc')
     modify_value(ts.path.with_name('tilt.com'),
                  'OutputFile', f'{ts.path.parent.name}_full_rec.mrc')
 
@@ -102,7 +102,8 @@ def fix_tiltcom(ts: TiltSeries, thickness: int, fsirt: int, bin: int):
                      'FakeSIRTiterations', str(fsirt))
 
     if get_value(ts.path.with_name("tilt.com"),
-                 'LOCALFILE') == ts.path.with_suffix(".xf").name:
+                 'LOCALFILE') is not None and get_value(ts.path.with_name("tilt.com"),
+                                                        'LOCALFILE').endswith(".xf"):
         remove_value(ts.path.with_name('tilt.com'), 'LOCALFILE')
 
     return
