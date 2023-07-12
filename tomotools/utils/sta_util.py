@@ -286,8 +286,10 @@ def ctfplotter_aretomo_export(ts: TiltSeries):
     # If required run ctfplotter or just return results of previous run.
     # Perform on original TiltSeries to avoid interpolation artefacts.
     ctffile = parse_ctfplotter(run_ctfplotter(ts, False))
+    
+    # ctfplotter is 1-indexed, excludeviews are 0-indexed
     ctffile_cleaned = ctffile[~ctffile.view_start.isin(
-        [str(ele) for ele in exclude])]
+        [str(ele+1) for ele in exclude])]
     
     # Write to AreTomo export folder
     ctf_out = write_ctfplotter(ctffile_cleaned, 

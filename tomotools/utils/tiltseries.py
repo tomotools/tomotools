@@ -490,6 +490,8 @@ def parse_darkimgs(ts: TiltSeries):
     ''' Parses AreTomo-generated _DarkImgs.txt file for a given tiltseries, returns list of excluded tilts (Zero-Indexed)
 
     If _DarkImgs is not found, check in the .aln file (as of version 1.3).
+    
+    Zero-indexed as in AreTomo convention!
     '''
 
     dark_tilts = []
