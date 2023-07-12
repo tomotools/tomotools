@@ -478,6 +478,13 @@ def write_ctfplotter(df: pd.DataFrame(), file: Path):
     # Somehow this header is present in ctfplotter files, so also add here.
     header = pd.DataFrame(['1', '0', '0.0', '0.0', '0.0', '3']).T
 
+    # Make sure that view_start is starting at 1
+    # This can happen if views are excluded by script
+    if df.iloc[0].view_start != 1:
+        shift = int(df.iloc[0].view_start) - 1
+        df['view_start'] = df['view_start'].astype(int) - shift
+        df['view_end'] = df['view_end'].astype(int) - shift
+
     temp_header = header.to_csv(sep="\t", header=False, index=False)
     temp = df.to_csv(sep="\t", header=False, index=False)
 
