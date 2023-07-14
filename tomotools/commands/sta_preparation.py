@@ -1,7 +1,6 @@
 import os
 import click
 import starfile
-import subprocess
 
 import pandas as pd
 
@@ -9,7 +8,7 @@ from os import path
 from pathlib import Path
 from datetime import date
 
-from tomotools.utils import sta_util
+from tomotools.utils import sta_util, tiltseries
 from tomotools.utils.tiltseries import run_ctfplotter, dose_filter, convert_input_to_TiltSeries
 from tomotools.utils.tomogram import Tomogram
 
@@ -287,3 +286,45 @@ def aretomo2stopgap(batch, bin, thickness, input_files, stopgap_dir):
 
     # Process as normal imod-aligned TS
     sta_util.list2stopgap(bin, thickness, ts_imodlike, stopgap_dir)
+
+
+def imod2tomotwin(batch, thickness, uid, input_files, tomotwin_dir):
+
+    ts_list = sta_util.batch_parser(input_files, batch)
+
+    tomotwin_dir = Path(tomotwin_dir)
+    tomo_dir = tomotwin_dir / "tomo"
+
+    if not path.isdir(tomo_dir):
+        os.mkdir(tomo_dir)
+
+    for ts in ts_list:
+
+        # bin to about 10 Apix
+        binning = round(10 / ts.angpix())
+
+        ts_ali = tiltseries.align_with_imod(ts, True, False, binning=binning)
+
+        rec = Tomogram.from_tiltseries(ts_ali, bin=1, sirt=0,
+                                       thickness=round(thickness/binning), convert_to_byte=False)
+
+        unique_name = f'{uid}_{ts.path.parent.name}.mrc'
+
+        os.symlink(rec.path.absolute(), tomo_dir / unique_name)
+
+
+def aretomo2tomotwin(batch, thickness, uid, input_files, tomotwin_dir):
+    # Get input files
+    ts_list = sta_util.batch_parser(input_files, batch)
+
+    # Process aretomo -> imod
+    print(f'Found {len(ts_list)} TiltSeries to work on. \n')
+
+    ts_imodlike = []
+
+    for ts in ts_list:
+        print(f"Now working on {ts.path.name}")
+        ts_imodlike.append(sta_util.aretomo_export(ts))
+
+    # Process as normal imod-aligned TS
+    imod2tomotwin(False, thickness, uid, ts_imodlike, tomotwin_dir)
