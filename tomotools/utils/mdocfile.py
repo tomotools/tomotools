@@ -137,3 +137,14 @@ def downgrade_DateTime(mdoc: dict):
             continue
         
     return mdoc
+
+
+def get_start_tilt(mdoc: dict):
+    ''' Returns the starting tilt, even after reordering.
+
+    '''
+
+    # Sorte by DateTime to get order of acquisition
+    mdoc['sections'] = sorted(mdoc['sections'], key=itemgetter('DateTime'))
+
+    return mdoc['sections'][0]['TiltAngle']
