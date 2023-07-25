@@ -204,6 +204,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
 @click.option('--aretomo/--imod', is_flag=True, default=True, show_default=True,
               help="Perform alignment with AreTomo or just move all files and then open etomo for batch alignment.")
 @click.option('--extra-thickness', default=0, show_default=True, help="Extra thickness in unbinned pixels")
+@click.option('-d','--thickness', default=None, show_default=True, help="Total thickness in unbinned pixels")
 @click.option('-b', '--bin', default=1, show_default=True, help="Final reconstruction binning")
 @click.option('--sirt', default=5, show_default=True, help="SIRT-like filter iterations")
 @click.option('--skip-positioning', is_flag=True,
@@ -215,7 +216,7 @@ def batch_prepare_tiltseries(splitsum, mcbin, reorder, frames, gainref, rotation
 @click.option('--batch-file', type=click.Path(exists=True, dir_okay=False),
               help="You can pass a tab-separated file with tilt series names and views to exclude before alignment and reconstruction.")
 @click.argument('input_files', nargs=-1, type=click.Path(exists=True))
-def reconstruct(move, local, aretomo, extra_thickness, bin, sirt, skip_positioning, previous, gpu, do_evn_odd,
+def reconstruct(move, local, aretomo, extra_thickness, thickness, bin, sirt, skip_positioning, previous, gpu, do_evn_odd,
                 batch_file, input_files):
     """Align and reconstruct the given tiltseries. 
     
@@ -310,7 +311,8 @@ def reconstruct(move, local, aretomo, extra_thickness, bin, sirt, skip_positioni
         # Define x_axis_tilt and thickness        
         x_axis_tilt: float = 0
         z_shift: float = 0
-        thickness: int = round(6000 / pix_xy) + extra_thickness
+        if thickness is None:
+            thickness: int = round(6000 / pix_xy) + extra_thickness
 
         if not skip_positioning:
             print(f"Trying to run automatic positioning on {tiltseries.path.name}. This might lead to issues with subtomogram averaging!")
