@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import warnings
+import math
 import pandas as pd
 
 from operator import itemgetter
@@ -65,9 +66,23 @@ class TiltSeries:
 
     def angpix(self):
         with mrcfile.mmap(self.path) as mrc:
-            angpix = float(mrc.voxel_size.x)
+            self.angpix = float(mrc.voxel_size.x)
 
-        return angpix
+        return self.angpix
+    
+    def dimZYX(self):
+        with mrcfile.mmap(self.path) as mrc:
+            self.dimZYX = mrc.data.shape
+
+        return self.dimZYX
+        
+    def axis_angle(self):
+        with mrcfile.mmap(self.path) as mrc:
+            header = str(mrc.header)
+            header = header.split('Tilt axis angle = ', 1)
+            axis_angle = float(header[1][0:4])
+        
+        return axis_angle
 
     @staticmethod
     def _update_mrc_header_from_mdoc(path: Path, mdoc: dict):
@@ -335,6 +350,8 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool, binning = 
         # Copy the imod-generated tlt-file to _ali.tlt to keep compatibility w/ AreTomo approach
         shutil.copyfile(ts.path.with_suffix('.tlt'),
                         ali_stack.with_suffix('.tlt'))
+        
+        out_x, out_y = binned_size(ts, binning)
 
         subprocess.run(['newstack',
                         '-InputFile', ts.path,
@@ -342,9 +359,13 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool, binning = 
                         '-TransformFile', ts.path.with_suffix('.xf'),
                         '-TaperAtFill', '1,1',
                         '-AdjustOrigin',
+                        '-OffsetsInXandY', '0,0',
+                        '-ImagesAreBinned', '1',
+                        '-SizeToOutputInXandY', f'{out_x},{out_y}',
                         '-quiet'] +
-                       (['-bin', str(binning)] if binning != 1 else []),
-                       stdout = subprocess.DEVNULL)
+                       (['-bin', str(binning),
+                         '-AntialiasFilter', '-1'] if binning != 1 else []),
+                       stdout=subprocess.DEVNULL)
 
         if do_evn_odd:
             ali_stack_evn = ts.evn_path.with_name(
@@ -358,9 +379,13 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool, binning = 
                             '-TransformFile', ts.path.with_suffix('.xf'),
                             '-TaperAtFill', '1,1',
                             '-AdjustOrigin',
+                            '-OffsetsInXandY', '0,0',
+                            '-ImagesAreBinned', '1',
+                            '-SizeToOutputInXandY', f'{out_x},{out_y}',
                             '-quiet'] +
-                           (['-bin', str(binning)] if binning != 1 else []),
-                           stdout = subprocess.DEVNULL)
+                           (['-bin', str(binning),
+                             '-AntialiasFilter', '-1'] if binning != 1 else []),
+                           stdout=subprocess.DEVNULL)
 
             subprocess.run(['newstack',
                             '-InputFile', ts.odd_path,
@@ -368,9 +393,13 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool, binning = 
                             '-TransformFile', ts.path.with_suffix('.xf'),
                             '-TaperAtFill', '1,1',
                             '-AdjustOrigin',
+                            '-OffsetsInXandY', '0,0',
+                            '-ImagesAreBinned', '1',
+                            '-SizeToOutputInXandY', f'{out_x},{out_y}',
                             '-quiet'] +
-                           (['-bin', str(binning)] if binning != 1 else []),
-                           stdout = subprocess.DEVNULL)
+                           (['-bin', str(binning),
+                             '-AntialiasFilter', '-1'] if binning != 1 else []),
+                           stdout=subprocess.DEVNULL)
 
             print(
                 f'Finished aligning {ts.path} and associated EVN/ODD stacks with imod.')
@@ -418,11 +447,9 @@ def run_ctfplotter(ts: TiltSeries, overwrite: bool):
     ''' Run imod ctfplotter on given TiltSeries object. Returns path to defocus file.'''
 
     if ts.defocus_file() is None or overwrite:
-        with mrcfile.mmap(ts.path) as mrc:
-            nmpix = str(float(mrc.voxel_size.x) / 10)
-            header = str(mrc.header)
-            header = header.split('Tilt axis angle = ', 1)
-            axis_angle = header[1][0:4]
+        
+        nmpix = ts.angpix() / 10
+        axis_angle = ts.axis_angle()
 
         mdoc = mdocfile.read(ts.mdoc)
         expected_defocus = str(
@@ -570,3 +597,19 @@ def convert_input_to_TiltSeries(input_files: []):
             print(f'Found TiltSeries {file.path}.')
 
     return return_list
+
+def binned_size(ts: TiltSeries, binning):
+    
+    dims = ts.dimZYX()
+    
+    in_x = dims[2]
+    in_y = dims[1]
+
+    if ts.axis_angle() < 45 or ts.axis_angle() > 135:
+        out_x = in_x
+        out_y = in_y
+    else:
+        out_x = in_y
+        out_y = in_x
+        
+    return math.ceil(out_x/binning),math.ceil(out_y/binning)

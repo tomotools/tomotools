@@ -7,7 +7,7 @@ from typing import Optional
 from os import path
 from glob import glob
 
-from tomotools.utils.tiltseries import TiltSeries
+from tomotools.utils.tiltseries import TiltSeries, binned_size
 from tomotools.utils import comfile
 
 
@@ -56,23 +56,28 @@ class Tomogram:
             ali_stack_evn = tiltseries.evn_path
             ali_stack_odd = tiltseries.odd_path
 
-        # Get stack dimensions to define size of the output tomogram.
-        with mrcfile.mmap(tiltseries.path, mode='r') as mrc:
-            pix_xy = float(mrc.voxel_size.x)
-            stack_dimensions = mrc.data.shape 
+        # Define default thickness as function of pixel size -> always reconstruct 600 nm if no better number is given
+
+        pix_xy = tiltseries.angpix()
         
         if thickness is None:    
-            # Define default thickness as function of pixel size -> always reconstruct 600 nm if no better number is given
             thickness = str(round(6000 / pix_xy))        
 
         # Get dimensions of aligned stack - assumption is that tilt is around the y axis        
-        [full_reconstruction_y,full_reconstruction_x] = stack_dimensions[1:3]
+        [full_reconstruction_y,full_reconstruction_x] = tiltseries.dimZYX()[1:3]
         
         # Bring stack to desired binning level
         if bin != 1:
             binned_stack = tiltseries.path.with_name(f'{tiltseries.path.stem}_bin_{bin}.mrc')
-            subprocess.run(['binvol', '-x', str(bin), '-y', str(bin), '-z', '1', tiltseries.path, binned_stack],
+            
+            subprocess.run(['newstack',
+                            '-in', tiltseries.path,
+                            '-bin', str(bin),
+                            '-antialias', '-1',
+                            '-ou', binned_stack,
+                            '-quiet'],
                            stdout=subprocess.DEVNULL)
+            
             ali_stack = binned_stack
             print(f'{tiltseries.path}: Binned to {bin}.')
             
@@ -80,9 +85,20 @@ class Tomogram:
                 binned_stack_evn = tiltseries.evn_path.with_name(f'{tiltseries.path.stem}_bin_{bin}_EVN.mrc')
                 binned_stack_odd = tiltseries.odd_path.with_name(f'{tiltseries.path.stem}_bin_{bin}_ODD.mrc')
                 
-                subprocess.run(['binvol', '-x', str(bin), '-y', str(bin), '-z', '1', tiltseries.evn_path, binned_stack_evn],
+                subprocess.run(['newstack',
+                                '-in', tiltseries.evn_path,
+                                '-bin', str(bin),
+                                '-antialias', '-1',
+                                '-ou', binned_stack_evn,
+                                '-quiet'],
                                stdout=subprocess.DEVNULL)
-                subprocess.run(['binvol', '-x', str(bin), '-y', str(bin), '-z', '1', tiltseries.odd_path, binned_stack_odd],
+                
+                subprocess.run(['newstack',
+                                '-in', tiltseries.odd_path,
+                                '-bin', str(bin),
+                                '-antialias', '-1',
+                                '-ou', binned_stack_odd,
+                                '-quiet'],
                                stdout=subprocess.DEVNULL)
                 
                 ali_stack_evn = binned_stack_evn
