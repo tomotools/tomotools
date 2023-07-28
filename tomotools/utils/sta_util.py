@@ -21,7 +21,10 @@ from tomotools.utils.tomogram import Tomogram
 def aretomo_export(ts: TiltSeries):
     mdoc = mdocfile.read(ts.mdoc)
 
-    angpix = mdoc['PixelSpacing']
+    angpix = ts.angpix()
+    
+    with mrcfile.mmap(ts.path) as mrc:
+        labels = mrc.get_labels()
 
     aln_file = ts.path.with_suffix('.aln')
     tlt_file = ts.path.with_suffix('.tlt')
@@ -31,8 +34,17 @@ def aretomo_export(ts: TiltSeries):
 
     if path.isdir(imod_dir) and path.isfile(path.join(imod_dir, (ali_stack.stem + ".st"))):
         print(f'Previous AreTomo export found for {ts.path.name}. Re-using.')
-        return TiltSeries(
+        
+        ali_stack_imod = TiltSeries(
             Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
+        
+        with mrcfile.mmap(ali_stack_imod.path, mode='r+') as mrc:
+            mrc.voxel_size = str(angpix)
+            for label in labels:
+                mrc.add_label(label)
+            mrc.update_header_stats()        
+        
+        return ali_stack_imod
 
     if not path.isfile(aln_file):
         raise FileNotFoundError(
@@ -57,6 +69,8 @@ def aretomo_export(ts: TiltSeries):
 
     with mrcfile.mmap(ali_stack_imod.path, mode='r+') as mrc:
         mrc.voxel_size = str(angpix)
+        for label in labels:
+            mrc.add_label(label)
         mrc.update_header_stats()
 
     # Get view exclusion list and create appropriate mdoc

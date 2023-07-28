@@ -464,13 +464,13 @@ def run_ctfplotter(ts: TiltSeries, overwrite: bool):
                             '-angleFn', ts.path.with_suffix('.tlt'),
                             '-defFn', ts.path.with_name(
                                 f'{ts.path.stem}.defocus'),
-                            '-pixelSize', nmpix,
+                            '-pixelSize', str(nmpix),
                             '-crop', '0.3',
                             '-volt', str(kV),
                             '-cs', str(cs),
                             '-am', str(0.07),
                             '-degPhase', str(0),
-                            '-AxisAngle', axis_angle,
+                            '-AxisAngle', str(axis_angle),
                             '-expDef', expected_defocus,
                             '-autoFit', '3,1'],
                            stdout=out)
