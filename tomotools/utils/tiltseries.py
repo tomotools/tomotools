@@ -1,5 +1,6 @@
 import os
 import shutil
+from typing import Tuple
 import subprocess
 import warnings
 import math
@@ -64,25 +65,30 @@ class TiltSeries:
         else:
             return None
 
-    def angpix(self):
+    @property
+    def angpix(self) -> float:
+        if hasattr(self, '_angpix'):
+            return self._angpix
         with mrcfile.mmap(self.path) as mrc:
-            self.angpix = float(mrc.voxel_size.x)
-
-        return self.angpix
+            self._angpix = float(mrc.voxel_size.x)
+        return self._angpix
     
-    def dimZYX(self):
+    @property
+    def dimZYX(self) -> Tuple[float, float, float]:
+        if hasattr(self, '_dimZYX'):
+            return self._dimZYX
         with mrcfile.mmap(self.path) as mrc:
-            self.dimZYX = mrc.data.shape
-
-        return self.dimZYX
+            self._dimZYX = mrc.data.shape
+        return self._dimZYX
         
-    def axis_angle(self):
+    @property
+    def axis_angle(self) -> float:
+        if hasattr(self, '_axis_angle'):
+            return self._axis_angle
         with mrcfile.mmap(self.path) as mrc:
-            header = str(mrc.header)
-            header = header.split('Tilt axis angle = ', 1)
-            axis_angle = float(header[1][0:4])
-        
-        return axis_angle
+            header = str(mrc.header).split('Tilt axis angle = ', 1)
+            self._axis_angle = float(header[1][0:4])
+        return self._axis_angle
 
     @staticmethod
     def _update_mrc_header_from_mdoc(path: Path, mdoc: dict):
@@ -448,8 +454,8 @@ def run_ctfplotter(ts: TiltSeries, overwrite: bool):
 
     if ts.defocus_file() is None or overwrite:
         
-        nmpix = ts.angpix() / 10
-        axis_angle = ts.axis_angle()
+        nmpix = ts.angpix / 10
+        axis_angle = ts.axis_angle
 
         mdoc = mdocfile.read(ts.mdoc)
         expected_defocus = str(
@@ -600,12 +606,12 @@ def convert_input_to_TiltSeries(input_files: []):
 
 def binned_size(ts: TiltSeries, binning):
     
-    dims = ts.dimZYX()
+    dims = ts.dimZYX
     
     in_x = dims[2]
     in_y = dims[1]
 
-    if ts.axis_angle() < 45 or ts.axis_angle() > 135:
+    if ts.axis_angle < 45 or ts.axis_angle > 135:
         out_x = in_x
         out_y = in_y
     else:

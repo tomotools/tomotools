@@ -1,6 +1,7 @@
 import os
 import subprocess
 import mrcfile
+from typing import Tuple
 
 from pathlib import Path
 from typing import Optional
@@ -35,15 +36,21 @@ class Tomogram:
             raise NotADirectoryError(f'{dir} is not a directory!')
         return find_Tomogram_halves(self, dir)
     
-    def angpix(self):
+    @property
+    def angpix(self) -> float:
+        if hasattr(self, '_angpix'):
+            return self._angpix
         with mrcfile.mmap(self.path,mode = 'r') as mrc:
-            self.angpix = float(mrc.voxel_size.x)
-        return self.angpix
+            self._angpix = float(mrc.voxel_size.x)
+        return self._angpix
 
-    def dimZYX(self):
+    @property
+    def dimZYX(self) -> Tuple[float, float, float]:
+        if hasattr(self, '_dimZYX'):
+            return self._dimZYX
         with mrcfile.mmap(self.path,mode = 'r') as mrc:
-            self.dimZYX = mrc.data.shape
-        return self.dimZYX
+            self._dimZYX = mrc.data.shape
+        return self._dimZYX
 
     @staticmethod
     def from_tiltseries(tiltseries: TiltSeries, bin: int = 1, sirt: int = 5, thickness: Optional[int] = None,
@@ -58,13 +65,13 @@ class Tomogram:
 
         # Define default thickness as function of pixel size -> always reconstruct 600 nm if no better number is given
 
-        pix_xy = tiltseries.angpix()
+        pix_xy = tiltseries.angpix
         
         if thickness is None:    
             thickness = str(round(6000 / pix_xy))        
 
         # Get dimensions of aligned stack - assumption is that tilt is around the y axis        
-        [full_reconstruction_y,full_reconstruction_x] = tiltseries.dimZYX()[1:3]
+        [full_reconstruction_y,full_reconstruction_x] = tiltseries.dimZYX[1:3]
         
         # Bring stack to desired binning level
         if bin != 1:

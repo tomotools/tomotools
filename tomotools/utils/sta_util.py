@@ -21,7 +21,7 @@ from tomotools.utils.tomogram import Tomogram
 def aretomo_export(ts: TiltSeries):
     mdoc = mdocfile.read(ts.mdoc)
 
-    angpix = ts.angpix()
+    angpix = ts.angpix
     
     with mrcfile.mmap(ts.path) as mrc:
         labels = mrc.get_labels()
@@ -271,7 +271,7 @@ def tomo2stopgap(ts: TiltSeries, bin: int, thickness: int):
     # voltage, cs: 300kV, 2.7 mm
     # amplitude contrast 0.07 as in run_ctfplotter
     
-    df_temp_tomo = pd.DataFrame(data={'pixelsize': "{:.3f}".format(ts.angpix()),
+    df_temp_tomo = pd.DataFrame(data={'pixelsize': "{:.3f}".format(ts.angpix),
                                  'tomo_x': dim_x,
                                  'tomo_y': dim_y,
                                  'tomo_z': thickness,
