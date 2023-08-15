@@ -1,7 +1,8 @@
 name: Ruff lint and pytest
 
 on: 
-  push
+  push:
+  workflow_dispatch:
 
 jobs:
   build:
