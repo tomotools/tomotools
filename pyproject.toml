@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tomotools"
+description = "Tomotools"
+readme = "README.md"
+version = "2.3"
+requires-python = ">=3.7"
+license = {text = "None so far"}
+authors = [
+  {email = "moritz.wachsmuth@bioquant.uni-heidelberg.de", name = "Moritz Wachsmuth-Melm"},
+  {email = "b.wimmer@bioc.uzh.ch", name = "Benedikt Wimmer"},
+]
+dependencies = [
+    "Click",
+    "numpy",
+    "pandas",
+    "mrcfile",
+    "emfile",
+    "dynamotable",
+    "matplotlib",
+]
+
+[tool.setuptools]
+packages = ["tomotools"]
+
+[project.optional-dependencies]
+cryocare = [
+    "tensorflow==2.4",
+    "Cryocare",
+    "packaging",
+]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[project.scripts]
+tomotools = "tomotools:tomotools"
+
+[project.urls]
+homepage = "https://github.com/tomotools/tomotools"
+repository = "https://github.com/tomotools/tomotools"
