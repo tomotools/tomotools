@@ -6,6 +6,7 @@ jobs:
   pytest:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
       - uses: pavelzw/pytest-action@v2
         with:
             verbose: true
