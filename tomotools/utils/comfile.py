@@ -1,4 +1,4 @@
-from tomotools.utils.tiltseries import TiltSeries
+from tomotools.utils.tiltseries import TiltSeries, binned_size
 
 
 def get_value(path, key):
@@ -66,7 +66,7 @@ def fake_ctfcom(ts: TiltSeries, binning: int):
                'Voltage 300',
                'SphericalAberration 2.7',
                'DefocusTol	50',
-               f'PixelSize {ts.angpix()*binning/10}',
+               f'PixelSize {ts.angpix*binning/10}',
                'AmplitudeContrast	0.07',
                'InterpolationWidth	15',
                'ActionIfGPUFails	1,2',
@@ -79,7 +79,8 @@ def fake_ctfcom(ts: TiltSeries, binning: int):
     return
 
 
-def fix_tiltcom(ts: TiltSeries, thickness: int, fsirt: int, bin: int):
+def fix_tiltcom(ts: TiltSeries, thickness: int, fsirt: int, bin: int,
+                fullimage: []):
     '''
     Make sure tilt.com file has the right parameters.
 
@@ -92,9 +93,11 @@ def fix_tiltcom(ts: TiltSeries, thickness: int, fsirt: int, bin: int):
     modify_value(ts.path.with_name('tilt.com'),
                  'THICKNESS', str(thickness))
     modify_value(ts.path.with_name('tilt.com'),
-                 'InputProjections', f'{ts.path.name}.mrc')
+                 'InputProjections', f'{ts.path.name}')
     modify_value(ts.path.with_name('tilt.com'),
                  'OutputFile', f'{ts.path.parent.name}_full_rec.mrc')
+    modify_value(ts.path.with_name('tilt.com'),
+                 'FULLIMAGE', f'{fullimage[0]} {fullimage[1]}')
 
     if get_value(ts.path.with_name("tilt.com"),
                  'FakeSIRTiterations') is not None:

@@ -259,7 +259,9 @@ class Tomogram:
         return Tomogram(full_rec)
 
     @staticmethod
-    def from_tiltseries_3dctf(tiltseries: TiltSeries, binning = 1, thickness = 3000, z_slices_nm = 25) -> 'Tomogram':
+    def from_tiltseries_3dctf(tiltseries: TiltSeries, binning=1, 
+                              thickness=3000, z_slices_nm=25, 
+                              fullimage: [] = [1000, 1000]) -> 'Tomogram':
         '''
         Calculate Tomogram with imod ctf3d
 
@@ -282,7 +284,7 @@ class Tomogram:
             raise FileNotFoundError("tilt.com not found")
         
         # Fix tilt.com
-        comfile.fix_tiltcom(tiltseries, thickness, 0, binning)
+        comfile.fix_tiltcom(tiltseries, thickness, 0, binning, fullimage)
         
         print(f'Fixed tilt.com file for {tiltseries.path.parent.name}.')
                 
