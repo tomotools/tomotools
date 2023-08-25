@@ -39,10 +39,13 @@ def aretomo_export(ts: TiltSeries):
             Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
         
         with mrcfile.mmap(ali_stack_imod.path, mode='r+') as mrc:
-            mrc.voxel_size = str(angpix)
-            for label in labels:
-                mrc.add_label(label)
-            mrc.update_header_stats()        
+                mrc.voxel_size = str(angpix)
+                
+                # Check whether labels were already added
+                if len(mrc.get_labels()) == 0:
+                    for label in labels:
+                        mrc.add_label(label)
+                mrc.update_header_stats()        
         
         return ali_stack_imod
 
@@ -233,23 +236,7 @@ def tomo2stopgap(ts: TiltSeries, bin: int, thickness: int):
     
     # Create wedge list  
     # First, build database with global info:
-
-    # Unbinned dims
-    with mrcfile.mmap(ts.path) as mrc:
-        dims = mrc.data.shape
-        
-    # Binned, rotated dims
-    with mrcfile.mmap(ts_ali_filt.path) as mrc:
-        dims_rot = mrc.data.shape
-        
-    # Find out whether stack was rotated:
-    if dims_rot[2] > dims_rot[1] and dims[2] > dims[1]:
-        # Everything is normal, keep in place
-        dim_x = dims[2]
-        dim_y = dims[1]
-    else: 
-        dim_x = dims[1]
-        dim_y = dims[2]
+    dim_x, dim_y = tiltseries.binned_size(ts, 1)
     
     # Then, go over tilts and add: tilt angle, defocus mean (in um), exposure
     tilts = []
@@ -370,8 +357,17 @@ def list2stopgap(bin, thickness, ts_list: [], stopgap_dir):
         for tomo_num in tomo_dict:
             file.write(f'{tomo_num} {tomo_dict[tomo_num]}\n')
 
+    # Get full dimensions of unbinned stack for reconstruction
+    # Right now, assumption is that all tomograms have the same xy dimensions.
+    dim_x = wedgelist['tomo_x'].values[0]
+    dim_y = wedgelist['tomo_y'].values[0]
+
     for tomo_num in rec_todo:
+                
         rec = Tomogram.from_tiltseries_3dctf(
-            rec_todo[tomo_num], binning=bin, thickness=thickness, z_slices_nm=25)
+            rec_todo[tomo_num], binning=bin, thickness=thickness,
+            z_slices_nm=25, fullimage=[dim_x,dim_y])
+        
         os.symlink(rec.path.absolute(), target_dir / f'{tomo_num}.rec')
+        
         print('\n')
