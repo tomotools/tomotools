@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["tomotools"]
+packages = ["tomotools", "tomotools.commands", "tomotools.utils"]
 
 [project.optional-dependencies]
 cryocare = [
