@@ -1,6 +1,7 @@
 import os
 import click
 import starfile
+import math
 
 import pandas as pd
 
@@ -251,7 +252,7 @@ def imod2relion(input_files):
               help="Read input files as text, each line is a tiltseries (folder)")
 @click.option('--bin', default=4, show_default=True, help="Binning of reconstruction.")
 @click.option('-d', '--thickness', default=3000, show_default=True,
-              help="Thickness for reconstruction.")
+              help="Thickness for reconstruction in unbinned pixels.")
 @click.argument('input_files', nargs=-1)
 @click.argument('stopgap_dir', nargs=1)
 def imod2stopgap(batch, bin, thickness, input_files, stopgap_dir):
@@ -300,8 +301,8 @@ def imod2tomotwin(batch, thickness, uid, input_files, tomotwin_dir):
 
     for ts in ts_list:
 
-        # bin to about 10 Apix
-        binning = round(10 / ts.angpix())
+        # bin to about 10 Apix, prefer round binning to avoid artifacts
+        binning = math.ceil(10 / ts.angpix / 2) * 2
 
         ts_ali = tiltseries.align_with_imod(ts, True, False, binning=binning)
 
