@@ -122,7 +122,7 @@ def project_particles(ctf, z_thickness, radius, input_star):
                     '--bg_radius', str(radius),
                     '--operate_out', f"{input_star.with_name(input_star.stem)}_projected.mrcs"])    
    
-    #os.unlink('temp.mrcs')
+    os.unlink('temp.mrcs')
 
 @click.command()
 @click.argument('star', nargs=1)
@@ -172,14 +172,14 @@ def apply_subset(subset_star, subtomo_stars):
         
     """
     
-    subset = starfile.read(subset_star)
+    subset = starfile.read(subset_star, always_dict=True)
     subset = subset['particles']
     
     subset['origin_star'] = subset['rlnImageName'].str.split("@", expand = True)[1]
 
     for st_star in subtomo_stars:
         
-        subtomo = starfile.read(st_star)
+        fullset_3d = starfile.read(st_star, always_dict=True)
         subset_2d = subset[subset['rlnImageName'].str.split("@", expand=True)[1] == f'{Path(st_star).stem}_projected.mrcs']
         
         selected_idx = subset_2d['rlnImageName'].str.split("@", expand=True)[0].tolist()
@@ -187,8 +187,13 @@ def apply_subset(subset_star, subtomo_stars):
         # indices in mrcs are 1-based
         selected_idx = [int(idx)-1 for idx in selected_idx]        
         
-        subset_3d = subtomo.iloc[selected_idx]
+        subset_3d = fullset_3d['particles'].iloc[selected_idx].copy()
         
-        starfile.write(subset_3d, Path(st_star).with_name(f'{Path(st_star).stem}_selected.star'))
+        # merge offsets xy and psi angle from 2d classification
+        subset_3d['rlnAnglePsi'] = list(subset_2d['rlnAnglePsi'])
+        subset_3d['rlnOriginXAngst'] = list(subset_2d['rlnOriginXAngst'])
+        subset_3d['rlnOriginYAngst'] = list(subset_2d['rlnOriginXAngst'])
+        
+        starfile.write({'optics': fullset_3d['optics'], 'particles': subset_3d}, Path(st_star).with_name(f'{Path(st_star).stem}_selected.star'))
         
         print(f'Wrote out {len(subset_3d.index)} particles from {st_star}. \n')
