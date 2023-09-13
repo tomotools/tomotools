@@ -1,4 +1,3 @@
-import os
 import click
 import starfile
 import mrcfile
@@ -159,6 +158,36 @@ def upgrade_star(star):
     
     starfile.write({'optics': star_optics, 'particles': particles}, f"{star.with_name(star.stem)}_upgraded.star")
 
+
+@click.command()
+@click.argument('star', nargs=1)
+def downgrade_star(star):
+    """
+    Take subtomogram starfile from Relion 3.1.4 and make it compatible with Warp.
+
+    """
+    star = Path(star)
+
+    star_parsed = starfile.read(star)
+
+    particles = star_parsed['particles']
+
+    # Remove entries related to optics groups
+    del particles['rlnOpticsGroup']
+    del particles['rlnGroupNumber']
+
+    # Add some optics info instead
+    particles['rlnMagnification'] = 10000
+    particles['rlnDetectorPixelSize'] = star_parsed['optics'].iloc[0]['rlnMicrographPixelSize']
+
+    if particles['rlnMicrographName'][0].endswith(".mrc"):
+
+        def mrc2tomostar(str):
+            return str.replace(".mrc",".tomostar")
+
+        particles['rlnMicrographName'] = particles['rlnMicrographName'].apply(mrc2tomostar)
+
+    starfile.write(particles, f"{star.with_name(star.stem)}_downgraded.star")
 
 @click.command()
 @click.argument('subset_star', nargs=1)
