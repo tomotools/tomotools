@@ -243,7 +243,7 @@ def align_with_areTomo(ts: TiltSeries, local: bool, previous: bool, do_evn_odd: 
         full_dimensions = mdoc['ImageSize']
         patch_x, patch_y = [
             str(round(full_dimensions[0] / 1000)), str(round(full_dimensions[1] / 1000))]
-        alignZ = str(round(1500 / angpix))
+        alignZ = str(round(2500 / angpix))
 
         subprocess.run([aretomo_executable(),
                         '-InMrc', ts.path,
