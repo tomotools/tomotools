@@ -6,5 +6,5 @@ import click
 def update(branch):
     """Auto-update tomotools to the latest version"""
     print('Updating...')
-    run(['pip', 'install', '--upgrade', f'git+https://github.com/MoritzWM/tomotools.git@origin/{branch}'])
+    run(['pip', 'install', '--upgrade', f'git+https://github.com/tomotools/tomotools.git@origin/{branch}'])
     print('Update completed!')
