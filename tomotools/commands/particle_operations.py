@@ -127,7 +127,7 @@ def project_particles(ctf, z_thickness, radius, input_star):
 @click.argument('star', nargs=1)
 def upgrade_star(star):
     """
-    Take subtomogram starfile from Warp and make it compatible with Relion 3.1.
+    Take subtomogram starfile from Warp and make it compatible with Relion 3.1.4
         
     """
     star = Path(star)
@@ -146,6 +146,18 @@ def upgrade_star(star):
     del particles['rlnDetectorPixelSize']
     particles['rlnOpticsGroup'] = '1'
     
+    # If rlnOrigin is given, convert to Angstrom
+    if 'rlnOriginX' in particles:
+        particles['rlnOriginXAngst'] = particles['rlnOriginX'].multiply(angpix)
+        particles['rlnOriginYAngst'] = particles['rlnOriginY'].multiply(angpix)
+        del particles['rlnOriginX']
+        del particles['rlnOriginY']
+        
+    # Treat Z separately in case of 2D data
+    if 'rlnOriginZ' in particles:
+        particles['rlnOriginZAngst'] = particles['rlnOriginZ'].multiply(angpix)
+        del particles['rlnOriginZ']
+    
     # Make _optics group for compatibility > 3.0
     star_optics = pd.DataFrame.from_dict([{'rlnOpticsGroupName': star.stem,
                    'rlnOpticsGroup': '1',
@@ -160,8 +172,10 @@ def upgrade_star(star):
 
 
 @click.command()
+@click.option('--m', is_flag=True, default=False, show_default=True, 
+              help = 'Make .star minimal for use with Warp/M.')
 @click.argument('star', nargs=1)
-def downgrade_star(star):
+def downgrade_star(m, star):
     """
     Take subtomogram starfile from Relion 3.1.4 and make it compatible with Warp.
 
@@ -177,17 +191,51 @@ def downgrade_star(star):
     del particles['rlnGroupNumber']
 
     # Add some optics info instead
+    angpix = star_parsed['optics'].iloc[0]['rlnMicrographPixelSize']
+    
     particles['rlnMagnification'] = 10000
-    particles['rlnDetectorPixelSize'] = star_parsed['optics'].iloc[0]['rlnMicrographPixelSize']
+    particles['rlnDetectorPixelSize'] = angpix
 
-    if particles['rlnMicrographName'][0].endswith(".mrc"):
-
+    
+        
+    # If rlnOrigin is given, convert to pixels
+    if 'rlnOriginXAngst' in particles:
+        particles['rlnOriginX'] = particles['rlnOriginXAngst'].divide(angpix)
+        particles['rlnOriginY'] = particles['rlnOriginYAngst'].divide(angpix)
+        del particles['rlnOriginXAngst']
+        del particles['rlnOriginYAngst']
+        
+    # Treat Z separately in case of 2D data
+    if 'rlnOriginZAngst' in particles:
+        particles['rlnOriginZ'] = particles['rlnOriginZAngst'].divide(angpix)
+        del particles['rlnOriginZAngst']
+    
+    if m:
+        particles_m = pd.DataFrame()
+        particles_m['rlnCoordinateX'] = particles['rlnCoordinateX']
+        particles_m['rlnCoordinateY'] = particles['rlnCoordinateY']
+        particles_m['rlnCoordinateZ'] = particles['rlnCoordinateZ']
+        
         def mrc2tomostar(str):
             return str.replace(".mrc",".tomostar")
+        
+        particles_m['rlnMicrographName'] = particles['rlnMicrographName'].apply(mrc2tomostar)
 
-        particles['rlnMicrographName'] = particles['rlnMicrographName'].apply(mrc2tomostar)
+        particles_m['rlnAngleRot'] = particles['rlnAngleRot']
+        particles_m['rlnAngleTilt'] = particles['rlnAngleTilt']
+        particles_m['rlnAnglePsi'] = particles['rlnAnglePsi']
 
-    starfile.write(particles, f"{star.with_name(star.stem)}_downgraded.star")
+        particles_m['rlnOriginX'] = particles['rlnOriginX']
+        particles_m['rlnOriginY'] = particles['rlnOriginY']
+        particles_m['rlnOriginZ'] = particles['rlnOriginZ']
+
+        particles_m['rlnImageName'] = particles['rlnImageName']
+        particles_m['rlnCtfImage'] = particles['rlnCtfImage']
+        
+        starfile.write(particles_m, f"{star.with_name(star.stem)}_downgraded_data.star")
+
+    else:
+        starfile.write(particles, f"{star.with_name(star.stem)}_downgraded.star")
 
 @click.command()
 @click.argument('subset_star', nargs=1)
