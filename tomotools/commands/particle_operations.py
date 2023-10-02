@@ -1,3 +1,4 @@
+import os
 import click
 import starfile
 import mrcfile
@@ -124,8 +125,10 @@ def project_particles(ctf, z_thickness, radius, input_star):
     os.unlink('temp.mrcs')
 
 @click.command()
+@click.option('--amp', default = 0.07, show_default=True, 
+               help = 'Amplitude contrast given during CTF estimation.')
 @click.argument('star', nargs=1)
-def upgrade_star(star):
+def upgrade_star(amp, star):
     """
     Take subtomogram starfile from Warp and make it compatible with Relion 3.1.4
         
@@ -165,7 +168,7 @@ def upgrade_star(star):
                    'rlnImageSize': dim[2],
                    'rlnVoltage': '300',
                    'rlnSphericalAberration': '2.7',
-                   'rlnAmplitudeContrast': '0.07',
+                   'rlnAmplitudeContrast': amp,
                    'rlnImageDimensionality': '3'}])
     
     starfile.write({'optics': star_optics, 'particles': particles}, f"{star.with_name(star.stem)}_upgraded.star")
