@@ -71,14 +71,7 @@ def imod2warp(batch_input, name, input_files, project_dir):
         print(f"Created Warp folder at {out_dir}.")
 
     # Parse input files
-    if batch_input:
-        input_files_parsed = sta_util.batch_parser(input_files[0])
-
-    else:
-        input_files_parsed = input_files
-
-    # Convert to list of tiltseries
-    ts_list = convert_input_to_TiltSeries(input_files_parsed)
+    ts_list = sta_util.batch_parser(input_files, batch_input)
 
     print(f'Found {len(ts_list)} TiltSeries to work on. \n')
 
@@ -130,15 +123,7 @@ def aretomo2warp(batch_input, name, input_files, project_dir):
         os.mkdir(path.join(out_dir, 'mdoc'))
         print(f"Created Warp folder at {out_dir}.")
 
-    # Parse input files
-    if batch_input:
-        input_files_parsed = sta_util.batch_parser(input_files[0])
-
-    else:
-        input_files_parsed = input_files
-
-    # Convert to list of tiltseries
-    ts_list = convert_input_to_TiltSeries(input_files_parsed)
+    ts_list = sta_util.batch_parser(input_files, batch_input)
 
     print(f'Found {len(ts_list)} TiltSeries to work on. \n')
 
