@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "tomotools"
 description = "Tomotools"
 readme = "README.md"
-version = "2.3"
+version = "0.2.3"
 requires-python = ">=3.7"
 license = {text = "None so far"}
 authors = [
