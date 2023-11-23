@@ -1,5 +1,8 @@
 # tomotools
-Scripts to make cryo-electron tomography a bit easier
+Scripts to make cryo-electron tomography a bit easier  
+
+[![Run pytest](https://github.com/tomotools/tomotools/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/tomotools/tomotools/actions/workflows/test.yml)
+
 
 ## Usage
 
