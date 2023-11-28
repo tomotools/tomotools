@@ -10,11 +10,14 @@ from dynamotable.utils import COLUMN_NAMES as TABLE_COLUMN_NAMES
 
 
 class SettingsCard:
+    """Dynamo settings.card."""
+
     def __init__(self, path: str, settings: dict):
         self.path: str = path
         self.settings: dict = settings
 
     def __getattr__(self, attr):
+        """Return attribute from settings card."""
         if attr in self.settings:
             return self.settings[attr]
         elif attr == "s":
@@ -23,13 +26,16 @@ class SettingsCard:
             raise AttributeError(f'No such setting "{attr}"')
 
     def get(self, key, default=None):
+        """Get value for key."""
         return self.settings.get(key, default)
 
     def update(self, other: "SettingsCard"):
+        """Update value from other settings card."""
         self.settings.update(other.settings)
 
     @staticmethod
     def read(path: str) -> "SettingsCard":
+        """Read settings.card file from given path."""
         settings = {}
         with open(path) as file:
             for line in file:
@@ -40,19 +46,24 @@ class SettingsCard:
         return SettingsCard(path, settings)
 
     def write(self, path: str):
+        """Write settings.card to given path."""
         with open(path, "w") as file:
             for key, value in self.settings.items():
-                if type(value) == list:
+                if isinstance(value, list):
                     value = "  ".join(value)
                 file.write(f"{key}={value};\n")
 
 
 class DataDir:
+    """Dynamo data directory."""
+
     @staticmethod
     def empty_table():
+        """Generate empty data table."""
         return pd.DataFrame(columns=TABLE_COLUMN_NAMES)
 
     def path_for_tag(self, tag: int):
+        """??."""
         batch_size: int = self.settings.get("batch", 0)
         padding: int = self.settings.get("padding", 6)
         ext: str = self.settings.get("extension", "em")
@@ -86,6 +97,7 @@ class DataDir:
         self.table["particle_path"] = self.table["tag"].transform(self.path_for_tag)
 
     def append(self, other: "DataDir"):
+        """Append to datadir."""
         other_table = other.table.copy()
         max_tag = self.table["tag"].max()
         if pd.notna(max_tag):
@@ -93,6 +105,7 @@ class DataDir:
         self.table = self.table.append(other_table, ignore_index=True)
 
     def write_table(self, path):
+        """Write data table."""
         dynamotable.write(
             self.table[
                 [col for col in TABLE_COLUMN_NAMES if col in self.table.columns]
@@ -101,6 +114,7 @@ class DataDir:
         )
 
     def link_particles_to(self, path):
+        """Link particles to path."""
         def link_tag(row):
             tag = row["tag"]
             symlink(
@@ -113,6 +127,8 @@ class DataDir:
 
 
 class DBox:
+    """Dynamo DBox data directory."""
+
     def __init__(self, path):
         # Path
         self.path = abspath(path)
@@ -141,7 +157,7 @@ class DBox:
 def _link_particles(source_dbox: DBox, dest_dbox: DBox):
     # Loop through the batch_xxxx directories
     for batch_dir in [
-        dir for dir in listdir(source_dbox.path) if dir.startswith("batch_")
+        d for d in listdir(source_dbox.path) if d.startswith("batch_")
     ]:
         # Create the batch_xxxx directories in dbox_out
         mkdir(join(dest_dbox.path, batch_dir))
@@ -161,7 +177,8 @@ def _merge_tags(original, appended):
     # Merge the two headers
     header = deepcopy(original[0])
     header.update(appended[0])
-    # The data is essentially a list of tags, ascending order, but in the form of a numpy array with shape (1, 1, x)
+    # The data is essentially a list of tags, ascending order
+    # but in the form of a numpy array with shape (1, 1, x)
     data = np.array(
         [[np.append(original[1], appended[1] + np.max(original[1], initial=0))]]
     )
@@ -171,8 +188,8 @@ def _merge_tags(original, appended):
 
 def _merge_tables(original, appended):
     appended = appended.copy()
-    max = original["tag"].max()
-    if pd.notna(max):
+    max_value = original["tag"].max()
+    if pd.notna(max_value):
         appended["tag"] += original["tag"].max()
     return original.append(appended, ignore_index=True)
 
@@ -190,7 +207,7 @@ def _decimal_digits(number: int) -> int:
 
 @click.command()
 def merge_dboxes(*args, **kwargs):
-    """!!!Very much work in progress!!! Merge Dynamo dBoxes folders"""
+    """!!!Very much work in progress!!! Merge Dynamo dBoxes folders."""
     if len(args) < 3:
         return
     # TODO: do some compatibility checking, e.g. compare settings.card files and so on
@@ -205,7 +222,7 @@ def merge_dboxes(*args, **kwargs):
     padding: int = _decimal_digits(particle_count)
     batch_size: int = 1000
     print(
-        f"Particle count: {particle_count}\nPadding: {padding}\nBatch_size: {batch_size}"
+        f"Particle no.: {particle_count}\nPadding: {padding}\nBatch_size: {batch_size}"
     )
 
     # Create the batch_xxx folders in the target DBox directory
@@ -219,19 +236,27 @@ def merge_dboxes(*args, **kwargs):
         local_batch_size: int = int(dbox.settings.batch)
         local_padding: int = int(dbox.settings.padding)
         ext: str = dbox.settings.extension
-        # Loop through the tags (particles), create symlinks in the destination folder in ascending order
+        # Loop through the tags (particles)
+        # Create symlinks in the destination folder in ascending order
         for tag in dbox.table["tag"]:
             tag = int(tag)
             linked_particle_count += 1
             src_particle = join(  # The source particle, where the link will point
-                dbox.path,  # ./list.../
-                f"batch_{tag // local_batch_size * local_batch_size}",  # ./list.../batch_xxx/
-                f"particle_{tag:0{local_padding}}.{ext}",  # ./list.../batch_xxx/particle_xxxx.em
+                                # ./list.../
+                                dbox.path,
+                                # ./list.../batch_xxx/
+                                f"batch_{tag // local_batch_size * local_batch_size}",
+                                # ./list.../batch_xxx/particle_xxxx.em
+                                f"particle_{tag:0{local_padding}}.{ext}",
             )
-            dst_particle = join(  # The destination, where the link will be created
-                dbox_out.path,  # ./list.../
-                f"batch_{linked_particle_count // batch_size * batch_size}",  # ./list.../batch_xxx/
-                f"particle_{linked_particle_count:0{padding}}.{ext}",  # ./list.../batch_xxx/particle_xxxx.em
+            dst_particle = join(
+                # The destination, where the link will be created
+                dbox_out.path,
+                # ./list.../
+                f"batch_{linked_particle_count // batch_size * batch_size}",
+                # ./list.../batch_xxx/
+                f"particle_{linked_particle_count:0{padding}}.{ext}",
+                # ./list.../batch_xxx/particle_xxxx.em
             )
             if not isfile(src_particle):
                 raise FileNotFoundError(f"Source particle not found: {src_particle}")
@@ -260,6 +285,7 @@ def merge_dboxes(*args, **kwargs):
 
 
 def flip_table(path: str):
+    """Flip dynamo table."""
     def flip_angle(angle: float):
         return angle - 180.0 if angle > 0 else angle + 180
 

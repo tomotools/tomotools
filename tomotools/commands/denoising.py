@@ -40,14 +40,14 @@ from tomotools.utils.util import num_gpus
     type=str,
     default="Y",
     show_default=True,
-    help="Tilt-axis of the tomogram. Used for splitting into training/validation. Y is imod and AreTomo default.",
+    help="Tilt-axis of the tomogram. Y is imod and AreTomo default.",
 )
 @click.option(
     "--n_normalization_samples",
     type=int,
     default=500,
     show_default=True,
-    help="Number of sub-volumes extracted per tomogram to calculate mean and SD for normalization.",
+    help="Number of sub-volumes extracted per tomogram for normalization.",
 )
 @click.argument("input_files", nargs=-1, type=click.Path(exists=True))
 @click.argument(
@@ -64,15 +64,16 @@ def cryocare_extract(
 ):
     """Prepares for cryoCARE-denoising.
 
-    Takes reconstructed tomograms or folders containing them as input. Must have EVN/ODD volumes associated!
+    Takes reconstructed tomograms or folders containing them as input.
+    Must have EVN/ODD volumes associated!
     The training data will be saved in output_path.
 
     """
     from cryocare.internals.CryoCAREDataModule import CryoCARE_DataModule
 
-    input_tomo = list()
-    input_evn = list()
-    input_odd = list()
+    input_tomo = []
+    input_evn = []
+    input_odd = []
 
     if not isdir(output_path):
         os.mkdir(output_path)
@@ -123,7 +124,7 @@ def cryocare_extract(
     type=int,
     default=16,
     show_default=True,
-    help="Increase if multiple GPUs are used. Try 32 or 64, depending on available memory.",
+    help="Increase if multiple GPUs are used. Try 32 or 64.",
 )
 @click.option(
     "--unet_kern_size",
@@ -167,7 +168,10 @@ def cryocare_train(
 ):
     """Trains a Noise2Noise model with cryoCARE.
 
-    Can only be used after cryocare-extract was run. Takes the training data generated as an input. Optionally, the output path and the model name can be specified.
+    Can only be used after cryocare-extract was run.
+    Takes the training data generated as an input.
+
+    Optionally, the output path and the model name can be specified.
     """
     from cryocare.internals.CryoCARE import CryoCARE
     from cryocare.internals.CryoCAREDataModule import CryoCARE_DataModule
@@ -230,9 +234,9 @@ def cryocare_train(
 )
 @click.option(
     "--gpu",
+    default="0",
     type=str,
-    default=None,
-    help="Specify which GPUs to use. Default: All GPUs.",
+    help="Specify which GPUs to use (eg. 2,3).",
 )
 @click.option(
     "--model-path",
@@ -250,16 +254,17 @@ def cryocare_train(
 def cryocare_predict(tiles, gpu, model_path, input_files, output):
     """Predicts denoised tomogram using cryoCARE.
 
-    Takes tomograms or folder containing them with associated EVN/ODD halves and the trained model as inputs.
+    Takes tomograms or folder containing them with associated EVN/ODD halves \
+    and the trained model as inputs.
     """
     import tempfile
 
     from cryocare.scripts.cryoCARE_predict import denoise, set_gpu_id
 
-    # Parse input tomogram
-    input_tomo = list()
-    input_evn = list()
-    input_odd = list()
+    # Parse input tomograms
+    input_tomo = []
+    input_evn = []
+    input_odd = []
 
     # Convert all input_files into a list of Tomogram objects
     for input_file in input_files:
@@ -291,47 +296,41 @@ def cryocare_predict(tiles, gpu, model_path, input_files, output):
         os.mkdir(output)
 
     # Take care of GPU stuff
-    if gpu is None:
-        gpu_id = [int(i) for i in range(0, num_gpus())]
-
-    else:
-        # Turn GPU list into list of integers
-        gpu_id = gpu.split(",")
-        gpu_id = [int(gpu) for gpu in gpu_id]
+    gpu_id = gpu.split(",")
+    gpu_id = [int(gpu) for gpu in gpu_id]
 
     set_gpu_id({"gpu_id": gpu_id})
 
     # Extract model and denoise
-    if os.path.isfile(model_path):
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            tar = tarfile.open(model_path, "r:gz")
-            tar.extractall(tmpdirname)
-            tar.close()
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        tar = tarfile.open(model_path, "r:gz")
+        tar.extractall(tmpdirname)
+        tar.close()
 
-            config = {}
-            config["even"] = input_evn
-            config["odd"] = input_odd
-            config["output"] = output
-            config["n_tiles"] = list(tiles)
+        config = {}
+        config["even"] = input_evn
+        config["odd"] = input_odd
+        config["output"] = output
+        config["n_tiles"] = list(tiles)
 
-            config["model_name"] = os.listdir(tmpdirname)[0]
-            config["path"] = join(tmpdirname)
+        config["model_name"] = os.listdir(tmpdirname)[0]
+        config["path"] = join(tmpdirname)
 
-            with open(join(tmpdirname, config["model_name"], "norm.json")) as f:
-                norm_data = json.load(f)
-                mean = norm_data["mean"]
-                std = norm_data["std"]
+        with open(join(tmpdirname, config["model_name"], "norm.json")) as f:
+            norm_data = json.load(f)
+            mean = norm_data["mean"]
+            std = norm_data["std"]
 
-            if type(config["even"]) is list:
-                all_even = tuple(config["even"])
-                all_odd = tuple(config["odd"])
-            elif os.path.isdir(config["even"]) and os.path.isdir(config["odd"]):
-                all_even = glob(join(config["even"], "*.mrc"))
-                all_odd = glob(join(config["odd"], "*.mrc"))
-            else:
-                all_even = [config["even"]]
-                all_odd = [config["odd"]]
+        if isinstance(config["even"], list):
+            all_even = tuple(config["even"])
+            all_odd = tuple(config["odd"])
+        elif os.path.isdir(config["even"]) and os.path.isdir(config["odd"]):
+            all_even = glob(join(config["even"], "*.mrc"))
+            all_odd = glob(join(config["odd"], "*.mrc"))
+        else:
+            all_even = [config["even"]]
+            all_odd = [config["odd"]]
 
-            for even, odd in zip(all_even, all_odd):
-                out_filename = join(config["output"], os.path.basename(even))
-                denoise(config, mean, std, even=even, odd=odd, output_file=out_filename)
+        for even, odd in zip(all_even, all_odd):
+            out_filename = join(config["output"], os.path.basename(even))
+            denoise(config, mean, std, even=even, odd=odd, output_file=out_filename)

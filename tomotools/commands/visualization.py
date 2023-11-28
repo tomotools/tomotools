@@ -10,7 +10,7 @@ from tomotools.utils import mathutil
 @click.command()
 @click.option(
     "--defocus",
-    help="(Central) defocus in um. Positive values denote underfocus. If not given, will try to find corresponding ctfplotter files [not yet implemented!].",
+    help="(Central) defocus in um. Positive values denote underfocus.",
 )
 @click.option(
     "--snrfalloff",
@@ -22,7 +22,7 @@ from tomotools.utils import mathutil
     "--deconvstrength",
     default=1.0,
     show_default=True,
-    help="Overall deconvolution strength, depends on SNR. 1 for SNR 1000, 0.67 for SNR 100, etc.",
+    help="Deconvolution strength, linked to SNR. 1 for SNR 1000, 0.67 for SNR 100, ...",
 )
 @click.option(
     "--hpnyquist",
@@ -44,17 +44,21 @@ def deconv(
     phaseflipped,
     input_files,
 ):
-    """Deconvolute your tomogram or list of tomograms. Python implementation Dimitri Tegunovs tom_deconv.m.
+    """Deconvolve your tomogram or list of tomograms.
 
-    The input file should be a reconstructed tomogram. AngPix is automatically read from the header.
+    Python implementation Dimitri Tegunovs tom_deconv.m.
+
+    The input file should be a reconstructed tomogram.
+    AngPix is automatically read from the header.
+
     Output file will be an mrc in the same folder, with added _deconv suffix.
 
     Original Script at https://github.com/dtegunov/tom_deconv/.
     """
-    # TODO: automatically determine defocus / read it out of ctfplotter or ctffind diagnostic files?
+    # TODO: automatically read defocus out of ctfplotter file?
     if defocus is None:
         raise NotImplementedError(
-            "Automated defocus determination not yet implemented. explicitly pass the defocus in um using the --defocus flag."
+            "Automated defocus determination not yet implemented."
         )
 
     for input_file in input_files:

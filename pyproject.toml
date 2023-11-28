@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tomotools"
+name = "Tomotools"
 description = "Scripts to make cryo-electron tomography a bit easier."
 readme = "README.md"
 version = "0.2.3"
@@ -70,6 +70,8 @@ extend-ignore = [
     "D401", # First line should be in imperative mood
     "D413", # Missing blank line after last section
     "D416", # Section name should end with a colon
+    "C901", # Function too complex -> noted as TODO in code
+    "RUF005", # Interferes with subprocess.run
 ]
 
 [tool.ruff.format]
