@@ -1,6 +1,7 @@
-import unittest
-import numpy as np
 import csv
+import unittest
+
+import numpy as np
 
 # from tomotools.commands import visualization
 from tomotools.utils import mathutil
@@ -189,7 +190,7 @@ class mathutil_test(unittest.TestCase):
 
         for case in cases:
             with self.subTest(cases):
-                with open(case["result"], mode="r") as file:
+                with open(case["result"]) as file:
                     result = csv.reader(file)
                     result = list(result)[0]
                     result = [float(ele) for ele in result]

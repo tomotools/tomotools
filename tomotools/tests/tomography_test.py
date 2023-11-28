@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Tue Jul 12 18:22:03 2022
 
@@ -7,7 +6,6 @@ Created on Tue Jul 12 18:22:03 2022
 """
 
 import unittest
-from tomotools.commands import preprocessing_reconstruction
 
 # TODO: implement test mdoc reading
 # TODO: implement test anchor / batch detection
@@ -41,7 +39,7 @@ class Testing(unittest.TestCase):
             with self.subTest(testfiles):
                 reconstruction = tomography.reconstruct(**params, input_files=testfile)
 
-                self.assertRegexpMatches()
+                self.assertRegex()
                 self.assertNotIn(
                     reconstruction,
                 )

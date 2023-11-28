@@ -2,8 +2,7 @@ import os
 import shutil
 import subprocess
 from glob import glob
-from os import mkdir
-from os import path
+from os import mkdir, path
 from os.path import abspath, basename, join
 from pathlib import Path
 from warnings import warn

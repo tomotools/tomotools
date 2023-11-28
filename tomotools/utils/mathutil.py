@@ -5,7 +5,6 @@ def tom_ctf1d(length, pixelsize, voltage, cs, defocus, amplitude, phaseshift, bf
     """A Python port of tom_ctf1d.m
     Input length of ctf, pixelsize in m, voltage in V, cs in m, defocus in m, amplitude contrast, phaseshift in rad, bfactor
     """
-
     ny = 1 / pixelsize
     lam = 12.2643247 / np.sqrt(voltage * (1.0 + voltage * 0.978466e-6)) * 1e-10
     lam2 = lam * 2
@@ -32,7 +31,6 @@ def wiener(
     """Calculates Wiener filter for tom_deconv
     Input: angpix, defocus in um (underfocus = positive value), highpass limit as fraction of Nyquist, phaseflipped Y/N, phaseshift in Deg
     """
-
     highpass = np.linspace(0, 1, 2048)
     highpass = np.minimum(1, highpass / hpnyquist) * np.pi
     highpass = 1 - np.cos(highpass)

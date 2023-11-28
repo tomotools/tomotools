@@ -1,8 +1,8 @@
-import mrcfile
-import numpy as np
 from os import path
 
 import click
+import mrcfile
+import numpy as np
 
 from tomotools.utils import mathutil
 
@@ -51,7 +51,6 @@ def deconv(
 
     Original Script at https://github.com/dtegunov/tom_deconv/.
     """
-
     # TODO: automatically determine defocus / read it out of ctfplotter or ctffind diagnostic files?
     if defocus is None:
         raise NotImplementedError(

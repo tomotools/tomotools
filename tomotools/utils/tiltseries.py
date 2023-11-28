@@ -1,3 +1,4 @@
+import csv
 import os
 import shutil
 import subprocess
@@ -5,12 +6,11 @@ import warnings
 from operator import itemgetter
 from os import path
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
 import mrcfile
-import csv
 
-from tomotools.utils import mdocfile, util
+from tomotools.utils import mdocfile
 from tomotools.utils.micrograph import Micrograph
 
 
@@ -167,7 +167,8 @@ class TiltSeries:
 def aretomo_executable() -> Optional[Path]:
     '''The AreTomo executable can be set with one of the following ways (in order of priority):
     1. Setting the ARETOMO_EXECUTABLE variable to the full path of the executable file
-    2. Putting the appropriate executable into the PATH and renaming it to "aretomo"'''
+    2. Putting the appropriate executable into the PATH and renaming it to "aretomo"
+    '''
     if "ARETOMO_EXECUTABLE" in os.environ:
         aretomo_exe = Path(os.environ["ARETOMO_EXECUTABLE"])
         if aretomo_exe.is_file():
@@ -187,7 +188,6 @@ def align_with_areTomo(
     If do_evn_odd is passed, also perform alignment on half-stacks.
     Will apply the pixel size from the input stack to the output stack.
     """
-
     ali_stack = ts.path.with_name(f"{ts.path.stem}_ali.mrc")
     aln_file = ts.path.with_suffix(".aln")
     orig_mdoc = ts.mdoc

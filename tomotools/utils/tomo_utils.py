@@ -4,7 +4,7 @@ import subprocess
 import warnings
 from glob import glob
 from os import path
-from os.path import splitext, isfile, join, isdir, basename, abspath
+from os.path import abspath, basename, isdir, isfile, join, splitext
 from typing import Optional
 
 import mrcfile
@@ -32,7 +32,8 @@ def sanitize_subframes_list(subframes: list):
 
 def sort_subframes_list(subframes: list):
     """Sorts a list of SubFrames by tilt-angle
-    Requires that all SubFrames have a corresponding MDOC file"""
+    Requires that all SubFrames have a corresponding MDOC file
+    """
     # Check if the list is a list of subframes
     if not all(isinstance(subframe, SubFrame) for subframe in subframes):
         raise ValueError("sort_subframes_list only supports lists of SubFrames")
@@ -375,7 +376,8 @@ def motioncor2_executable() -> Optional[str]:
 def aretomo_executable() -> Optional[str]:
     '''The AreTomo executable can be set with one of the following ways (in order of priority):
     1. Setting the ARETOMO_EXECUTABLE variable to the full path of the executable file
-    2. Putting the appropriate executable into the PATH and renaming it to "aretomo"'''
+    2. Putting the appropriate executable into the PATH and renaming it to "aretomo"
+    '''
     if "ARETOMO_EXECUTABLE" in os.environ:
         aretomo_exe = os.environ["ARETOMO_EXECUTABLE"]
         if isfile(aretomo_exe):
@@ -391,7 +393,8 @@ def sem2mc2(RotationAndFlip: int = 0):
     """Converts SerialEM property RotationAndFlip into MotionCor2-compatibly -RotGain / -FlipGain values.
     Using List on https://bio3d.colorado.edu/SerialEM/hlp/html/setting_up_serialem.htm#cameraOrientation as Reference,
     For MotionCor2: Rotation = n*90deg, Flip 1 = flip around X, Flip 2 = flip around Y
-    Returns a List with first item as rotation and second item as flip."""
+    Returns a List with first item as rotation and second item as flip.
+    """
     conv = {
         0: [0, 0],
         1: [3, 0],
@@ -424,7 +427,6 @@ def check_defects(gainref: os.PathLike):
 
 def defects_tif(gainref, tempdir, template):
     """Creates a -DefectsFile input for MotionCor2 from SerialEM defects txt"""
-
     defects_txt = check_defects(gainref)
     defects_tif = join(tempdir, f"{basename(defects_txt)}.tif")
 

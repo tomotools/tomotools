@@ -1,13 +1,13 @@
-import os
-import click
-import pickle
 import json
+import os
+import pickle
 import tarfile
-
+from glob import glob
 from os import path
 from os.path import isdir, join
 from pathlib import Path
-from glob import glob
+
+import click
 
 from tomotools.utils.tomogram import Tomogram
 from tomotools.utils.util import num_gpus
@@ -68,7 +68,6 @@ def cryocare_extract(
     The training data will be saved in output_path.
 
     """
-
     from cryocare.internals.CryoCAREDataModule import CryoCARE_DataModule
 
     input_tomo = list()
@@ -171,9 +170,9 @@ def cryocare_train(
     Can only be used after cryocare-extract was run. Takes the training data generated as an input. Optionally, the output path and the model name can be specified.
     """
     from cryocare.internals.CryoCARE import CryoCARE
-    from csbdeep.models import Config
     from cryocare.internals.CryoCAREDataModule import CryoCARE_DataModule
     from cryocare.scripts.cryoCARE_predict import set_gpu_id
+    from csbdeep.models import Config
 
     if gpu is None:
         gpu_id = [int(i) for i in range(0, num_gpus())]
@@ -253,10 +252,9 @@ def cryocare_predict(tiles, gpu, model_path, input_files, output):
 
     Takes tomograms or folder containing them with associated EVN/ODD halves and the trained model as inputs.
     """
-
     import tempfile
 
-    from cryocare.scripts.cryoCARE_predict import set_gpu_id, denoise
+    from cryocare.scripts.cryoCARE_predict import denoise, set_gpu_id
 
     # Parse input tomogram
     input_tomo = list()

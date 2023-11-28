@@ -71,7 +71,7 @@ def _write_key_value(file, key, value):
     if isinstance(value, list):
         file.write(f'{key} = {" ".join([str(v) for v in value])}\n')
     else:
-        file.write(f"{key} = {str(value)}\n")
+        file.write(f"{key} = {value!s}\n")
 
 
 def write(mdoc, path):

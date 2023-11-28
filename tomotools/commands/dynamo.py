@@ -1,5 +1,5 @@
-from os import mkdir, symlink, listdir
-from os.path import isfile, isdir, abspath, join, basename
+from os import listdir, mkdir, symlink
+from os.path import abspath, basename, isdir, isfile, join
 
 import click
 import dynamotable
@@ -31,7 +31,7 @@ class SettingsCard:
     @staticmethod
     def read(path: str) -> "SettingsCard":
         settings = {}
-        with open(path, "r") as file:
+        with open(path) as file:
             for line in file:
                 key, value = line.strip().rstrip(";").split("=")
                 if " " in value:
@@ -154,8 +154,9 @@ def _link_particles(source_dbox: DBox, dest_dbox: DBox):
 
 
 def _merge_tags(original, appended):
-    import numpy as np
     from copy import deepcopy
+
+    import numpy as np
 
     # Merge the two headers
     header = deepcopy(original[0])

@@ -3,11 +3,11 @@ import shutil
 import subprocess
 import warnings
 from glob import glob
-from os.path import join, isfile
+from os.path import isfile, join
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
-from tomotools.utils import util, mdocfile
+from tomotools.utils import mdocfile, util
 from tomotools.utils.movie import Movie
 
 
@@ -209,7 +209,7 @@ class Micrograph:
         print("Checking MotionCor2 output files")
 
         if gain_ref_mrc is not None:
-            with open(join(output_dir, "motioncor2.log"), "r") as log:
+            with open(join(output_dir, "motioncor2.log")) as log:
                 if any(l.startswith("Warning: Gain ref not found.") for l in log):
                     raise Exception(
                         "Gain reference was specified, but not applied by MotionCor2. Check log file!"
@@ -237,7 +237,8 @@ def sem2mc2(RotationAndFlip: int = 0):
     According to https://bio3d.colorado.edu/SerialEM/betaHlp/html/about_properties.htm#per_camera_properties,
     RotationAndFlip is defined as n+m where n*90° is CCW rotation and m is 0 for no flip and 4 for flip around Y (=vertical axis)
     For MotionCor2: Rotation = n*90deg CCW, Flip 1 = flip around horizontal (X) axis, Flip 2 = flip around vertical (Y) axis
-    Returns a List with first item as rotation and second item as flip."""
+    Returns a List with first item as rotation and second item as flip.
+    """
     conv = {
         0: [0, 0],
         1: [1, 0],
@@ -267,15 +268,16 @@ def check_defects(gainref: Path):
 
 def defects_tif(gainref: Path, tempdir: Path, template: Path):
     """Creates a -DefectsMap input for MotionCor2 from SerialEM defects txt in the passed temporary directory.
-    Requires a template file with the dimensions of the frames to be corrected."""
+    Requires a template file with the dimensions of the frames to be corrected.
+    """
     defects_txt = Path(check_defects(gainref))
     defects_tif = defects_txt.with_suffix(".tif")
     if isfile(defects_tif):
-        print(f"Found defects file {str(defects_tif)}")
+        print(f"Found defects file {defects_tif!s}")
         return defects_tif
     else:
         subprocess.run(["clip", "defect", "-D", defects_txt, template, defects_tif])
-        print(f"Found defects file and converted to {str(defects_tif)}")
+        print(f"Found defects file and converted to {defects_tif!s}")
         return defects_tif
 
 
