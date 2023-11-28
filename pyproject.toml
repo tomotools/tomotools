@@ -6,7 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "tomotools"
 description = "Tomotools"
 readme = "README.md"
-version = "2.3"
+version = "0.2.3"
+
 requires-python = ">=3.7"
 license = {text = "None so far"}
 authors = [
@@ -24,7 +25,7 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["tomotools"]
+packages = ["tomotools", "tomotools.commands", "tomotools.utils"]
 
 [project.optional-dependencies]
 cryocare = [
