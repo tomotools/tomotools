@@ -11,7 +11,7 @@ D) Set-up of Tilt Series acquisition including frame alignment with SEMCCD.
 
 ## Acquisition Parameters
 
-This protocol uses the following parameter sets in SerialEM, but adapt according to your needs. Some good magnification / spot size / illuminated area combinations for our Titan Krios G1 / K2 system are given in the end of the protocol.
+This protocol uses the following parameter sets in SerialEM, but adapt according to your needs. Some good magnification / spot size / illuminated area settings for our Titan Krios G1 / K2 system are given in the end of the protocol.
 
 All images should be acquired in counting mode. 
 
@@ -173,4 +173,5 @@ Shift Beam instead of moving stage
 | Tomogram Area [nm]    | 820 x 850 | 650 x 670 | 510 x 525 |
 | Spot Size             | 7 nP      | 7 nP      | 7 nP      |
 | Illuminated Area [µm] | 1.75      | 0.9       | 0.75      |
+| Exposure Time [s]     | 1.2       | 0.6       | 0.5       |
 | Exposure Time [s]     | 1.2       | 0.6       | 0.5       |
