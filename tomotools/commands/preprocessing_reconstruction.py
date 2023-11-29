@@ -387,7 +387,7 @@ def reconstruct(
     batch_file,
     input_files,
 ):
-    """Align and reconstruct the given tiltseries.
+    r"""Align and reconstruct the given tiltseries.
 
     Optionally moves tilt series and excludes specified tilts.
     Then runs AreTomo alignment, dose-filtration and imod WBP reconstruction.
