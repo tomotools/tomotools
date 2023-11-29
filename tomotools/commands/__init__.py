@@ -10,7 +10,7 @@ commands = []
 # derived from:
 # https://stackoverflow.com/questions/64844219/python-import-all-functions-from-folder
 
-for loader, name in pkgutil.walk_packages(__path__):
+for loader, name, pkg in pkgutil.walk_packages(__path__): #noqa B007
     module = loader.find_module(name).load_module(name)
 
     for f_name, value in inspect.getmembers(
