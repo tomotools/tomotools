@@ -3,10 +3,11 @@ from pathlib import Path
 
 def _convert_value_field(field: str):
     if " " in field:
-        # If there's a space in the field, it might either be a string containing spaces or a tuple of ints/floats
+        # If there's a space in the field,
+        # it might either be a string containing spaces or a tuple of ints/floats
         fields_split = [_convert_value_field(f) for f in field.split()]
         # check if all fields were successfully converted to int or float
-        if all(map(lambda v: isinstance(v, int) or isinstance(v, float), fields_split)):
+        if all(isinstance(v, int) or isinstance(v, float) for v in fields_split):
             return fields_split
         else:
             # otherwise it must have been a string
@@ -25,6 +26,7 @@ def _convert_value_field(field: str):
 
 
 def find_relative_path(working_dir: Path, abs_path: Path):
+    """Try to find paths relative to the current working dir."""
     while not working_dir.joinpath(abs_path).is_file():
         try:
             # Cut off first part
@@ -36,13 +38,14 @@ def find_relative_path(working_dir: Path, abs_path: Path):
 
 
 def read(file: Path):
-    mdoc = dict()
+    """Read mdoc from path as dictionary."""
+    mdoc = {}
     mdoc["path"] = file
-    mdoc["titles"] = list()
-    mdoc["sections"] = list()
-    mdoc["framesets"] = list()
-    # The currently edited dict, at the beginning this is the mdoc itself (as in, the global metadata)
-    # When a section (ZValue) is described, current_section will be set to the dict belonging to that section
+    mdoc["titles"] = []
+    mdoc["sections"] = []
+    mdoc["framesets"] = []
+    # The currently edited dict, at the beginning this is "global" the mdoc itself
+    # For each ZValue current_section will be set to the dict belonging to that section
     current_section = mdoc
     with open(file) as f:
         for line in f:
@@ -51,10 +54,10 @@ def read(file: Path):
             if line.startswith("[T ="):  # Title
                 mdoc["titles"].append(line[4:-1])
             elif line.startswith("[ZValue ="):  # Section
-                current_section = dict()
+                current_section = {}
                 mdoc["sections"].append(current_section)
             elif line.startswith("[FrameSet ="):  # Section
-                current_section = dict()
+                current_section = {}
                 mdoc["framesets"].append(current_section)
             elif len(line) == 0:
                 continue
@@ -75,6 +78,7 @@ def _write_key_value(file, key, value):
 
 
 def write(mdoc, path):
+    """Write mdoc from dict at path."""
     with open(path, "w") as file:
         # First write global vars, then titles, ZValues and FrameSets
         for key, value in mdoc.items():

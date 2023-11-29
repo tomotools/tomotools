@@ -5,6 +5,8 @@ from tomotools.utils import mdocfile
 
 
 class Movie:
+    """Object for frameseries / movie."""
+
     def __init__(self, path: Path, tilt_angle: float = 0.0):
         if not path.is_file():
             raise FileNotFoundError(f"File {path} does not exist!")
@@ -17,8 +19,10 @@ class Movie:
 
     @property
     def is_mrc(self):
+        """Format is mrc."""
         return self.path.suffix == ".mrc"
 
     @property
     def is_tiff(self):
+        """Format is tif(f)."""
         return self.path.suffix == ".tiff" or self.path.suffix == ".tif"

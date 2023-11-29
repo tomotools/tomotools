@@ -3,12 +3,15 @@ from typing import Tuple
 
 
 class SEMNavigator:
+    """SerialEM nav file."""
+
     def __init__(self):
-        self.header = dict()
-        self.items = list()
+        self.header = {}
+        self.items = []
 
     @staticmethod
     def read(path: os.PathLike) -> "SEMNavigator":
+        """Read navigator from path."""
         nav = SEMNavigator()
         with open(path) as file:
             for line in file:
@@ -33,7 +36,10 @@ class SEMNavigator:
 
 
 class NavigatorItem(dict):
+    """Item in navigator."""
+
     def __repr__(self):
+        """Returns best possible string representation."""
         # Best: return Note
         note = self.get("Note")
         if note is not None:

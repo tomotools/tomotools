@@ -1,18 +1,19 @@
 import subprocess
 
 
-def _list_append_replace(l: list, index: int, item):
-    if 0 <= index < len(l):
+def _list_append_replace(input_list: list, index: int, item):
+    if 0 <= index < len(input_list):
         # Can replace
-        l[index] = item
-    elif index == len(l):
+        input_list[index] = item
+    elif index == len(input_list):
         # Append
-        l.append(item)
+        input_list.append(item)
     else:
         raise IndexError("Can only replace items and append one item, not multiple")
 
 
 def num_gpus():
+    """Return number of GPUs in system."""
     name = subprocess.Popen(
         ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
         stdout=subprocess.PIPE,
@@ -23,6 +24,7 @@ def num_gpus():
 
 
 def gpuinfo():
+    """Parse nvidia-smi output."""
     def indent_level(line: str):
         indent_level = 0
         while line[indent_level * 4 : indent_level * 4 + 4] == "    ":
@@ -34,7 +36,7 @@ def gpuinfo():
         .stdout.decode("utf-8")
         .splitlines()
     )
-    parsed = dict()
+    parsed = {}
     # ..denoting the indentation levels # TODO properly comment
     active_dicts = [parsed]
     for line in lines:
@@ -50,7 +52,7 @@ def gpuinfo():
             # Section heading
             heading = line.strip()
             level = indent_level(line)
-            d = dict()
+            d = {}
             active_dicts[level][heading] = d
             _list_append_replace(active_dicts, level + 1, d)
     return parsed

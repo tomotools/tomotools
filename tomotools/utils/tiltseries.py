@@ -2,7 +2,6 @@ import csv
 import os
 import shutil
 import subprocess
-import warnings
 from operator import itemgetter
 from os import path
 from pathlib import Path
@@ -15,6 +14,8 @@ from tomotools.utils.micrograph import Micrograph
 
 
 class TiltSeries:
+    """Class for TiltSeries."""
+
     def __init__(self, path: Path):
         if not path.is_file():
             raise FileNotFoundError(f"File not found: {path}")
@@ -25,6 +26,7 @@ class TiltSeries:
         self.odd_path: Optional[Path] = None
 
     def with_split_files(self, evn_file: Path, odd_file: Path) -> "TiltSeries":
+        """Create TiltSeries with EVN/ODD by giving their paths."""
         if not evn_file.is_file():
             raise FileNotFoundError(f"File not found: {evn_file}")
         if not odd_file.is_file():
@@ -35,6 +37,7 @@ class TiltSeries:
         return self
 
     def with_split_dir(self, dir: Path) -> "TiltSeries":
+        """Create TiltSeries with EVN/ODD by giving their parent directory."""
         if not dir.is_dir():
             raise NotADirectoryError(f"{dir} is not a directory!")
         stem = self.path.stem
@@ -44,10 +47,15 @@ class TiltSeries:
         return self.with_split_files(evn_file, odd_file)
 
     def with_mdoc(self, file: Path):
+        """Explicitely use this mdoc file."""
         self.mdoc: Path = file
         return self
 
     def delete_files(self, delete_mdoc=True):
+        """Delete all files associated with TiltSeries.
+
+        Deletion of mdoc optional.
+        """
         for file in [
             self.path,
             self.evn_path,
@@ -59,11 +67,13 @@ class TiltSeries:
 
     # TODO: parse ctffind or ctfplotter files
     def get_defocus(self, output_file: Optional[Path] = None):
+        """Parse Defocus file. To be implemented."""
         pass
 
     @staticmethod
     # TODO: run ctffind
     def find_defocus(self):
+        """Run ctffind. To be implemented."""
         pass
 
     @staticmethod
@@ -95,7 +105,9 @@ class TiltSeries:
         reorder=False,
         overwrite_titles: Optional[List[str]] = None,
     ) -> "TiltSeries":
+        """Create TiltSeries from Micrographs, aka run newstack."""
         # TODO: Possibly remove overwrite_titles
+        # TODO: Reduce complexity C901.
         if ts_path.exists():
             raise FileExistsError(f"File at {ts_path} already exists!")
         if reorder:
@@ -105,18 +117,18 @@ class TiltSeries:
 
         # First, take care of the MDOC files
         if all(micrograph.mdoc for micrograph in micrographs):
-            # If all movies have their own associated mdoc, merge the mdoc files (except titles, see below)
-            stack_mdoc = {"titles": list(), "sections": list(), "framesets": list()}
+            # If all movies have their own associated mdoc, merge the mdoc files
+            stack_mdoc = {"titles": [], "sections": [], "framesets": []}
             for micrograph in micrographs:
                 mdoc = micrograph.mdoc
                 stack_mdoc["titles"] = mdoc["titles"]
                 stack_mdoc["sections"].append(mdoc["framesets"][0])
-                # Copy global vars (overwrite existing, so again only the last values are kept)
+                # Copy global vars, so again only the last values are kept
                 for key, value in mdoc.items():
                     if key not in ("framesets", "titles", "sections"):
                         stack_mdoc[key] = value
 
-            # Merging the titles is too difficult, I'll just keep the title of the last frame
+            # Merging the titles is too difficult, just keep last one.
             if overwrite_titles is not None:
                 # Update titles and append frameset as new section
                 stack_mdoc["titles"] = overwrite_titles
@@ -130,7 +142,7 @@ class TiltSeries:
 
         else:
             raise FileNotFoundError(
-                "No original MDOC was provided and the movies don't have MDOCs, aborting!"
+                "No original MDOC was provided and the movies don't have MDOCs!"
             )
 
         # Now, create the TiltSeries files
@@ -164,18 +176,20 @@ class TiltSeries:
             return TiltSeries(ts_path)
 
 
-def aretomo_executable() -> Optional[Path]:
-    '''The AreTomo executable can be set with one of the following ways (in order of priority):
-    1. Setting the ARETOMO_EXECUTABLE variable to the full path of the executable file
+def aretomo_executable() -> Optional[str]:
+    """Return AreTomo executable.
+
+    Path can be set with one of the following ways (in order of priority):
+    1. Setting the ARETOMO_EXECUTABLE variable to the full path of the executable
     2. Putting the appropriate executable into the PATH and renaming it to "aretomo"
-    '''
+    """
     if "ARETOMO_EXECUTABLE" in os.environ:
-        aretomo_exe = Path(os.environ["ARETOMO_EXECUTABLE"])
-        if aretomo_exe.is_file():
+        aretomo_exe = os.environ["ARETOMO_EXECUTABLE"]
+        if path.isfile(aretomo_exe):
             return aretomo_exe
         else:
-            warnings.warn(
-                f'ARETOMO_EXECUTABLE is set to "{aretomo_exe}", but the file does not exist. Falling back to PATH'
+            raise FileNotFoundError(
+                f'Variable for AreTomo is set to "{aretomo_exe}", but file is missing.'
             )
     return shutil.which("AreTomo")
 
@@ -183,9 +197,14 @@ def aretomo_executable() -> Optional[Path]:
 def align_with_areTomo(
     ts: TiltSeries, local: bool, previous: bool, do_evn_odd: bool, gpu: str
 ):
-    """Takes a TiltSeries as input and runs AreTomo on it, if desired with local alignment.
+    """Takes a TiltSeries as input and runs AreTomo on it.
+
+    Optional: do local alignment.
+
     If previous is True, respect previous alignment in folder.
+
     If do_evn_odd is passed, also perform alignment on half-stacks.
+
     Will apply the pixel size from the input stack to the output stack.
     """
     ali_stack = ts.path.with_name(f"{ts.path.stem}_ali.mrc")
@@ -212,7 +231,7 @@ def align_with_areTomo(
     if previous:
         if not path.isfile(aln_file):
             raise FileNotFoundError(
-                f"{ts.path}: --previous was passed, but no previous alignment was found at {aln_file}."
+                f"{ts.path}: --previous was passed, but nothing found at {aln_file}."
             )
 
         subprocess.run(
@@ -327,9 +346,12 @@ def align_with_areTomo(
 
 
 def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
-    """Runs mtffilter on the given TiltSeries object with the doses in the associated mdoc file.
+    """Runs mtffilter on the given TiltSeries object.
+
+    Uses the doses in the associated mdoc file.
     Will take into account EVN/ODD stacks if do_evn_odd is passed.
-    mdoc needs to contain only ExposureDose, as PriorRecordDose is deduced by mtffilter based on the DateTime entry, see mtffilter -help, section "-dtype"
+    mdoc needs to contain only ExposureDose, as PriorRecordDose is deduced by mtffilter
+    based on the DateTime entry, see mtffilter -help, section "-dtype"
     """
     mdoc = mdocfile.read(ts.mdoc)
 
@@ -386,7 +408,10 @@ def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
 
 def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool):
     """Aligns given TiltSeries with imod.
-    If previous is passed, use .xf and .tlt file from previous alignment and just calculate a new stack, if desired with EVN/ODD.
+
+    If previous is passed, use .xf and .tlt file from previous alignment
+    and just calculate a new stack, if desired with EVN/ODD.
+
     "De-novo" batch alignment still needs to be implemented...
     """
     orig_mdoc = ts.mdoc
@@ -395,12 +420,12 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool):
         # Generate new stack with alignment files
         if not path.isfile(ts.path.with_suffix(".xf")):
             raise FileNotFoundError(
-                f'--previous flagged passed, required transformation file {ts.path.with_suffix(".xf")} not found! '
+                f'--previous passed, but {ts.path.with_suffix(".xf")} not found! '
             )
 
         ali_stack = ts.path.with_name(f"{ts.path.stem}_ali.mrc")
 
-        # Copy the imod-generated tlt-file to _ali.tlt to keep compatibility w/ AreTomo approach
+        # Copy the imod-generated tlt-file to _ali.tlt to keep compatibility w/ AreTomo
         shutil.copyfile(ts.path.with_suffix(".tlt"), ali_stack.with_suffix(".tlt"))
 
         subprocess.run(
@@ -469,13 +494,13 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool):
     elif not previous:
         # TODO: implement batch alignment with imod adoc here!
         raise NotImplementedError(
-            "Batch Alignment with imod is not implemented yet. You can align manually and then return using the --previous."
+            "Only the --previous flag is supported for imod so far."
         )
 
 
 def aln_to_tlt(aln_file: Path):
-    """Generate imod-compatible tlt file from AreTomo-generated aln file"""
-    tilts = list()
+    """Generate imod-compatible tlt file from AreTomo-generated aln file."""
+    tilts = []
 
     with open(aln_file) as f:
         reader = csv.reader(f, delimiter=" ")

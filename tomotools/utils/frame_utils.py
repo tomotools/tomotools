@@ -1,7 +1,6 @@
 import os
 import shutil
 import subprocess
-import warnings
 from glob import glob
 from os import path
 from os.path import abspath, basename, isdir, isfile, join, splitext
@@ -13,6 +12,7 @@ from tomotools.utils import mdocfile, util
 
 
 def assert_subframes_list(subframes: list, is_split):
+    """Assert list of subframes is in correct format."""
     if not all(isinstance(subframe, SubFrame) for subframe in subframes):
         raise ValueError("Only a list of SubFrames is supported!")
     for subframe in subframes:
@@ -20,9 +20,10 @@ def assert_subframes_list(subframes: list, is_split):
 
 
 def sanitize_subframes_list(subframes: list):
+    """Sanitize subframe list, removing EVN and ODD frames."""
     if not all(isinstance(subframe, SubFrame) for subframe in subframes):
         raise ValueError("Only a list of SubFrames is supported!")
-    sanitized_list = list()
+    sanitized_list = []
     for subframe in subframes:
         base_name, ext = splitext(basename(subframe.path))
         if not (base_name.endswith("_EVN") or base_name.endswith("_ODD")):
@@ -31,7 +32,8 @@ def sanitize_subframes_list(subframes: list):
 
 
 def sort_subframes_list(subframes: list):
-    """Sorts a list of SubFrames by tilt-angle
+    """Sorts a list of SubFrames by tilt-angle.
+
     Requires that all SubFrames have a corresponding MDOC file
     """
     # Check if the list is a list of subframes
@@ -48,23 +50,24 @@ def frames2stack(
     overwrite_titles=None,
     skip_evnodd=False,
 ):
+    """Turn a list of frames into a TiltSeries stack."""
     # Check if frames and their respective mdoc files exist
     assert_subframes_list(subframes, is_split=False)
 
-    # If all subframes have their own associated mdoc, merge the mdoc files (except titles, see below)
+    # If all subframes have their own associated mdoc, merge the mdoc files
     if all(subframe.subframe_mdoc for subframe in subframes):
-        stack_mdoc = {"titles": list(), "sections": list(), "framesets": list()}
+        stack_mdoc = {"titles": [], "sections": [], "framesets": []}
         for subframe in subframes:
             # Update titles and append frameset as new section
             mdoc = subframe.mdoc
             stack_mdoc["titles"] = mdoc["titles"]
             stack_mdoc["sections"].append(mdoc["framesets"][0])
-            # Copy global vars (overwrite existing, so again only the last values are kept)
+            # Copy global vars (overwrite existing, so only the last values are kept)
             for key, value in mdoc.items():
                 if key not in ("framesets", "titles", "sections"):
                     stack_mdoc[key] = value
 
-        # Merging the titles is too difficult, I'll just keep the title of the last frame
+        # Merging the titles is too difficult, just keep the title of the last frame
         if overwrite_titles is not None:
             stack_mdoc["titles"] = overwrite_titles
 
@@ -142,36 +145,45 @@ def frames2stack(
 
 
 class SubFrame:
+    """Object for TiltSeries SubFrames."""
+
     @property
     def mdoc_path(self):
+        """SubFrame mdoc path."""
         return f"{self.path}.mdoc"
 
     @property
     def mdoc(self):
+        """SubFrame mdoc."""
         if self._mdoc is None and self.subframe_mdoc:
             self._mdoc = mdocfile.read(self.mdoc_path)
         return self._mdoc
 
     @property
     def path_evn(self):
+        """EVN SubFrame path."""
         base, ext = splitext(self.path)
         return f"{base}_EVN{ext}"
 
     @property
     def path_odd(self):
+        """ODD SubFrame path."""
         base, ext = splitext(self.path)
         return f"{base}_ODD{ext}"
 
     @property
     def is_split(self):
+        """EVN and ODD files found."""
         return isfile(self.path_evn) and isfile(self.path_odd)
 
     @property
     def is_mrc(self):
+        """Check file type is mrc."""
         return self.path.endswith(".mrc") or self.path.endswith(".mrcs")
 
     @property
     def subframe_mdoc(self):
+        """Subframe mdoc present?."""
         return isfile(self.mdoc_path)
 
     def __init__(self, path: str, tilt_angle):
@@ -181,9 +193,11 @@ class SubFrame:
         self._mdoc = None
 
     def files_exist(self, is_split) -> bool:
+        """Subframe files exist."""
         return self.path is not None and isfile(self.path) and is_split == self.is_split
 
     def assert_files_exist(self, is_split):
+        """Assert files exist."""
         for file in [self.path] + ([self.path_evn, self.path_odd] if is_split else []):
             if not isfile(file):
                 raise FileNotFoundError(f"File does not exist: {file}")
@@ -197,9 +211,12 @@ def motioncor2(
     group: int = 1,
     mcrot: int = 0,
     mcflip: int = 0,
-    override_gainref: str = None,
+    override_gainref: Optional[str] = None,
     gpus: Optional[str] = None,
 ):
+    """Run MotionCor2 on a list of SubFrames."""
+    # TODO: Reduce code complexity C901
+
     assert_subframes_list(subframes, is_split=False)
     gain_ref_dm4 = None
     gain_ref_mrc = None
@@ -222,18 +239,16 @@ def motioncor2(
         elif splitext(override_gainref)[1] == ".mrc":
             gain_ref_mrc = override_gainref
     elif subframes[0].subframe_mdoc:
-        # Check, if Subframe mdocs are given, if yes check whether zero or one unique gain refs are given
-        gain_refs = set(
-            [
-                subframe.mdoc["framesets"][0].get("GainReference", None)
-                for subframe in subframes
-            ]
-        )
+        # Check, if Subframe mdocs are given
+        # If yes check whether zero or one unique gain refs are given
+        gain_refs = {subframe.mdoc["framesets"][0].get("GainReference", None)
+                for subframe in subframes}
         if len(gain_refs) != 1:
             raise Exception(
-                f'Only zero or one unique gain refs are supported, yet {len(gain_refs)} were found in the MDOC files:\n{", ".join(gain_refs)}'
+                f'Only 0 or 1 gainref supported, {len(gain_refs)} found in mdoc.'
             )
-        # The gain ref should be in the same folder as the input file(s), so check if it's there
+        # The gain ref should be in the same folder as the input file(s)
+        # Check if it's there
         gain_ref_dm4 = gain_refs.pop()
 
     if gain_ref_dm4 is not None:
@@ -252,12 +267,12 @@ def motioncor2(
     if gain_ref_mrc is not None:
         if not isfile(gain_ref_mrc):
             raise FileNotFoundError(
-                f"The GainRef file {gain_ref_mrc} doesn't exist, something must have gone wrong!"
+                f"The GainRef file {gain_ref_mrc} doesn't exist."
             )
         print(f"Using gainref file {gain_ref_mrc}")
     else:
         print(
-            "No gain reference is specified in the MDOC files or given as an argument, continuing without gain correction"
+            "No gain reference is given or found, continuing without gain correction"
         )
 
     # Link the input files to the working dir
@@ -318,9 +333,9 @@ def motioncor2(
     ) as err:
         subprocess.run(command, cwd=tempdir, stdout=out, stderr=err)
 
-    # If present, copy the mdoc files to the output dir, rename from .tif.mdoc to .mrc.mdoc
-    # they are read and then written and not just copied so that the GainReference field can be removed
-    # and the pixel spacing can be adjusted
+    # If present, copy the mdoc files to the output dir
+    # Rename from .tif.mdoc to .mrc.mdoc
+    # GainReference field can is removed and the pixel spacing adjusted
 
     for subframe in subframes:
         if subframe.subframe_mdoc:
@@ -329,7 +344,8 @@ def motioncor2(
                 isinstance(subframe.mdoc["framesets"], list)
                 and len(subframe.mdoc["framesets"]) == 1
             ):
-                raise "Unexpected MDOC format: tomotools can only handle a single frameset per mdoc"
+                raise NotImplementedError(
+                    "Unexpected MDOC format: can only handle a single frameset in mdoc")
             subframe.mdoc["framesets"][0]["PixelSpacing"] *= binning
             subframe.mdoc["framesets"][0]["Binning"] *= binning
             if "GainReference" in subframe.mdoc["framesets"][0]:
@@ -359,8 +375,10 @@ def motioncor2(
 
 
 def motioncor2_executable() -> Optional[str]:
-    """The MotionCor executable can be set with one of the following ways (in order of priority):
-    1. Setting the MOTIONCOR2_EXECUTABLE variable to the full path of the executable file
+    """Return MotionCor2 executable.
+
+    Path can be set with one of the following ways (in order of priority):
+    1. Setting the MOTIONCOR2_EXECUTABLE variable to the full path of the executable
     2. Putting the appropriate executable into the PATH and renaming it to "motioncor2"
     """
     if "MOTIONCOR2_EXECUTABLE" in os.environ:
@@ -368,33 +386,43 @@ def motioncor2_executable() -> Optional[str]:
         if isfile(mc2_exe):
             return mc2_exe
         else:
-            warnings.warn(
-                f'MOTIONCOR2_EXECUTABLE is set to "{mc2_exe}", but the file does not exist. Falling back to PATH'
+            raise FileNotFoundError(
+                f'Variable for MC2 is set to "{mc2_exe}", but file is missing.'
             )
     return shutil.which("motioncor2")
 
 
 def aretomo_executable() -> Optional[str]:
-    '''The AreTomo executable can be set with one of the following ways (in order of priority):
-    1. Setting the ARETOMO_EXECUTABLE variable to the full path of the executable file
+    """Return AreTomo executable.
+
+    Path can be set with one of the following ways (in order of priority):
+    1. Setting the ARETOMO_EXECUTABLE variable to the full path of the executable
     2. Putting the appropriate executable into the PATH and renaming it to "aretomo"
-    '''
+    """
     if "ARETOMO_EXECUTABLE" in os.environ:
         aretomo_exe = os.environ["ARETOMO_EXECUTABLE"]
         if isfile(aretomo_exe):
             return aretomo_exe
         else:
-            warnings.warn(
-                f'ARETOMO_EXECUTABLE is set to "{aretomo_exe}", but the file does not exist. Falling back to PATH'
+            raise FileNotFoundError(
+                f'Variable for AreTomo is set to "{aretomo_exe}", but file is missing.'
             )
     return shutil.which("AreTomo")
 
 
 def sem2mc2(RotationAndFlip: int = 0):
-    """Converts SerialEM property RotationAndFlip into MotionCor2-compatibly -RotGain / -FlipGain values.
-    Using List on https://bio3d.colorado.edu/SerialEM/hlp/html/setting_up_serialem.htm#cameraOrientation as Reference,
+    """Parse RotationAndFlip for MC2.
+
+    Takes SerialEM property RotationAndFlip value,
+    returns MotionCor2-compatibly -RotGain / -FlipGain values.
+    as a list with first item as rotation and second item as flip.
+
+
+    According to
+    bio3d.colorado.edu/SerialEM/hlp/html/setting_up_serialem.htm#cameraOrientation,
+
     For MotionCor2: Rotation = n*90deg, Flip 1 = flip around X, Flip 2 = flip around Y
-    Returns a List with first item as rotation and second item as flip.
+
     """
     conv = {
         0: [0, 0],
@@ -411,7 +439,7 @@ def sem2mc2(RotationAndFlip: int = 0):
 
 def check_defects(gainref: os.PathLike):
     """Checks for a SerialEM-created defects file and -if found- returns file name."""
-    defects_temp = list()
+    defects_temp = []
 
     defects_temp.extend(glob(path.join(path.dirname(gainref), "defects*.txt")))
 
@@ -427,8 +455,12 @@ def check_defects(gainref: os.PathLike):
 
 
 def defects_tif(gainref, tempdir, template):
-    """Creates a -DefectsMap input for MotionCor2 from SerialEM defects txt in the passed temporary directory.
+    """Create Defect Map for MC2 from defects.txt.
+
+    Input SerialEM gain reference, example frame and temporary directory.
     Requires a template file with the dimensions of the frames to be corrected.
+
+    Returns path of the defects.tif
     """
     defects_txt = check_defects(gainref)
     defects_tif = join(tempdir, f"{basename(defects_txt)}.tif")
