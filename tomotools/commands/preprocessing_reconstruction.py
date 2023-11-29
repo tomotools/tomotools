@@ -395,7 +395,7 @@ def reconstruct(
     reconstruction will only be performed if the --do-evn-odd flag is passed.
 
     Batch file for tilt exclusion should look like this (tab-separated):
-    TS_01.mrc    1,39-41
+    TS_01.mrc    1,39-41 \n
     TS_02.mrc    1-4,41
     """
     # Read in batch tilt exclude file
