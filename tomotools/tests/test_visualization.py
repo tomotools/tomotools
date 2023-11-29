@@ -1,15 +1,22 @@
-import unittest
-import numpy as np
+"""Test tom_deconv math."""
 import csv
+import unittest
+
+import numpy as np
 
 # from tomotools.commands import visualization
 from tomotools.utils import mathutil
 
 
 class mathutil_test(unittest.TestCase):
-    def test_ctf1d(self):
-        # Tests whether ctf1d returns correct ctf (compared to original implementation on https://github.com/dtegunov/tom_deconv
+    """Test mathutil."""
 
+    def test_ctf1d(self):
+        """Test ctf1d.
+
+        Tests whether ctf1d returns correct ctf, as the original implementation on
+        https://github.com/dtegunov/tom_deconv
+        """
         params = {
             "length": 128,
             "pixelsize": 10e-10,
@@ -158,8 +165,10 @@ class mathutil_test(unittest.TestCase):
         self.assertTrue(np.allclose(mathutil.tom_ctf1d(**params), result, rtol=1e-3))
 
     def test_wiener(self):
-        # Test whether Wiener filter is correctly constructed (compared to original implementation)
+        """Test Wiener filter construction.
 
+        Compare to values for original implementation.
+        """
         cases = [
             {
                 "in": {
@@ -171,7 +180,7 @@ class mathutil_test(unittest.TestCase):
                     "phaseflipped": False,
                     "phaseshift": 0,
                 },
-                "result": "testfiles/Wiener_case1.csv",
+                "result": "tomotools/tests/testfiles/Wiener_case1.csv",
             },
             {
                 "in": {
@@ -183,13 +192,13 @@ class mathutil_test(unittest.TestCase):
                     "phaseflipped": True,
                     "phaseshift": 0,
                 },
-                "result": "testfiles/Wiener_case2.csv",
+                "result": "tomotools/tests/testfiles/Wiener_case2.csv",
             },
         ]
 
         for case in cases:
             with self.subTest(cases):
-                with open(case["result"], mode="r") as file:
+                with open(case["result"]) as file:
                     result = csv.reader(file)
                     result = list(result)[0]
                     result = [float(ele) for ele in result]

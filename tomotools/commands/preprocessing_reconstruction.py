@@ -2,11 +2,9 @@ import os
 import shutil
 import subprocess
 from glob import glob
-from os import mkdir
-from os import path
+from os import mkdir, path
 from os.path import abspath, basename, join
 from pathlib import Path
-from warnings import warn
 
 import click
 import mrcfile
@@ -36,7 +34,7 @@ from tomotools.utils.tomogram import Tomogram
 def blend_montages(cpus, input_files, output_dir):
     """Blend montages using justblend.
 
-    The input files must be montage .mrc/.st files, so usually you will invoke this function with something like:
+    The input files must be montage .mrc/.st files, example:
     blend-montages MMM*.mrc output_dir
     """
     if not path.isdir(output_dir):
@@ -89,12 +87,12 @@ def blend_montages(cpus, input_files, output_dir):
     is_flag=True,
     default=True,
     show_default=True,
-    help="Sort tilt-series by angle in ascending order and create an appropriate MDOC file",
+    help="Sort tilt-series by angle in ascending order",
 )
 @click.option(
     "--frames",
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
-    help="If your frames are not automatically found, you can pass the path to the frames directory",
+    help="If your frames are not automatically found, pass frame directory.",
 )
 @click.option(
     "--gainref",
@@ -105,7 +103,7 @@ def blend_montages(cpus, input_files, output_dir):
     "--rotationandflip",
     type=int,
     default=None,
-    help="Override RotationAndFlip for the gain reference (useful if it's not in the mdoc file)",
+    help="Override RotationAndFlip for the gain reference, else read from mdoc.",
 )
 @click.option(
     "--group",
@@ -119,13 +117,13 @@ def blend_montages(cpus, input_files, output_dir):
     is_flag=True,
     default=False,
     show_default=True,
-    help="Perform full-frame or patch alignment. Local alignment may lead to overfitting.",
+    help="Perform full-frame or patch alignment.",
 )
 @click.option(
     "--gpu",
     type=str,
     default=None,
-    help="Which GPUs to use, passed as comma-separated list eg. 0,1. Default: all available",
+    help="GPUs to use, eg. 0,1. Default: all available",
 )
 @click.option(
     "--exposuredose",
@@ -141,6 +139,7 @@ def blend_montages(cpus, input_files, output_dir):
 )
 @click.argument("input_files", nargs=-1, type=click.Path(exists=True))
 @click.argument("output_dir", type=click.Path(writable=True))
+# TODO: Fix complexity error C901
 def batch_prepare_tiltseries(
     splitsum,
     mcbin,
@@ -158,15 +157,19 @@ def batch_prepare_tiltseries(
 ):
     """Prepare tilt-series for reconstruction.
 
-    This function runs MotionCor2 on movie frames, stacks the motion-corrected frames and sorts them by tilt-angle.
-    The input files may be individual .mrc/.st tilt-series files or directories containing them.
-    In the latter case, a simple search for MRC and ST files will be run (using the globs *.mrc and *.st).
+    This function runs MotionCor2 on movie frames, stacks the motion-corrected frames
+    and sorts them by tilt-angle.
 
+    The input files may be individual .mrc/.st tilt-series files
+    or directories containing them.
+    In the latter case, a simple search for MRC and ST files will be run
+    (using the globs *.mrc and *.st).
     Every input file requires a corresponding .mdoc file.
+
     The last argument is the output dir. It will be created if it doesn't exist.
     """
     # Convert all directories into a list of MRC/ST files
-    input_files_temp = list()
+    input_files_temp = []
     for input_file in input_files:
         input_file = Path(input_file)
         if input_file.is_file():
@@ -193,13 +196,15 @@ def batch_prepare_tiltseries(
         if mdoc.get("Montage", 0) == 1:
             print(f"Skipping {input_file} because it is a montage")
             continue
-        # Identify batch / anchoring files, as they all should have an abs tilt angle < 1 for all sections -> feels a bit hacky
+        # Identify batch / anchoring files, using two criteria:
+        # 1. Fewer than three sections
+        # 2. abs(tilt angle) < 1 for all sections -> feels a bit hacky, but works
         elif len(mdoc["sections"]) < 3:
             print(f"{input_file} has fewer than three sections. Skipping.")
             continue
         elif all(abs(section["TiltAngle"]) < 1 for section in mdoc["sections"]):
             print(
-                f"{input_file} is not a tilt series, as all TiltAngles are near zero. Skipping."
+                f"{input_file} is not a tilt series, all angles near 0. Skipping."
             )
             continue
 
@@ -216,7 +221,7 @@ def batch_prepare_tiltseries(
             and exposuredose is None
         ):
             print(
-                f"{input_file} has no ExposureDose set. This might lead to problems down the road!"
+                f"{input_file} has no ExposureDose set. This might lead to problems!"
             )
 
         # Are any SubFrames present?
@@ -237,7 +242,7 @@ def batch_prepare_tiltseries(
                 ]
             except FileNotFoundError:
                 print(
-                    f"Not all movie frames were found for {input_file}, specify them using the --frames option. Skipping at this point."
+                    f"Movie frames not found for {input_file}, use --frames. Skipping."
                 )
                 continue
 
@@ -271,7 +276,8 @@ def batch_prepare_tiltseries(
             mdoc_rotflip = mdoc["sections"][0]["RotationAndFlip"]
             mcrot, mcflip = sem2mc2(mdoc_rotflip)
 
-        # Grab frame size to estimate appropriate patch numbers (will only be used if --patch is specified)
+        # Grab frame size to estimate appropriate patch numbers
+        # Will only be used if --patch is specified
         patch_x, patch_y = [
             str(round(mdoc["ImageSize"][0] / 800)),
             str(round(mdoc["ImageSize"][1] / 800)),
@@ -344,7 +350,7 @@ def batch_prepare_tiltseries(
 @click.option(
     "--zero-xaxis-tilt",
     is_flag=True,
-    help="Run tomogram positioning, but keep X-axis tilt at zero. Remember to add some extra thickness if you do this, otherwise you might truncate your tomogram",
+    help="Run tomogram positioning, but keep X-axis tilt at zero.",
 )
 @click.option(
     "--previous", is_flag=True, help="Use previous alignment found in the folder."
@@ -358,14 +364,15 @@ def batch_prepare_tiltseries(
 @click.option(
     "--do-evn-odd",
     is_flag=True,
-    help="Perform alignment, dose-filtration and reconstruction also on EVN/ODD stacks, if present. Needed for later cryoCARE processing. If the EVN/ODD stacks are found, they will be moved and tilts will be excluded as with the original stack regardless of this flag.",
+    help="Reconstruct ENV/ODD stacks also.",
 )
 @click.option(
     "--batch-file",
     type=click.Path(exists=True, dir_okay=False),
-    help="You can pass a tab-separated file with tilt series names and views to exclude before alignment and reconstruction.",
+    help="Pass a tab-separated file with tilt series names and views to exclude.",
 )
 @click.argument("input_files", nargs=-1, type=click.Path(exists=True))
+# TODO: Fix complexity error C901
 def reconstruct(
     move,
     local,
@@ -380,9 +387,16 @@ def reconstruct(
     batch_file,
     input_files,
 ):
-    """Align and reconstruct the given tiltseries.
+    r"""Align and reconstruct the given tiltseries.
 
-    Optionally moves tilt series and excludes specified tilts. Then runs AreTomo alignment and ultimately dose-filtration and imod WBP reconstruction.
+    Optionally moves tilt series and excludes specified tilts.
+    Then runs AreTomo alignment, dose-filtration and imod WBP reconstruction.
+    EVN/ODD stacks will always be moved and tilts excluded, but alignment and
+    reconstruction will only be performed if the --do-evn-odd flag is passed.
+
+    Batch file for tilt exclusion should look like this (tab-separated):
+    TS_01.mrc    1,39-41 \n
+    TS_02.mrc    1-4,41
     """
     # Read in batch tilt exclude file
     ts_info = {}
@@ -390,16 +404,16 @@ def reconstruct(
         with open(batch_file) as file:
             for line in file:
                 if line != "\n":
-                    l = line.rsplit(maxsplit=1)
-                    if len(l) != 2:
-                        warn(f'Skipping invalid line in the batch file: "{line}"')
+                    lsplit = line.rsplit(maxsplit=1)
+                    if len(lsplit) != 2:
+                        print(f'Skipping invalid line in the batch file: "{line}"')
                         continue
-                    temp = {l[0]: l[1].rstrip()}
+                    temp = {lsplit[0]: lsplit[1].rstrip()}
                     ts_info.update(temp)
 
-    input_ts = list()
+    input_ts = []
 
-    # Sanitize input list to only include the main stack and create TiltSeries objects
+    # Sanitize input list
     for input_file in input_files:
         if (
             input_file.endswith("_EVN.mrc")
@@ -428,21 +442,21 @@ def reconstruct(
         if str(tiltseries.path) in ts_info:
             excludetilts = ts_info[str(tiltseries.path)]
             print(
-                f"Found tilts to exclude in {batch_file}. Will exclude tilts {excludetilts}."
+                f"Reading {batch_file}, will exclude tilts {excludetilts}."
             )
 
         if move:
-            dir = tiltseries.path.with_suffix("")
-            dir.mkdir()
+            ts_dir = tiltseries.path.with_suffix("")
+            ts_dir.mkdir()
             print(f"Move files to subdir {dir}")
-            tiltseries.path = tiltseries.path.rename(dir / tiltseries.path.name)
-            tiltseries.mdoc = tiltseries.mdoc.rename(dir / tiltseries.mdoc.name)
+            tiltseries.path = tiltseries.path.rename(ts_dir / tiltseries.path.name)
+            tiltseries.mdoc = tiltseries.mdoc.rename(ts_dir / tiltseries.mdoc.name)
             if tiltseries.is_split:
                 tiltseries.evn_path = tiltseries.evn_path.rename(
-                    dir / tiltseries.evn_path.name
+                    ts_dir / tiltseries.evn_path.name
                 )
                 tiltseries.odd_path = tiltseries.odd_path.rename(
-                    dir / tiltseries.odd_path.name
+                    ts_dir / tiltseries.odd_path.name
                 )
 
         # Exclude tilts
@@ -455,10 +469,10 @@ def reconstruct(
                 subprocess.run(exclude_cmd + [str(tiltseries.evn_path)])
                 subprocess.run(exclude_cmd + [str(tiltseries.odd_path)])
                 print(
-                    f"Excluded specified tilts from EVN and ODD stacks for {tiltseries.path}."
+                    "Excluded specified tilts from EVN and ODD stacks."
                 )
 
-            # To clean the directory up a bit, move the excluded views to a separate subdirectory
+            # To clean the directory up, move the excluded views to subdirectory
             excludedir = join(tiltseries.path.parent, "excluded_views")
             if not path.isdir(excludedir):
                 os.mkdir(excludedir)
@@ -468,12 +482,13 @@ def reconstruct(
 
             with open(join(excludedir, "README"), mode="w+") as file:
                 file.write(
-                    "Restore full stack by moving these files back and running command excludeviews -restore"
+                    "Restore full stack by running excludeviews -restore"
                 )
 
         # Align Stack
-        # If previous is passed and imod alignment file .xf is found, use imod. Otherwise, use AreTomo.
-        # TODO: Once imod batch alignment is implemented, figure out a better way of doing this, eg. with a flag (--imod / --aretomo)
+        # If previous is passed and imod alignment file .xf is found, use imod.
+        # Otherwise, use AreTomo.
+        # TODO: Figure out a better way of doing this, eg. with a flag
 
         if previous and path.isfile(tiltseries.path.with_suffix(".xf")):
             tiltseries_ali = align_with_imod(tiltseries, previous, do_evn_odd)
@@ -527,7 +542,7 @@ def reconstruct(
         # If it fails, just use default values
         if fs.returncode != 0:
             print(
-                f"{tiltseries.path}: findsection failed, using default values: thickness {thickness}, z_shift {z_shift}, x_axis_tilt {x_axis_tilt}"
+                f"{tiltseries.path}: findsection failed, using default values."
             )
         else:
             # Else, get tomopitch
@@ -545,9 +560,9 @@ def reconstruct(
                 text=True,
             ).stdout.splitlines()
             # Check for failed process again.
-            if any(l.startswith("ERROR") for l in tomopitch):
+            if any(line.startswith("ERROR") for line in tomopitch):
                 print(
-                    f"{tiltseries.path}: tomopitch failed, using default values: thickness {thickness}, z_shift {z_shift}, x_axis_tilt {x_axis_tilt}"
+                    f"{tiltseries.path}: tomopitch failed, using default values."
                 )
             else:
                 x_axis_tilt = float(tomopitch[-3].split()[-1])
@@ -555,7 +570,10 @@ def reconstruct(
                 z_shift = z_shift_line.split()[-1]
                 thickness = int(thickness_line.split()[-1]) + extra_thickness
                 print(
-                    f"{tiltseries.path}: Succesfully estimated tomopitch: thickness {thickness}, z_shift {z_shift}, x_axis_tilt {x_axis_tilt}"
+                    f"{tiltseries.path}: Succesfully estimated tomopitch."
+                )
+                print(
+                    f"thickness {thickness}, z_shift {z_shift}, axis tilt {x_axis_tilt}"
                 )
         pitch_mod.unlink(missing_ok=True)
         tomo_pitch.path.unlink(missing_ok=True)

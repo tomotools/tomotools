@@ -1,4 +1,5 @@
 from subprocess import run
+
 import click
 
 
@@ -7,7 +8,7 @@ import click
     "--branch", default="main", show_default=True, help="The GitHub branch to use"
 )
 def update(branch):
-    """Auto-update tomotools to the latest version"""
+    """Auto-update tomotools to the latest version."""
     print("Updating...")
     run(
         [

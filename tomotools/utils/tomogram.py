@@ -9,6 +9,8 @@ from tomotools.utils.tiltseries import TiltSeries
 
 
 class Tomogram:
+    """Tomogram class."""
+
     def __init__(self, path: Path):
         if not path.is_file():
             raise FileNotFoundError(f"File not found: {path}")
@@ -18,6 +20,7 @@ class Tomogram:
         self.odd_path: Optional[Path] = None
 
     def with_split_files(self, evn_file: Path, odd_file: Path) -> "Tomogram":
+        """Create tomogram with EVN/ODD by passing their paths."""
         if not evn_file.is_file():
             raise FileNotFoundError(f"File not found: {evn_file}")
         if not odd_file.is_file():
@@ -28,6 +31,7 @@ class Tomogram:
         return self
 
     def with_split_dir(self, dir: Path) -> "Tomogram":
+        """Create tomogram with EVN/ODD by passing directory containing them."""
         if not dir.is_dir():
             raise NotADirectoryError(f"{dir} is not a directory!")
         stem = self.path.stem
@@ -38,11 +42,13 @@ class Tomogram:
 
     @property
     def angpix(self):
+        """Return angpix from header."""
         with mrcfile.mmap(self.path, mode="r") as mrc:
             self.angpix = float(mrc.voxel_size.x)
 
     @property
     def dimZYX(self):
+        """Return full dimensions from data shape."""
         with mrcfile.mmap(self.path, mode="r") as mrc:
             self.dimZYX = mrc.data.shape
 
@@ -57,6 +63,8 @@ class Tomogram:
         do_EVN_ODD: bool = False,
         trim: bool = True,
     ) -> "Tomogram":
+        """Create Tomogram from TiltSeries, aka reconstruct."""
+        # TODO: Reduce complexity C901
         ali_stack = tiltseries.path
 
         if do_EVN_ODD and tiltseries.is_split:
@@ -69,7 +77,8 @@ class Tomogram:
             stack_dimensions = mrc.data.shape
 
         if thickness is None:
-            # Define default thickness as function of pixel size -> always reconstruct 600 nm if no better number is given
+            # Define default thickness as function of pixel size
+            # always reconstruct 600 nm if no better number is given
             thickness = str(round(6000 / pix_xy))
 
         # Get dimensions of aligned stack - assumption is that tilt is around the y axis
@@ -285,9 +294,9 @@ class Tomogram:
             print(f"{tiltseries.path}: Finished reconstruction of EVN/ODD stacks.")
 
         if trim:
-            # Trim: Read in dimensions of full_rec (as YZX) to avoid rounding differences due to binning
+            # Trim: Read in dimensions of full_rec (as YZX)
             with mrcfile.mmap(full_rec, mode="r") as mrc:
-                full_rec_dim = mrc.data.shape
+                fullrec_dim = mrc.data.shape
 
             final_rec = tiltseries.path.with_name(
                 f"{tiltseries.path.stem}_rec_bin_{bin}.mrc"
@@ -297,17 +306,17 @@ class Tomogram:
                 [
                     "trimvol",
                     "-x",
-                    f"1,{full_rec_dim[2]}",
+                    f"1,{fullrec_dim[2]}",
                     "-y",
-                    f"1,{full_rec_dim[0]}",
+                    f"1,{fullrec_dim[0]}",
                     "-z",
-                    f"1,{full_rec_dim[1]}",
+                    f"1,{fullrec_dim[1]}",
                     "-sx",
-                    f"1,{full_rec_dim[2]}",
+                    f"1,{fullrec_dim[2]}",
                     "-sy",
-                    f"1,{full_rec_dim[0]}",
+                    f"1,{fullrec_dim[0]}",
                     "-sz",
-                    f"{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}",
+                    f"{int(fullrec_dim[1]) / 3:.0f},{int(fullrec_dim[1]) * 2 / 3:.0f}",
                     "-f",
                     "-rx",
                     full_rec,
@@ -337,17 +346,17 @@ class Tomogram:
                     [
                         "trimvol",
                         "-x",
-                        f"1,{full_rec_dim[2]}",
+                        f"1,{fullrec_dim[2]}",
                         "-y",
-                        f"1,{full_rec_dim[0]}",
+                        f"1,{fullrec_dim[0]}",
                         "-z",
-                        f"1,{full_rec_dim[1]}",
+                        f"1,{fullrec_dim[1]}",
                         "-sx",
-                        f"1,{full_rec_dim[2]}",
+                        f"1,{fullrec_dim[2]}",
                         "-sy",
-                        f"1,{full_rec_dim[0]}",
+                        f"1,{fullrec_dim[0]}",
                         "-sz",
-                        f"{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}",
+                        f"{int(fullrec_dim[1]) / 3:.0f},{int(fullrec_dim[1]) * 2 / 3:.0f}", #noqa:E501
                         "-f",
                         "-rx",
                         full_rec_evn,
@@ -360,17 +369,17 @@ class Tomogram:
                     [
                         "trimvol",
                         "-x",
-                        f"1,{full_rec_dim[2]}",
+                        f"1,{fullrec_dim[2]}",
                         "-y",
-                        f"1,{full_rec_dim[0]}",
+                        f"1,{fullrec_dim[0]}",
                         "-z",
-                        f"1,{full_rec_dim[1]}",
+                        f"1,{fullrec_dim[1]}",
                         "-sx",
-                        f"1,{full_rec_dim[2]}",
+                        f"1,{fullrec_dim[2]}",
                         "-sy",
-                        f"1,{full_rec_dim[0]}",
+                        f"1,{fullrec_dim[0]}",
                         "-sz",
-                        f"{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}",
+                        f"{int(fullrec_dim[1]) / 3:.0f},{int(fullrec_dim[1]) * 2 / 3:.0f}", #noqa:E501
                         "-f",
                         "-rx",
                         full_rec_odd,

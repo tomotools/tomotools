@@ -11,12 +11,12 @@ import click
 @click.option("-p", "--palindromic", is_flag=True)
 @click.argument("output_file")
 def create_movie(framerate, quality, glob, palindromic, output_file):
-    """Create a movie from a series of image files"""
-    dir = path.dirname(output_file)
+    """Create a movie from a series of image files."""
+    directory = path.dirname(output_file)
     basename, ext = path.splitext(path.basename(output_file))
-    output_file_tmp = path.join(dir, f"{basename}_tmp{ext}")
-    output_file_rev = path.join(dir, f"{basename}_rev{ext}")
-    videofiles_tmp = path.join(dir, f"{basename}.txt")
+    output_file_tmp = path.join(directory, f"{basename}_tmp{ext}")
+    output_file_rev = path.join(directory, f"{basename}_rev{ext}")
+    videofiles_tmp = path.join(directory, f"{basename}.txt")
 
     cmd = [
         "ffmpeg",

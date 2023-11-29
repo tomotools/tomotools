@@ -37,7 +37,6 @@ tomotools [subcommand] --help
 ### Other
 - **semnavigator**: Display SerialEM navigator files to find back you tomogram positions
 - **create-movie**: Create a movie from a series of image files.
-- **nff-to-amiramesh**
 - **update**: Automatically pulls the most recent version from GitHub and runs ```pip install --upgrade``` on it.
 
 ## Installation
