@@ -180,7 +180,7 @@ class mathutil_test(unittest.TestCase):
                     "phaseflipped": False,
                     "phaseshift": 0,
                 },
-                "result": "testfiles/Wiener_case1.csv",
+                "result": "tomotools/tests/testfiles/Wiener_case1.csv",
             },
             {
                 "in": {
@@ -192,7 +192,7 @@ class mathutil_test(unittest.TestCase):
                     "phaseflipped": True,
                     "phaseshift": 0,
                 },
-                "result": "testfiles/Wiener_case2.csv",
+                "result": "tomotools/tests/testfiles/Wiener_case2.csv",
             },
         ]
 
