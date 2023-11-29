@@ -210,7 +210,7 @@ def batch_prepare_tiltseries(
             continue
 
         # File is a tilt-series.
-        print(f"Working on {input_file}, which looks like a tilt series")
+        print(f"\nWorking on {input_file}, which looks like a tilt series")
 
         # Fix ExposureDose if required
         if exposuredose is not None:
@@ -317,8 +317,6 @@ def batch_prepare_tiltseries(
                 micrograph.path.rename(output_dir.joinpath(micrograph.path.name))
             shutil.rmtree(frames_corrected_dir)
             print(f'Successfully created micrograph images in {output_dir}. \n')
-
-        print("\n")
 
 
 @click.command()
