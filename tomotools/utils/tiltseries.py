@@ -597,7 +597,7 @@ def convert_input_to_TiltSeries(input_files:[]):
     for input_file in input_files:
         input_file = Path(input_file)
         if input_file.is_file():
-            if (not input_file.name.endswith('.st') or
+            if not (input_file.name.endswith('.st') or
                      input_file.name.endswith('.mrc')):
                 continue
             if (input_file.name.endswith('_EVN.mrc') or

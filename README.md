@@ -45,28 +45,40 @@ If you can only access your userspace, consider using [micromamba](https://mamba
 
 If you want to use the scripts interfacing with cryoCARE denoising, please install ```tomotools[cryocare]```. 
 
-### Install via:
+### Full Install via:
 ```
 conda create -n tomotools python=3.8 cudatoolkit=11.0 cudnn=8.0 -c conda-forge
 conda activate tomotools
 pip install "tomotools[cryocare] @ git+https://github.com/tomotools/tomotools.git"
 ```
+
+### Minimal Install via:
+```
+conda create -n tomotools python=3.8 -c conda-forge
+conda activate tomotools
+pip install "tomotools @ git+https://github.com/tomotools/tomotools.git"
+```
+### Confirm Installation:
+
 With tomotools installed into a conda environment, you can then start tomotools with:
 ```
 conda activate tomotools
 tomotools --help
 ```
+
 ### Notes on sbgrid:
 If you're using an sbgrid environment, make sure to set the following in your ```.sbgrid.conf``` file:
 
 ```
 PYTHON_X=3.8.8 (anything > 3.8 works)  
 ```
+
 Additionally, try ```pip --version``` to make sure it's correctly working. This is required for ```tomotools update```. Else, you can add the following line to your ```.bashrc```:
 
 ```
 alias pip='python -m pip'
 ```
+
 Likely, you will also need to add your local Python path to ```.bashrc```:
 
 ```

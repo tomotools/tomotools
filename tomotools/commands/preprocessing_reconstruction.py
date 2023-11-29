@@ -338,24 +338,38 @@ def batch_prepare_tiltseries(
     "-b", "--bin", default=1, show_default=True, help="Final reconstruction binning"
 )
 @click.option(
-    "--sirt", default=5, show_default=True, help="SIRT-like filter iterations"
+    "--sirt", 
+    default=5, 
+    show_default=True, 
+    help="SIRT-like filter iterations"
 )
-@click.option('--aretomo/--imod', is_flag=True, default=True, show_default=True,
+@click.option('--aretomo/--imod', 
+              is_flag=True, 
+              default=True, 
+              show_default=True,
               help="Use AreTomo or imod for alignment.")
 @click.option(
-    "--previous", is_flag=True, help="Use previous alignment found in the folder."
+    "--previous", 
+    is_flag=True,
+    default=False,
+    help="Use previous alignment found in the folder."
 )
 @click.option(
     "--gpu",
     type=str,
     default=None,
-    help="Specify which GPUs to use for AreTomo. Default: GPU 0",
+    help="Specify which GPUs to use for AreTomo. [default: all]",
 )
-@click.option('--skip-positioning', is_flag=True, default = True,
+@click.option('--skip-positioning', 
+              is_flag=True, 
+              default = True, 
+              show_default = True,
               help='Skip tomogram positioning. Useful for STA.')
 @click.option(
     "--do-evn-odd",
     is_flag=True,
+    default=False,
+    show_default = True,
     help="Reconstruct ENV/ODD stacks also.",
 )
 @click.option(
@@ -412,12 +426,12 @@ def reconstruct(
 
     for tiltseries in input_ts:
 
-        print(f"Now working on {tiltseries.path.name}.")
+        print(f"\nNow working on {tiltseries.path.name}.")
 
         if move:
             tsdir = tiltseries.path.with_suffix('')
             tsdir.mkdir()
-            print(f'Moving files to subdir {dir}.')
+            print(f'Moving files to subdir {tsdir}.')
             tiltseries.path = tiltseries.path.rename(tsdir / tiltseries.path.name)
             tiltseries.mdoc = tiltseries.mdoc.rename(tsdir / tiltseries.mdoc.name)
             if tiltseries.is_split:
