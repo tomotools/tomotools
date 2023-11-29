@@ -1,9 +1,6 @@
 # tomotools
 Scripts to make cryo-electron tomography a bit easier  
 
-[![Run pytest](https://github.com/tomotools/tomotools/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/tomotools/tomotools/actions/workflows/test.yml)
-
-
 ## Usage
 
 **Full options can be listed via:**
@@ -46,7 +43,7 @@ We suggest installing tomotools into its own conda / mamba environment. If you c
 ```
 conda create -n tomotools python=3.8 cudatoolkit=11.0 cudnn=8.0 -c conda-forge
 conda activate tomotools
-pip install 'git+https://github.com/MoritzWM/tomotools.git'
+pip install 'git+https://github.com/tomotools/tomotools.git'
 ```
 With tomotools installed into a conda environment, you can then start tomotools with:
 ```
