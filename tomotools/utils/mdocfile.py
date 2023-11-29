@@ -1,5 +1,32 @@
+import csv
+from operator import itemgetter
+from os import path
 from pathlib import Path
 
+
+def convert_to_order_list(mdoc: dict, out_dir: Path):
+    """Writers order_list.csv required for Relion4.
+
+    Takes mdoc as dict (via mdocfile.read) and path for output.
+    Returns path to output file.
+    """
+    # Sorte by DateTime to get order of acquisition
+    mdoc['sections'] = sorted(mdoc['sections'], key=itemgetter('DateTime'))
+
+    tilt_list = [int(section['TiltAngle']) for section in mdoc['sections']]
+
+    # Generate output file path
+    output_file = path.join(out_dir, (out_dir.stem + '_order.csv'))
+
+    with open(output_file, 'w+') as f:
+        writer = csv.writer(f)
+        i = 1
+
+        for tilt in tilt_list:
+            writer.writerow([i, tilt])
+            i = i + 1
+
+    return output_file
 
 def _convert_value_field(field: str):
     if " " in field:
@@ -99,3 +126,22 @@ def write(mdoc, path):
             file.write(f"[FrameSet = {i}]\n")
             for key, value in frameset.items():
                 _write_key_value(file, key, value)
+
+def downgrade_DateTime(mdoc: dict):
+    """Downgrades DateTime from YYYY to YY (behaviour SerialEM < 4)."""
+    for section in mdoc['sections']:
+        #Check that date is really in DD-MMM-YYYY (= 11 chars)
+        if len(section['DateTime'].split()[0]) == 11:
+            section['DateTime'] = section['DateTime'][0:7]+section['DateTime'][9::]
+        else:
+            continue
+
+    return mdoc
+
+
+def get_start_tilt(mdoc: dict):
+    """Returns the starting tilt, even after reordering."""
+    # Sorte by DateTime to get order of acquisition
+    mdoc['sections'] = sorted(mdoc['sections'], key=itemgetter('DateTime'))
+
+    return mdoc['sections'][0]['TiltAngle']

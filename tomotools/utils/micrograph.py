@@ -116,7 +116,8 @@ class Micrograph:
             print(
                 f"Found gain reference {gain_ref_dm4}, converting to {gain_ref_mrc}"
             )
-            subprocess.run(["dm2mrc", gain_ref_dm4, gain_ref_mrc])
+            subprocess.run(["dm2mrc", gain_ref_dm4, gain_ref_mrc],
+                           stdout=subprocess.DEVNULL)
 
         if gain_ref_mrc is not None:
             if not gain_ref_mrc.is_file():
@@ -276,29 +277,28 @@ def aretomo_executable() -> Optional[str]:
 
 
 def sem2mc2(RotationAndFlip: int = 0):
-    """Parse RotationAndFlip for MC2.
+    """Read RotationAndFlip for MotionCor2.
 
-    Takes SerialEM property RotationAndFlip value,
-    returns MotionCor2-compatibly -RotGain / -FlipGain values.
-    as a list with first item as rotation and second item as flip.
+    Converts SerialEM property RotationAndFlip into MC2 -RotGain / -FlipGain values.
 
+    RotationAndFlip is defined as n+m where n*90° is CCW rotation and
+    m is 0 for no flip and 4 for flip around Y (=vertical axis).
+    For MotionCor2: Rotation = n*90deg CCW,
+    Flip 1 = flip around horizontal (X) axis, Flip 2 = flip around vertical (Y) axis
 
-    According to
-    bio3d.colorado.edu/SerialEM/hlp/html/setting_up_serialem.htm#cameraOrientation,
+    Returns a List with first item as rotation and second item as flip.
 
-    For MotionCor2: Rotation = n*90deg, Flip 1 = flip around X, Flip 2 = flip around Y
-
+    https://bio3d.colorado.edu/SerialEM/betaHlp/html/about_properties.htm#per_camera_properties
     """
-    conv = {
-        0: [0, 0],
-        1: [3, 0],
-        2: [2, 0],
-        3: [1, 0],
-        4: [0, 2],
-        5: [1, 2],
-        6: [2, 2],
-        7: [3, 2],
-    }
+    conv = {0: [0, 0],
+            1: [1, 0],
+            2: [2, 0],
+            3: [3, 0],
+            4: [0, 1],
+            5: [1, 2],
+            6: [2, 2],
+            7: [3, 2]}
+
     return conv[RotationAndFlip]
 
 
@@ -328,7 +328,7 @@ def defects_tif(gainref, tempdir, template):
     Returns path of the defects.tif
     """
     defects_txt = check_defects(gainref)
-    defects_tif = join(tempdir, f"{basename(defects_txt)}.tif")
+    defects_tif = Path(tempdir) / f"{basename(defects_txt)}.tif"
 
     subprocess.run(["clip", "defect", "-D", defects_txt, template, defects_tif])
     print(f"Found and converted defects file {defects_tif}")

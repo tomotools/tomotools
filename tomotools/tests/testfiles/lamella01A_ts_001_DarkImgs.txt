@@ -1,0 +1,7 @@
+# Indices of removed dark images
+# Index is 0 based.
+   1
+  35
+  36
+  37
+  38
