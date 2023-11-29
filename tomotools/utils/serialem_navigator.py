@@ -3,18 +3,21 @@ from typing import Tuple
 
 
 class SEMNavigator:
+    """SerialEM nav file."""
+
     def __init__(self):
-        self.header = dict()
-        self.items = list()
+        self.header = {}
+        self.items = []
 
     @staticmethod
-    def read(path: os.PathLike) -> 'SEMNavigator':
+    def read(path: os.PathLike) -> "SEMNavigator":
+        """Read navigator from path."""
         nav = SEMNavigator()
         with open(path) as file:
             for line in file:
                 if line.isspace() or len(line) == 0:
                     continue
-                elif line.startswith('['):
+                elif line.startswith("["):
                     index = _parse_header(line)
                     nav_item = NavigatorItem(index)
                     line = next(file)
@@ -33,15 +36,18 @@ class SEMNavigator:
 
 
 class NavigatorItem(dict):
+    """Item in navigator."""
+
     def __repr__(self):
+        """Returns best possible string representation."""
         # Best: return Note
-        note = self.get('Note')
+        note = self.get("Note")
         if note is not None:
             return note
         # Second best: return MapFile
-        map_file = self.get('MapFile')
+        map_file = self.get("MapFile")
         if map_file is not None:
-            return map_file.rsplit('\\', maxsplit=1)[-1]
+            return map_file.rsplit("\\", maxsplit=1)[-1]
         # Fallback: return id
         return self.id
 
@@ -57,5 +63,5 @@ def _parse_header(line: str) -> str:
 
 
 def _parse_field(line: str) -> Tuple[str, str]:
-    key, value = line.split(' = ', maxsplit=1)
+    key, value = line.split(" = ", maxsplit=1)
     return key.strip(), value.strip()

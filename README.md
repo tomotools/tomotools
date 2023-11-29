@@ -1,5 +1,8 @@
 # tomotools
-Scripts to make cryo-electron tomography a bit easier
+Scripts to make cryo-electron tomography a bit easier  
+
+[![Run pytest](https://github.com/tomotools/tomotools/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/tomotools/tomotools/actions/workflows/test.yml)
+
 
 ## Usage
 
@@ -44,7 +47,6 @@ tomotools [subcommand] --help
 ### Other
 - **semnavigator**: Display SerialEM navigator files to find back you tomogram positions
 - **create-movie**: Create a movie from a series of image files.
-- **nff-to-amiramesh**
 - **update**: Automatically pulls the most recent version from GitHub and runs ```pip install --upgrade``` on it.
 
 ## Installation
@@ -54,7 +56,7 @@ We suggest installing tomotools into its own conda / mamba environment. If you c
 ```
 conda create -n tomotools python=3.8 cudatoolkit=11.0 cudnn=8.0 -c conda-forge
 conda activate tomotools
-pip install 'git+https://github.com/MoritzWM/tomotools.git'
+pip install 'git+https://github.com/tomotools/tomotools.git'
 ```
 With tomotools installed into a conda environment, you can then start tomotools with:
 ```
