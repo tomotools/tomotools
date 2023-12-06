@@ -191,6 +191,8 @@ def cryocare_extract(
     if not isdir(output_path):
         os.mkdir(output_path)
 
+    print("\n")
+
     # Convert all input_files into a list of Tomogram objects
     input_tomo = convert_input_to_Tomogram(input_files)
 
@@ -198,9 +200,11 @@ def cryocare_extract(
         if tomo.is_split:
             input_evn.append(tomo.evn_path)
             input_odd.append(tomo.odd_path)
-            print(f"Found reconstruction {tomo.path} with EVN and ODD stacks.")
-        else:
-            print(f"No EVN/ODD reconstructions found for {tomo.path}. Skipping.")
+            #print(f"Found reconstruction {tomo.path} with EVN and ODD stacks.")
+        #else:
+            #print(f"No EVN/ODD reconstructions found for {tomo.path}. Skipping.")
+
+    print(f"Will extract from {len(input_evn)} tomograms. \n")
 
     dm = CryoCARE_DataModule()
     dm.setup(

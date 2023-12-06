@@ -338,18 +338,18 @@ def batch_prepare_tiltseries(
     "-b", "--bin", default=1, show_default=True, help="Final reconstruction binning"
 )
 @click.option(
-    "--sirt", 
-    default=5, 
-    show_default=True, 
+    "--sirt",
+    default=5,
+    show_default=True,
     help="SIRT-like filter iterations"
 )
-@click.option('--aretomo/--imod', 
-              is_flag=True, 
-              default=True, 
+@click.option('--aretomo/--imod',
+              is_flag=True,
+              default=True,
               show_default=True,
               help="Use AreTomo or imod for alignment.")
 @click.option(
-    "--previous", 
+    "--previous",
     is_flag=True,
     default=False,
     help="Use previous alignment found in the folder."
@@ -360,9 +360,9 @@ def batch_prepare_tiltseries(
     default=None,
     help="Specify which GPUs to use for AreTomo. [default: all]",
 )
-@click.option('--skip-positioning', 
-              is_flag=True, 
-              default = True, 
+@click.option('--skip-positioning',
+              is_flag=True,
+              default = True,
               show_default = True,
               help='Skip tomogram positioning. Useful for STA.')
 @click.option(
