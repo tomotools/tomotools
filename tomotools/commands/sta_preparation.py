@@ -70,14 +70,12 @@ def imod2warp(batch_input, name, input_files, project_dir):
     # Parse input files
     ts_list = sta_util.batch_parser(input_files, batch_input)
 
-    # TODO: make sure taSolution.log is copied to take over improved angles!
-
     print(f'Found {len(ts_list)} TiltSeries to work on. \n')
 
     for ts in ts_list:
         print(f"Now working on {ts.path.name}")
 
-        sta_util.make_warp_dir(ts, out_dir)
+        sta_util.make_warp_dir(ts, out_dir, imod = True)
 
         print(f"Warp files prepared for {ts.path.name}. \n")
 

@@ -92,11 +92,14 @@ def aretomo_export(ts: TiltSeries):
     return ali_stack_imod
 
 
-def make_warp_dir(ts: TiltSeries, project_dir):
+def make_warp_dir(ts: TiltSeries, project_dir: Path, imod: bool = False):
     """Export tiltseries to Warp."""
     required_files = [ts.path,
                       ts.mdoc,
                       ts.path.with_suffix(".xf")]
+
+    if imod:
+        required_files.append(ts.path.parent/"taSolution.log")
 
     # Check that all files are present
     if (all(path.isfile(req) for req in required_files) and
@@ -113,7 +116,7 @@ def make_warp_dir(ts: TiltSeries, project_dir):
     ts_dir = path.join(project_dir,"imod",ts.path.stem)
     os.mkdir(ts_dir)
 
-    [shutil.copy(file,ts_dir) for file in required_files[2:6]]
+    [shutil.copy(file,ts_dir) for file in required_files[2:]]
 
     # tilt images go to warp root directory
     subprocess.run(['newstack','-quiet',
@@ -167,7 +170,6 @@ def batch_parser(input_files: [], batch: bool):
     ts_list = convert_input_to_TiltSeries(input_files_parsed)
 
     return ts_list
-
 
 
 def ctfplotter_aretomo_export(ts: TiltSeries):
