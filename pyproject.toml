@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Tomotools"
+description = "Scripts to make cryo-electron tomography a bit easier."
+readme = "README.md"
+version = "0.3.1"
+
+requires-python = ">=3.7"
+license = {text = "None so far"}
+authors = [
+  {email = "moritz.wachsmuth@bioquant.uni-heidelberg.de", name = "Moritz Wachsmuth-Melm"},
+  {email = "b.wimmer@bioc.uzh.ch", name = "Benedikt Wimmer"},
+]
+dependencies = [
+    "Click",
+    "numpy",
+    "pandas",
+    "mrcfile",
+    "emfile",
+    "dynamotable",
+    "matplotlib",
+]
+
+[tool.setuptools]
+packages = ["tomotools", "tomotools.commands", "tomotools.utils"]
+
+[project.optional-dependencies]
+cryocare = [
+    "tensorflow==2.4",
+    "Cryocare",
+    "packaging",
+]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[project.scripts]
+tomotools = "tomotools:tomotools"
+
+[project.urls]
+homepage = "https://github.com/tomotools/tomotools"
+repository = "https://github.com/tomotools/tomotools"
+
+[tool.ruff]
+# partially copied from github.com/teamtomo/membrain-seg
+line-length = 88
+target-version = "py38"
+extend-select = [
+    "E",    # style errors
+    "W",    # style warnings
+    "F",    # flakes
+    "D",    # pydocstyle
+    "I",    # isort
+    "U",    # pyupgrade
+    "C",    # flake8-comprehensions
+    "B",    # flake8-bugbear
+    "A001", # flake8-builtins
+    "RUF",  # ruff-specific rules
+]
+extend-ignore = [
+    "D100", # Missing docstring in public module
+    "D107", # Missing docstring in __init__
+    "D203", # 1 blank line required before class docstring
+    "D212", # Multi-line docstring summary should start at the first line
+    "D213", # Multi-line docstring summary should start at the second line
+    "D401", # First line should be in imperative mood
+    "D413", # Missing blank line after last section
+    "D416", # Section name should end with a colon
+    "C901", # Function too complex -> noted as TODO in code
+    "RUF005", # Interferes with subprocess.run,
+    "RUF015", # Prefer next(iter) over iter[0] 
+    "B012", # We use try/ finally a lot to avoid raising exceptions
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "tab"

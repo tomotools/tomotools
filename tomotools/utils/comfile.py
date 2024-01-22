@@ -1,10 +1,11 @@
-from tomotools.utils.tiltseries import TiltSeries, binned_size
+from tomotools.utils.tiltseries import TiltSeries
 
 
 def get_value(path, key):
+    """Get value from comfile at path using key."""
     with open(path) as file:
         for line in file:
-            if line.startswith(f'{key}\t'):
+            if line.startswith(f"{key}\t"):
                 return line.split()[1].strip()
             elif line.startswith(f'{key} '):
                 return line.split()[1].strip()
@@ -12,27 +13,29 @@ def get_value(path, key):
 
 
 def modify_value(path, key, value):
-    lines = list()
+    """Set value for key in comfile at path."""
+    lines = []
     with open(path) as file:
         lines = file.readlines()
     for n, line in enumerate(lines):
-        if line.startswith(f'{key}\t'):
-            lines[n] = f'{key}\t{value}\n'
-        elif line.startswith(f'{key} '):
-            lines[n] = f'{key} {value}\n'
-    with open(path, 'w') as file:
+        if line.startswith(f"{key}\t"):
+            lines[n] = f"{key}\t{value}\n"
+        elif line.startswith(f"{key} "):
+            lines[n] = f"{key} {value}\n"
+    with open(path, "w") as file:
         file.writelines(lines)
 
     return
 
 
 def remove_value(path, key):
-    lines = list()
-    lines_cleaned = list()
+    """Remove value from comfile."""
+    lines = []
+    lines_cleaned = []
 
     with open(path) as file:
         lines = file.readlines()
-    for n, line in enumerate(lines):
+    for _, line in enumerate(lines):
         if line.startswith(f'{key}\t'):
             continue
         elif line.startswith(f'{key} '):
@@ -47,13 +50,12 @@ def remove_value(path, key):
 
 
 def fake_ctfcom(ts: TiltSeries, binning: int):
-    '''
+    """
     Create ctfcorrection.com file for your reconstruction folder.
 
     Does not check whether the required files are there!
     Right now, 300 kV and 2.7 mm Cs are hard-coded.
-    '''
-
+    """
     content = ['# Command file to run ctfphaseflip',
                '# Created with tomotools',
                '$setenv IMOD_OUTPUT_FORMAT MRC',
@@ -81,13 +83,12 @@ def fake_ctfcom(ts: TiltSeries, binning: int):
 
 def fix_tiltcom(ts: TiltSeries, thickness: int, fsirt: int, bin: int,
                 fullimage: []):
-    '''
+    """
     Make sure tilt.com file has the right parameters.
 
     AreTomo irritatingly puts the alignment file as LOCALFILE, remove this.
 
-    '''
-
+    """
     modify_value(ts.path.with_name('tilt.com'),
                  'IMAGEBINNED', str(bin))
     modify_value(ts.path.with_name('tilt.com'),

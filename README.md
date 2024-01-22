@@ -1,5 +1,5 @@
 # tomotools
-Scripts to make cryo-electron tomography a bit easier
+Scripts to make cryo-electron tomography a bit easier  
 
 ## Usage
 
@@ -29,48 +29,60 @@ tomotools [subcommand] --help
 - **deconv**: Python implementation of Dimitry Tegunov's _tom_deconv.m_ script.
 
 ### Subtomogram Averaging Preparation
-- **imod2relion**: Takes a list of imod directories or a file listing them and prepares everything for Relion4 import.
 - **imod2warp**: Takes a list of imod directories or a file listing them and prepares everything for Warp.
-- **aretomo2relion**: Takes a list of directories with AreTomo-aligned tiltseries or a file listing them and prepares everything for Relion4 import.
 - **aretomo2warp**: Takes a list of directories with AreTomo-aligned tiltseries or a file listing them and prepares everything for Warp.
 - **fit-ctf**: Run imod ctfplotter on a set of tiltseries and save results to their folder.
 - **merge-dboxes**: Very beta, merges Dynamo DBoxes.
 
-## Subtomogram Averaging Particle Operations
-- **project-particles**: Takes star-file with subtomograms, projects along Z and runs ```relion_preprocess``` on them. Writes out .star file for 2D classification in Relion.
-- **subset-selection**: Apply subset-selection on projected particles to the original particle .star.
-- **upgrade-star**: Upgrade Warp-generated .star file to those expected by Relion >= 3.1
-
 ### Other
 - **semnavigator**: Display SerialEM navigator files to find back you tomogram positions
 - **create-movie**: Create a movie from a series of image files.
-- **nff-to-amiramesh**
 - **update**: Automatically pulls the most recent version from GitHub and runs ```pip install --upgrade``` on it.
 
 ## Installation
-We suggest installing tomotools into its own conda / mamba environment. If you can only access your userspace, consider using [micromamba](https://mamba.readthedocs.io/en/latest/installation.html).
+We suggest installing tomotools into its own conda / mamba environment. 
+If you can only access your userspace, consider using [micromamba](https://mamba.readthedocs.io/en/latest/installation.html).
 
-### Install via:
+If you want to use the scripts interfacing with cryoCARE denoising, please install ```tomotools[cryocare]```. 
+
+### Full Install via:
 ```
 conda create -n tomotools python=3.8 cudatoolkit=11.0 cudnn=8.0 -c conda-forge
 conda activate tomotools
-pip install 'git+https://github.com/MoritzWM/tomotools.git'
+pip install "tomotools[cryocare] @ git+https://github.com/tomotools/tomotools.git"
 ```
+
+### Minimal Install via:
+```
+conda create -n tomotools python=3.8 -c conda-forge
+conda activate tomotools
+pip install "tomotools @ git+https://github.com/tomotools/tomotools.git"
+```
+### Confirm Installation:
+
 With tomotools installed into a conda environment, you can then start tomotools with:
 ```
 conda activate tomotools
 tomotools --help
 ```
+
 ### Notes on sbgrid:
 If you're using an sbgrid environment, make sure to set the following in your ```.sbgrid.conf``` file:
 
 ```
 PYTHON_X=3.8.8 (anything > 3.8 works)  
 ```
+
 Additionally, try ```pip --version``` to make sure it's correctly working. This is required for ```tomotools update```. Else, you can add the following line to your ```.bashrc```:
 
 ```
 alias pip='python -m pip'
+```
+
+Likely, you will also need to add your local Python path to ```.bashrc```:
+
+```
+export PATH="/YOURHOMEFOLDER/.local/bin:$PATH"
 ```
 
 ### Feedback, Bug Reports and Contributions are always welcome!

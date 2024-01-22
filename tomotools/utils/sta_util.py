@@ -1,28 +1,30 @@
 import os
 import shutil
 import subprocess
-import mrcfile
-import starfile
-
-import pandas as pd
-
-from os import path
 from glob import glob
+from os import path
 from pathlib import Path
-from typing import Optional
 
-from tomotools.utils import mdocfile, comfile, tiltseries
-from tomotools.utils.tiltseries import TiltSeries, aretomo_executable, parse_darkimgs
-from tomotools.utils.tiltseries import parse_ctfplotter, run_ctfplotter, write_ctfplotter
-from tomotools.utils.tiltseries import convert_input_to_TiltSeries
-from tomotools.utils.tomogram import Tomogram
+import mrcfile
+
+from tomotools.utils import mdocfile
+from tomotools.utils.tiltseries import (
+    TiltSeries,
+    aretomo_executable,
+    convert_input_to_TiltSeries,
+    parse_ctfplotter,
+    parse_darkimgs,
+    run_ctfplotter,
+    write_ctfplotter,
+)
 
 
 def aretomo_export(ts: TiltSeries):
+    """Export AreTomo alignments to xf using -OutImod 2."""
     mdoc = mdocfile.read(ts.mdoc)
 
     angpix = ts.angpix
-    
+
     with mrcfile.mmap(ts.path) as mrc:
         labels = mrc.get_labels()
 
@@ -32,26 +34,27 @@ def aretomo_export(ts: TiltSeries):
 
     imod_dir = path.join(ts.path.parent, (ali_stack.stem + "_Imod"))
 
-    if path.isdir(imod_dir) and path.isfile(path.join(imod_dir, (ali_stack.stem + ".st"))):
+    if path.isdir(imod_dir) and path.isfile(path.join(imod_dir,
+                                                      (ali_stack.stem + ".st"))):
         print(f'Previous AreTomo export found for {ts.path.name}. Re-using.')
-        
+
         ali_stack_imod = TiltSeries(
             Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
-        
+
         with mrcfile.mmap(ali_stack_imod.path, mode='r+') as mrc:
                 mrc.voxel_size = str(angpix)
-                
+
                 # Check whether labels were already added
                 if len(mrc.get_labels()) == 0:
                     for label in labels:
                         mrc.add_label(label)
-                mrc.update_header_stats()        
-        
+                mrc.update_header_stats()
+
         return ali_stack_imod
 
     if not path.isfile(aln_file):
         raise FileNotFoundError(
-            f'{ts.path}: No previous alignment was found at {aln_file}. You need to first run alignments using tomotools reconstruct.')
+            f'{ts.path}: No previous alignment was found at {aln_file}.')
 
     subprocess.run([aretomo_executable(),
                     '-InMrc', ts.path,
@@ -80,39 +83,44 @@ def aretomo_export(ts: TiltSeries):
     exclude = parse_darkimgs(ts)
 
     mdoc_cleaned = mdoc
-    mdoc_cleaned['sections'] = [ele for idx, ele in enumerate(
-        mdoc['sections']) if idx not in exclude]
+
+    mdoc_cleaned['sections'] = [ele for idx, ele in enumerate(mdoc['sections'])
+                                if idx not in exclude]
+
     mdocfile.write(mdoc_cleaned, ali_stack_imod.mdoc)
 
     return ali_stack_imod
 
 
 def make_warp_dir(ts: TiltSeries, project_dir):
-
+    """Export tiltseries to Warp."""
     required_files = [ts.path,
                       ts.mdoc,
                       ts.path.with_suffix(".xf")]
 
     # Check that all files are present
-    if all([path.isfile(req) for req in required_files]) and any([path.isfile(ts.path.with_suffix(".rawtlt")), path.isfile(ts.path.with_suffix(".tlt"))]):
+    if (all(path.isfile(req) for req in required_files) and
+        any([path.isfile(ts.path.with_suffix(".rawtlt")),
+             path.isfile(ts.path.with_suffix(".tlt"))])
+        ):
         print("All required alignment files found.")
 
     else:
-        raise FileNotFoundError(
-            f"Not all alignment files found for {ts.path.name}.")
+        raise FileNotFoundError(f"Not all alignment files found for {ts.path.name}.")
 
-    # Create imod subdirectory and copy alignment files (to protect against later modification)
-    ts_dir = path.join(project_dir, "imod", ts.path.stem)
+    # Create imod subdirectory
+    # copy alignment files (to protect against later modification)
+    ts_dir = path.join(project_dir,"imod",ts.path.stem)
     os.mkdir(ts_dir)
 
-    [shutil.copy(file, ts_dir) for file in required_files[2:6]]
+    [shutil.copy(file,ts_dir) for file in required_files[2:6]]
 
     # tilt images go to warp root directory
-    subprocess.run(['newstack', '-quiet',
-                   '-split', '0',
-                    '-append', 'mrc',
-                    '-in', ts.path,
-                    path.join(project_dir, (ts.path.stem+"_sec_"))])
+    subprocess.run(['newstack','-quiet',
+                   '-split','0',
+                   '-append','mrc',
+                   '-in',ts.path,
+                   path.join(project_dir,(ts.path.stem+"_sec_"))])
 
     # Create mdoc with SubFramePath and save it to the mdoc subdirectory
     mdoc = mdocfile.read(ts.mdoc)
@@ -122,7 +130,7 @@ def make_warp_dir(ts: TiltSeries, project_dir):
     # Check that mdoc has as many sections as there are tilt images
     if not len(mdoc['sections']) == len(subframelist):
         raise FileNotFoundError(
-            f"There are {len(mdoc['sections'])} mdoc entries but {len(subframelist)} exported frames.")
+            "Error: Mismatch between mdoc entries and frames!")
 
     for i in range(0, len(mdoc['sections'])):
         mdoc['sections'][i]['SubFramePath'] = 'X:\\WarpDir\\' + \
@@ -132,16 +140,18 @@ def make_warp_dir(ts: TiltSeries, project_dir):
 
     mdocfile.write(mdoc, path.join(project_dir, "mdoc", ts.path.stem+".mdoc"))
 
+    return
+
 
 def batch_parser(input_files: [], batch: bool):
-
+    """Batch-parse tiltseries to work on from textfile."""
     input_files_parsed = []
-    
+
     # Check whether you already received a correctly formatted list of TiltSeries
-    if type(input_files[0]) == TiltSeries:
+    if isinstance(input_files[0], TiltSeries):
         return input_files
-    
-    if type(input_files[0]) == list:
+
+    if isinstance(input_files[0], list):
         return input_files[0]
 
     # Parse input files
@@ -161,20 +171,20 @@ def batch_parser(input_files: [], batch: bool):
 
 
 def ctfplotter_aretomo_export(ts: TiltSeries):
-    
+    """Exclude AreTomo Excludeview from ctfplotter file."""
     exclude = parse_darkimgs(ts)
-    
+
     # If required run ctfplotter or just return results of previous run.
     # Perform on original TiltSeries to avoid interpolation artefacts.
     ctffile = parse_ctfplotter(run_ctfplotter(ts, False))
-    
+
     # ctfplotter is 1-indexed, excludeviews are 0-indexed
     ctffile_cleaned = ctffile[~ctffile.view_start.isin(
         [str(ele+1) for ele in exclude])]
-    
+
     # Write to AreTomo export folder
-    ctf_out = write_ctfplotter(ctffile_cleaned, 
-                               ts.path.parent / f'{ts.path.stem}_ali_Imod' / 
+    ctf_out = write_ctfplotter(ctffile_cleaned,
+                               ts.path.parent / f'{ts.path.stem}_ali_Imod' /
                                f'{ts.path.stem}_ali.defocus')
 
-
+    return ctf_out

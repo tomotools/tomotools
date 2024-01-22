@@ -1,3 +1,5 @@
+"""Wrapper for tomotools."""
+
 import click
 
 from .commands import commands
@@ -5,7 +7,8 @@ from .commands import commands
 
 @click.group()
 def tomotools():
-    click.echo('Tomotools version 0.2.7 \n')
+    """Scripts for cryo-ET data processing."""
+    click.echo("Tomotools version 0.3.1 \n")
 
 
 for command in commands:
