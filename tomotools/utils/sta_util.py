@@ -6,8 +6,10 @@ from os import path
 from pathlib import Path
 
 import mrcfile
+import pandas as pd
+import starfile
 
-from tomotools.utils import mdocfile
+from tomotools.utils import comfile, mdocfile, tiltseries
 from tomotools.utils.tiltseries import (
     TiltSeries,
     aretomo_executable,
@@ -17,6 +19,7 @@ from tomotools.utils.tiltseries import (
     run_ctfplotter,
     write_ctfplotter,
 )
+from tomotools.utils.tomogram import Tomogram
 
 
 def aretomo_export(ts: TiltSeries):
@@ -190,3 +193,143 @@ def ctfplotter_aretomo_export(ts: TiltSeries):
                                f'{ts.path.stem}_ali.defocus')
 
     return ctf_out
+
+
+def tomo2stopgap(ts: TiltSeries, bin: int, thickness: int):
+    """Prepare tomogram for STOPGAP.
+
+    Align, dose-filter, reconstruct with ctf3d.
+    Build wedge list.
+    """
+    # Re-align + bin
+    ts_ali = tiltseries.align_with_imod(ts, True, False, binning=bin)
+
+    # Perform dose filtration
+    ts_ali_filt = tiltseries.dose_filter(ts_ali, False)
+    ts_ali.delete_files(False)
+
+    # Check that ctfplotter is there + create file
+    if ts.defocus_file() is None:
+        print(f'Defocus file not found for {ts.path.name}. Running ctfplotter now.')
+        run_ctfplotter(ts, True)
+
+    comfile.fake_ctfcom(ts_ali_filt, 1)
+
+    # Create wedge list
+    # First, build database with global info:
+    dim_x, dim_y = tiltseries.binned_size(ts, 1)
+
+    # Then, go over tilts and add: tilt angle, defocus mean (in um), exposure
+    tilts = []
+
+    with open(ts.path.with_suffix(".tlt")) as file:
+        for line in file:
+            if line.startswith('\n'):
+                continue
+            else:
+                tilts.append(float(line.strip()))
+
+    ctf_file = parse_ctfplotter(ts.defocus_file())
+    mdoc = mdocfile.insert_prior_dose(mdocfile.read(ts.mdoc))
+
+    # Angpix, XY from header (so other tools can handle the correct rotation)
+    # Z as thickness
+    # z-shift left at 0
+    # pshift left at 0
+    # voltage, cs: 300kV, 2.7 mm
+    # amplitude contrast 0.07 as in run_ctfplotter
+
+    df_temp_tomo = pd.DataFrame(data={'pixelsize': f"{ts.angpix:.3f}",
+                                 'tomo_x': dim_x,
+                                 'tomo_y': dim_y,
+                                 'tomo_z': thickness,
+                                 'z_shift': 0,
+                                 'pshift': 0,
+                                 'voltage': 300,
+                                 'cs': 2.7,
+                                 'amp_contrast': 0.07,
+                                 'tilt_angle': tilts,
+                                 'defocus': 0,
+                                 'exposure': 0},dtype = str)
+
+    for i in range(len(tilts)):
+
+        df_temp_tomo.iat[i,10] = f"{(float(ctf_file.iloc[i].df_1_nm) + float(ctf_file.iloc[i].df_2_nm)) / 2000:.2f}" #noqa:E501
+        df_temp_tomo.iat[i,11] = "{:.1f}".format(mdoc['sections'][i]['ExposureDose'] + mdoc['sections'][i]['PriorRecordDose']) #noqa:E501
+
+    return ts_ali_filt, df_temp_tomo
+
+
+def list2stopgap(bin, thickness, ts_list: [], stopgap_dir):
+    """Take list of tiltseries, prepare STOPGAP project."""
+    # Create target folder
+    stopgap_dir = Path(stopgap_dir)
+    target_dir = stopgap_dir / f"tomos_bin{bin}"
+
+    # If folder does not exist, initialise
+    if not path.isdir(stopgap_dir / f"tomos_bin{bin}"):
+
+        os.mkdir(target_dir)
+
+        wedgelist = pd.DataFrame()
+
+        tomo_num = 1
+
+        subprocess.run(['touch',
+                        target_dir / "tomo_dict.txt"])
+
+    else:
+        # read previous wedgelist
+        wedgelist = starfile.read(target_dir / "wedgelist.star")
+        # set tomo index to avoid clashed
+        tomo_num = max(wedgelist['tomo_num']) + 1
+
+    # First, check that all required files are there
+
+    rec_todo = {}
+    tomo_dict = {}
+
+    print(f'Exporting {len(ts_list)} tomograms to STOPGAP. \n')
+
+    for ts in ts_list:
+
+        print(f'\nWorking on {ts.path.name}, tomo_num {tomo_num}.')
+
+        # Save index assignment for later
+        tomo_dict[tomo_num] = str(ts.path.absolute())
+
+        # Get stack for reconstruction and wedge list
+        final_stack, wedgelist_temp = tomo2stopgap(ts, bin, thickness)
+
+        rec_todo[tomo_num] = final_stack
+        wedgelist_temp['tomo_num'] = tomo_num
+
+        wedgelist = pd.concat([wedgelist, wedgelist_temp])
+
+        tomo_num += 1
+
+    print('\n')
+    print('STOPGAP files have been prepared. Now starting reconstruction. \n')
+
+    # Write wedgelist and dictionary to map tomogram identity
+    starfile.write({'stopgap_wedgelist': wedgelist},
+                   target_dir / "wedgelist.star", overwrite=True)
+
+    with open(target_dir / "tomo_dict.txt", 'a') as file:
+        for tomo_num in tomo_dict:
+            file.write(f'{tomo_num} {tomo_dict[tomo_num]}\n')
+
+    # Get full dimensions of unbinned stack for reconstruction
+    # Right now, assumption is that all tomograms have the same xy dimensions.
+    dim_x = wedgelist['tomo_x'].values[0]
+    dim_y = wedgelist['tomo_y'].values[0]
+
+    for tomo_num in rec_todo:
+
+        rec = Tomogram.from_tiltseries_3dctf(
+            rec_todo[tomo_num], binning=bin, thickness=thickness,
+            z_slices_nm=25, fullimage=[dim_x,dim_y])
+
+        os.symlink(rec.path.absolute(), target_dir / f'{tomo_num}.rec')
+
+        print('\n')

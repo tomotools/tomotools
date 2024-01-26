@@ -136,3 +136,60 @@ def aretomo2warp(batch_input, name, input_files, project_dir):
 
         print(f"Warp files prepared for {ts.path.name}. \n")
 
+
+@click.command()
+@click.option('-b', '--batch', is_flag=True, default=False, show_default=True,
+              help="Read input files as text, each line is a tiltseries (folder)")
+@click.option('--bin', default=4, show_default=True, help="Binning of reconstruction.")
+@click.option('-d', '--thickness', default=3000, show_default=True,
+              help="Thickness for reconstruction in unbinned pixels.")
+@click.argument('input_files', nargs=-1)
+@click.argument('stopgap_dir', nargs=1)
+def imod2stopgap(batch, bin, thickness, input_files, stopgap_dir):
+    """Export imod-aligned tomograms for STOPGAP averaging.
+
+    Input either a textfile listing tomogram names (with flag -b/--batch) or
+    each tomogram (folder) separately.
+    Provide desired binning and thickness (in ubpx).
+
+    Provide the STOPGAP project directory. Will create "tomos_binX" subfolder.
+    """
+    # Get input files
+    ts_list = sta_util.batch_parser(input_files, batch)
+
+    sta_util.list2stopgap(bin, thickness, ts_list, stopgap_dir)
+
+
+@click.command()
+@click.option('-b', '--batch', is_flag=True, default=False, show_default=True,
+              help="Input is a file with a tiltseries on each line.")
+@click.option('--bin', default=4, show_default=True,
+              help="Binning for reconstruction.")
+@click.option('-d', '--thickness', default=3000, show_default=True,
+              help="Thickness for reconstruction.")
+@click.argument('input_files', nargs=-1)
+@click.argument('stopgap_dir', nargs=1)
+def aretomo2stopgap(batch, bin, thickness, input_files, stopgap_dir):
+    """Export AreTomo-aligned tomograms for STOPGAP averaging.
+
+    Input either a textfile listing tomogram names (with flag -b/--batch) or
+    each tomogram (folder) separately.
+    Provide desired binning and thickness (in ubpx).
+
+    Provide the STOPGAP project directory. Will create "tomos_binX" subfolder.
+    """
+    # Get input files
+    ts_list = sta_util.batch_parser(input_files, batch)
+
+    # Process aretomo -> imod
+    print(f'Found {len(ts_list)} TiltSeries to work on. \n')
+
+    ts_imodlike = []
+
+    for ts in ts_list:
+        print(f"Now working on {ts.path.name}")
+        ts_imodlike.append(sta_util.aretomo_export(ts))
+        sta_util.ctfplotter_aretomo_export(ts)
+
+    # Process as normal imod-aligned TS
+    sta_util.list2stopgap(bin, thickness, ts_imodlike, stopgap_dir)

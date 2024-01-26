@@ -22,6 +22,7 @@ dependencies = [
     "emfile",
     "dynamotable",
     "matplotlib",
+    "starfile"
 ]
 
 [tool.setuptools]
