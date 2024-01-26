@@ -16,14 +16,15 @@ def fit_ctf(input_files):
     """Performs interactive CTF-Fitting.
 
     Takes tiltseries or folders containing them as input.
-    Runs imod ctfplotter interactively. Defaults to overwriting previous results.
+    Runs imod ctfplotter interactively.
+    Defaults to overwriting previous results. Saves results to folder.
 
-    Saves results to folder.
     """
     tiltseries = convert_input_to_TiltSeries(input_files)
 
     for ts in tiltseries:
         run_ctfplotter(ts, True)
+
 
 @click.command()
 @click.option('-b', '--batch-input', is_flag=True, default=False, show_default=True,
@@ -62,29 +63,19 @@ def imod2warp(batch_input, name, input_files, project_dir):
 
     else:
         os.mkdir(out_dir)
-        os.mkdir(path.join(out_dir,'imod'))
-        os.mkdir(path.join(out_dir,'mdoc'))
+        os.mkdir(path.join(out_dir, 'imod'))
+        os.mkdir(path.join(out_dir, 'mdoc'))
         print(f"Created Warp folder at {out_dir}.")
 
     # Parse input files
-    if batch_input:
-        input_files_parsed = []
-        with open(input_files[0], "r+") as f:
-            for line in f:
-                input_files_parsed.append(line.strip("\n"))
-
-    else:
-        input_files_parsed = input_files
-
-    # Convert to list of tiltseries
-    ts_list = convert_input_to_TiltSeries(input_files_parsed)
+    ts_list = sta_util.batch_parser(input_files, batch_input)
 
     print(f'Found {len(ts_list)} TiltSeries to work on. \n')
 
     for ts in ts_list:
         print(f"Now working on {ts.path.name}")
 
-        sta_util.make_warp_dir(ts, out_dir)
+        sta_util.make_warp_dir(ts, out_dir, imod = True)
 
         print(f"Warp files prepared for {ts.path.name}. \n")
 
@@ -126,22 +117,11 @@ def aretomo2warp(batch_input, name, input_files, project_dir):
 
     else:
         os.mkdir(out_dir)
-        os.mkdir(path.join(out_dir,'imod'))
-        os.mkdir(path.join(out_dir,'mdoc'))
+        os.mkdir(path.join(out_dir, 'imod'))
+        os.mkdir(path.join(out_dir, 'mdoc'))
         print(f"Created Warp folder at {out_dir}.")
 
-    # Parse input files
-    if batch_input:
-        input_files_parsed = []
-        with open(input_files[0], "r+") as f:
-            for line in f:
-                input_files_parsed.append(line.strip("\n"))
-
-    else:
-        input_files_parsed = input_files
-
-    # Convert to list of tiltseries
-    ts_list = convert_input_to_TiltSeries(input_files_parsed)
+    ts_list = sta_util.batch_parser(input_files, batch_input)
 
     print(f'Found {len(ts_list)} TiltSeries to work on. \n')
 

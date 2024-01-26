@@ -7,6 +7,7 @@ from typing import Optional
 
 import mrcfile
 
+from tomotools.utils import comfile
 from tomotools.utils.tiltseries import TiltSeries
 
 
@@ -71,10 +72,7 @@ class Tomogram:
             ali_stack_evn = tiltseries.evn_path
             ali_stack_odd = tiltseries.odd_path
 
-        # Get stack dimensions to define size of the output tomogram.
-        with mrcfile.mmap(tiltseries.path, mode="r") as mrc:
-            pix_xy = float(mrc.voxel_size.x)
-            stack_dimensions = mrc.data.shape
+        pix_xy = tiltseries.angpix
 
         if thickness is None:
             # Define default thickness as function of pixel size
@@ -82,66 +80,45 @@ class Tomogram:
             thickness = str(round(6000 / pix_xy))
 
         # Get dimensions of aligned stack - assumption is that tilt is around the y axis
-        [full_reconstruction_y, full_reconstruction_x] = stack_dimensions[1:3]
+        [full_reconstruction_y,full_reconstruction_x] = tiltseries.dimZYX[1:3]
 
         # Bring stack to desired binning level
         if bin != 1:
             binned_stack = tiltseries.path.with_name(
-                f"{tiltseries.path.stem}_bin_{bin}.mrc"
-            )
-            subprocess.run(
-                [
-                    "binvol",
-                    "-x",
-                    str(bin),
-                    "-y",
-                    str(bin),
-                    "-z",
-                    "1",
-                    tiltseries.path,
-                    binned_stack,
-                ],
-                stdout=subprocess.DEVNULL,
-            )
+                f'{tiltseries.path.stem}_bin_{bin}.mrc')
+
+            subprocess.run(['newstack',
+                            '-in', tiltseries.path,
+                            '-bin', str(bin),
+                            '-antialias', '-1',
+                            '-ou', binned_stack,
+                            '-quiet'],
+                           stdout=subprocess.DEVNULL)
+
             ali_stack = binned_stack
             print(f"{tiltseries.path}: Binned to {bin}.")
 
             if do_EVN_ODD and tiltseries.is_split:
                 binned_stack_evn = tiltseries.evn_path.with_name(
-                    f"{tiltseries.path.stem}_bin_{bin}_EVN.mrc"
-                )
+                    f'{tiltseries.path.stem}_bin_{bin}_EVN.mrc')
                 binned_stack_odd = tiltseries.odd_path.with_name(
-                    f"{tiltseries.path.stem}_bin_{bin}_ODD.mrc"
-                )
+                    f'{tiltseries.path.stem}_bin_{bin}_ODD.mrc')
 
-                subprocess.run(
-                    [
-                        "binvol",
-                        "-x",
-                        str(bin),
-                        "-y",
-                        str(bin),
-                        "-z",
-                        "1",
-                        tiltseries.evn_path,
-                        binned_stack_evn,
-                    ],
-                    stdout=subprocess.DEVNULL,
-                )
-                subprocess.run(
-                    [
-                        "binvol",
-                        "-x",
-                        str(bin),
-                        "-y",
-                        str(bin),
-                        "-z",
-                        "1",
-                        tiltseries.odd_path,
-                        binned_stack_odd,
-                    ],
-                    stdout=subprocess.DEVNULL,
-                )
+                subprocess.run(['newstack',
+                                '-in', tiltseries.evn_path,
+                                '-bin', str(bin),
+                                '-antialias', '-1',
+                                '-ou', binned_stack_evn,
+                                '-quiet'],
+                               stdout=subprocess.DEVNULL)
+
+                subprocess.run(['newstack',
+                                '-in', tiltseries.odd_path,
+                                '-bin', str(bin),
+                                '-antialias', '-1',
+                                '-ou', binned_stack_odd,
+                                '-quiet'],
+                               stdout=subprocess.DEVNULL)
 
                 ali_stack_evn = binned_stack_evn
                 ali_stack_odd = binned_stack_odd
@@ -294,6 +271,70 @@ class Tomogram:
             return Tomogram(final_rec)
 
         return Tomogram(full_rec)
+
+    @staticmethod
+    def from_tiltseries_3dctf(tiltseries: TiltSeries, binning=1,
+                              thickness=3000, z_slices_nm=25,
+                              fullimage: [] = None) -> 'Tomogram':
+        """
+        Calculate Tomogram with imod ctf3d.
+
+        As ctf3d requires tilt.com and ctfcorrection.com, provide imod-aligned
+        stack as input (either from etomo or AreTomo + export).
+        Stack is assumed to be at the desired binning level and dose-filtered.
+
+        This is only useful for STA, so the following options are unavailable:
+        - fSIRT
+        - EVN/ODD
+        - x_axis_tilt
+        - convert_to_byte
+        """
+        if fullimage is None:
+            fullimage = [1000, 1000]
+
+        # Check necessary files are there
+        if not path.isfile(tiltseries.path.with_name("ctfcorrection.com")):
+            raise FileNotFoundError("ctfcorrection.com not found.")
+
+        if not path.isfile(tiltseries.path.with_name("tilt.com")):
+            raise FileNotFoundError("tilt.com not found")
+
+        # Fix tilt.com
+        comfile.fix_tiltcom(tiltseries, thickness, 0, binning, fullimage)
+
+        print(f'Fixed tilt.com file for {tiltseries.path.parent.name}.')
+
+        # Set up files
+        subprocess.run(['ctf3dsetup',
+                        '-th', str(z_slices_nm),
+                        '-pa','tilt'], cwd = tiltseries.path.parent)
+
+        print(f'Reconstructing {tiltseries.path.parent.name} with ctf3d.')
+
+        # Perform actual reconstruction
+        subprocess.run(['processchunks',
+                        'localhost',
+                        'ctf3d'], cwd = tiltseries.path.parent,
+                       stdout = subprocess.DEVNULL)
+
+        print(f'Reconstruction of {tiltseries.path.parent.name} done.')
+
+        # Clean up
+        tiltseries.delete_files(False)
+
+        # Rotate tomogram to default
+        subprocess.run(['clip','rotx',
+                        tiltseries.path.parent /
+                        f'{tiltseries.path.stem}_3dctf_rec.mrc',
+                        tiltseries.path.parent /
+                        f'{tiltseries.mdoc.with_suffix("").stem}_3dctf_rec_rot.mrc'])
+        print(f'Rotation of {tiltseries.path.parent.name} done.')
+
+        os.remove(tiltseries.path.parent /
+                  f'{tiltseries.path.stem}_3dctf_rec.mrc')
+
+        return Tomogram(tiltseries.path.parent /
+                        f'{tiltseries.mdoc.with_suffix("").stem}_3dctf_rec_rot.mrc')
 
 
 def find_Tomogram_halves(tomo: Tomogram, split_dir: Optional[Path] = None):

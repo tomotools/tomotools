@@ -7,7 +7,6 @@ from os.path import abspath, basename, join
 from pathlib import Path
 
 import click
-import mrcfile
 
 from tomotools.utils import mdocfile
 from tomotools.utils.micrograph import Micrograph, sem2mc2
@@ -328,12 +327,19 @@ def batch_prepare_tiltseries(
     show_default=True,
     help="Local or global alignments (local takes significantly longer)",
 )
+@click.option('-d','--thickness', default=None, show_default=True,
+              help="Total thickness in unbinned pixels")
 @click.option(
     "--extra-thickness",
     default=0,
     show_default=True,
     help="Extra thickness in unbinned pixels",
 )
+@click.option(
+    "--ali-d",
+    default = 250,
+    show_default = True,
+    help="Sample thickness passed to AreTomo for optimal alignment, in nm.")
 @click.option(
     "-b", "--bin", default=1, show_default=True, help="Final reconstruction binning"
 )
@@ -373,6 +379,13 @@ def batch_prepare_tiltseries(
     help="Reconstruct ENV/ODD stacks also.",
 )
 @click.option(
+    "--bytes/--nobytes",
+    is_flag=True,
+    default=True,
+    show_default=True,
+    help="Convert tomogram to bytes after rotation?",
+)
+@click.option(
     "--batch-file",
     type=click.Path(exists=True, dir_okay=False),
     help="Pass a tab-separated file with tilt series names and views to exclude.",
@@ -381,15 +394,18 @@ def batch_prepare_tiltseries(
 # TODO: Fix complexity error C901
 def reconstruct(
     move,
+    thickness,
     local,
     aretomo,
     extra_thickness,
     bin,
+    ali_d,
     sirt,
     skip_positioning,
     previous,
     gpu,
     do_evn_odd,
+    bytes,
     batch_file,
     input_files,
 ):
@@ -482,20 +498,20 @@ def reconstruct(
             tiltseries_ali = align_with_imod(tiltseries, previous, do_evn_odd)
         else:
             tiltseries_ali = align_with_areTomo(
-                tiltseries, local, previous, do_evn_odd, gpu
+                tiltseries, local, previous, do_evn_odd, gpu, volz=ali_d
             )
 
         # Do dose filtration.
         tiltseries_dosefiltered = dose_filter(tiltseries_ali, do_evn_odd)
 
         # Get AngPix
-        with mrcfile.mmap(tiltseries.path, mode="r") as mrc:
-            pix_xy = float(mrc.voxel_size.x)
+        pix_xy = tiltseries.angpix
 
         # Define x_axis_tilt and thickness
         x_axis_tilt: float = 0
         z_shift: float = 0
-        thickness: int = round(6000 / pix_xy) + extra_thickness
+        if thickness is None:
+            thickness: int = round(6000 / pix_xy) + extra_thickness
 
         if not skip_positioning:
             print(f"Trying to run automatic positioning on {tiltseries.path.name}.")
@@ -554,7 +570,8 @@ def reconstruct(
                                  x_axis_tilt=x_axis_tilt,
                                  z_shift=z_shift,
                                  sirt=sirt,
-                                 do_EVN_ODD=do_evn_odd)
+                                 do_EVN_ODD=do_evn_odd,
+                                 convert_to_byte=bytes)
 
         tiltseries_ali.delete_files(delete_mdoc=False)
 
