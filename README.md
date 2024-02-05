@@ -40,7 +40,7 @@ tomotools [subcommand] --help
 - **update**: Automatically pulls the most recent version from GitHub and runs ```pip install --upgrade``` on it.
 
 ## Dependencies
-tomotools depends on commands from motioncor2, imod, and aretomo for full functionality.
+tomotools depends on commands from MotionCor2, IMOD, and AreTomo for full functionality.
 
 ## Installation
 We suggest installing tomotools into its own conda / mamba environment. 
