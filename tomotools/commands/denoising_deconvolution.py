@@ -200,9 +200,6 @@ def cryocare_extract(
         if tomo.is_split:
             input_evn.append(tomo.evn_path)
             input_odd.append(tomo.odd_path)
-            #print(f"Found reconstruction {tomo.path} with EVN and ODD stacks.")
-        #else:
-            #print(f"No EVN/ODD reconstructions found for {tomo.path}. Skipping.")
 
     print(f"Will extract from {len(input_evn)} tomograms. \n")
 
@@ -375,9 +372,6 @@ def cryocare_predict(tiles, gpu, model_path, input_files, output):
         if tomo.is_split:
             input_evn.append(tomo.evn_path)
             input_odd.append(tomo.odd_path)
-            print(f"Found reconstruction {tomo.path} with EVN and ODD stacks.")
-        else:
-            print(f"No EVN/ODD reconstructions found for {tomo.path}. Skipping.")
 
     # Create output directory
     if not path.isdir(output):
