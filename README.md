@@ -39,6 +39,9 @@ tomotools [subcommand] --help
 - **create-movie**: Create a movie from a series of image files.
 - **update**: Automatically pulls the most recent version from GitHub and runs ```pip install --upgrade``` on it.
 
+## Dependencies
+tomotools depends on commands from motioncor2, imod, and aretomo for full functionality.
+
 ## Installation
 We suggest installing tomotools into its own conda / mamba environment. 
 If you can only access your userspace, consider using [micromamba](https://mamba.readthedocs.io/en/latest/installation.html).
