@@ -368,8 +368,8 @@ def batch_prepare_tiltseries(
 )
 @click.option('--skip-positioning',
               is_flag=True,
-              default = True,
-              show_default = True,
+              default=False,
+              show_default=True,
               help='Skip tomogram positioning. Useful for STA.')
 @click.option(
     "--do-evn-odd",
