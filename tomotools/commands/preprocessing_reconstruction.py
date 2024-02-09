@@ -366,10 +366,10 @@ def batch_prepare_tiltseries(
     default=None,
     help="Specify which GPUs to use for AreTomo. [default: all]",
 )
-@click.option('--skip-positioning',
+@click.option('--do-positioning/--skip-positioning',
               is_flag=True,
-              default = True,
-              show_default = True,
+              default=False,
+              show_default=True,
               help='Skip tomogram positioning. Useful for STA.')
 @click.option(
     "--do-evn-odd",
@@ -401,7 +401,7 @@ def reconstruct(
     bin,
     ali_d,
     sirt,
-    skip_positioning,
+    do_positioning,
     previous,
     gpu,
     do_evn_odd,
@@ -513,7 +513,7 @@ def reconstruct(
         if thickness is None:
             thickness: int = round(6000 / pix_xy) + extra_thickness
 
-        if not skip_positioning:
+        if do_positioning:
             print(f"Trying to run automatic positioning on {tiltseries.path.name}.")
             # Perform reconstruction at bin 8 to find pitch / thickness
             tomo_pitch = Tomogram.from_tiltseries(tiltseries_dosefiltered,
