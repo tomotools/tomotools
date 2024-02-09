@@ -15,7 +15,7 @@ def update(branch):
             "pip",
             "install",
             "--upgrade",
-            f"git+https://github.com/tomotools/tomotools.git@origin/{branch}",
+            f"git+https://github.com/tomotools/tomotools.git@{branch}",
         ]
     )
     print("Update completed!")
