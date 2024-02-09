@@ -305,11 +305,11 @@ def align_with_areTomo(
     # AreTomo somehow is inconsistent in naming .aln files
     if ts.path.suffix == '.st' and path.isfile(f"{ts.path}.aln"):
         os.rename(f"{ts.path}.aln", aln_file)
-    
+
     # Keep compatibility with AreTomo < 1.3, which output the file
     if not path.isfile(ali_stack.with_suffix('.tlt')):
         aln_to_tlt(aln_file)
-        
+
     if do_evn_odd and ts.is_split:
         ali_stack_evn = ts.evn_path.with_name(f"{ts.path.stem}_ali_EVN.mrc")
         ali_stack_odd = ts.odd_path.with_name(f"{ts.path.stem}_ali_ODD.mrc")
