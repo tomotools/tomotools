@@ -149,7 +149,7 @@ def aretomo2warp(batch_input, name, input_files, project_dir):
               help="Unique identifier to tell apart tomograms from several sessions.")
 @click.argument('input_files', nargs=-1)
 @click.argument('tomotwin_dir', nargs=1)
-def imod2tomotwin(batch, thickness, uid, input_files, tomotwin_dir):
+def imod2tomotwin(batch_input, thickness, uid, input_files, tomotwin_dir):
     """Prepare for TomoTwin picking.
 
     Takes as input several tiltseries (folders) or a file listing them (with -b),
@@ -162,7 +162,7 @@ def imod2tomotwin(batch, thickness, uid, input_files, tomotwin_dir):
     Provide the unbinned thickness, and a unique identifier for this session.
     UID will be put in from of name, e.g. 230105_TS_01.mrc.
     """
-    ts_list = sta_util.batch_parser(input_files, batch)
+    ts_list = sta_util.batch_parser(input_files, batch_input)
 
     tomotwin_dir = Path(tomotwin_dir)
     tomo_dir = tomotwin_dir / "tomo"
@@ -194,7 +194,7 @@ def imod2tomotwin(batch, thickness, uid, input_files, tomotwin_dir):
               help="Unique identifier to tell apart tomograms from several sessions.")
 @click.argument('input_files', nargs=-1)
 @click.argument('tomotwin_dir', nargs=1)
-def aretomo2tomotwin(batch, thickness, uid, input_files, tomotwin_dir):
+def aretomo2tomotwin(batch_input, thickness, uid, input_files, tomotwin_dir):
     """Prepare for TomoTwin picking.
 
     Takes as input several tiltseries (folders) or a file listing them (with -b),
@@ -208,7 +208,7 @@ def aretomo2tomotwin(batch, thickness, uid, input_files, tomotwin_dir):
     UID will be put in from of name, e.g. 230105_TS_01.mrc.
     """
     # Get input files
-    ts_list = sta_util.batch_parser(input_files, batch)
+    ts_list = sta_util.batch_parser(input_files, batch_input)
 
     # Process aretomo -> imod
     print(f'Found {len(ts_list)} TiltSeries to work on. \n')
