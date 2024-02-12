@@ -216,6 +216,6 @@ def tomotwin_prep(tomotwin_dir, ts_list, thickness, uid):
                                                 thickness=round(thickness/binning),
                                                 convert_to_byte=False)
 
-        unique_name = f'{uid}_{ts.path.parent.name}.mrc'
+        unique_name = f'{uid}_{ts.path.parent.absolute().name}.mrc'
 
         os.symlink(rec.path.absolute(), tomo_dir / unique_name)
