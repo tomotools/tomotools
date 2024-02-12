@@ -349,11 +349,11 @@ def batch_prepare_tiltseries(
     show_default=True,
     help="SIRT-like filter iterations"
 )
-@click.option('--aretomo/--imod',
+@click.option('--imod/--aretomo',
               is_flag=True,
-              default=True,
+              default=False,
               show_default=True,
-              help="Use AreTomo or imod for alignment.")
+              help="Use imod instead of AreTomo for alignment.")
 @click.option(
     "--previous",
     is_flag=True,
@@ -396,7 +396,7 @@ def reconstruct(
     move,
     thickness,
     local,
-    aretomo,
+    imod,
     extra_thickness,
     bin,
     ali_d,
@@ -456,7 +456,7 @@ def reconstruct(
 
         # If imod alignment is wanted and no previous tag is passed, stop here
         # imod batch alignment can handle the rest!
-        if not aretomo and not previous:
+        if imod and not previous:
             print(f'Moved {tiltseries.path.name} into subfolder. Continue in etomo. \n')
             continue
 
@@ -491,10 +491,10 @@ def reconstruct(
 
 
         # Align Stack
-        # If previous is passed and imod alignment file .xf is found, use imod.
+        # If previous is passed, respect --imod flag.
         # Otherwise, use AreTomo.
 
-        if previous and not aretomo and path.isfile(tiltseries.path.with_suffix('.xf')):
+        if previous and imod:
             tiltseries_ali = align_with_imod(tiltseries, previous, do_evn_odd)
         else:
             tiltseries_ali = align_with_areTomo(
