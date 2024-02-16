@@ -197,7 +197,10 @@ def reconstruct_3dctf(thickness, bin, input_files):
         # Link reconstruction back to main dir, in case AreTomo alignments are used
         if aretomo:
             os.symlink(rec.path.absolute(),
-                       ts_in.parent / f'{ts_in.path.name}_3dctf_bin{bin}.mrc')
+                       ts_in.path.parent / f'{ts_in.path.stem}_3dctf_bin{bin}.mrc')
+        else:
+            os.rename(rec.path.absolute(), 
+                      ts_in.path.parent / f'{ts_in.path.stem}_3dctf_bin{bin}.mrc')
 
         print('\n')
 
