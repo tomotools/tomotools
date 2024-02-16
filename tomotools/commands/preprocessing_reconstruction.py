@@ -169,47 +169,35 @@ def batch_prepare_tiltseries(
     The last argument is the output dir. It will be created if it doesn't exist.
     """
     # Convert all directories into a list of MRC/ST files
-    input_files_temp = []
-    for input_file in input_files:
-        input_file = Path(input_file)
-        if input_file.is_file():
-            input_files_temp.append(input_file)
-        elif input_file.is_dir():
-            input_files_temp += [Path(p) for p in glob(path.join(input_file, "*.mrc"))]
-            input_files_temp += [Path(p) for p in glob(path.join(input_file, "*.st"))]
-    input_files = input_files_temp
+    input_files = convert_input_to_TiltSeries(input_files)
 
     output_dir = Path(output_dir)
     if not output_dir.is_dir():
         output_dir.mkdir(parents=True)
 
     for input_file in input_files:
-        if input_file.suffix == ".mdoc":
-            mdoc = mdocfile.read(input_file)
-            input_file = input_file.with_suffix("")
-        else:
-            try:
-                mdoc = mdocfile.read(Path(str(input_file) + ".mdoc"))
-            except FileNotFoundError:
-                print(f'No MDOC file found for {input_file}. \n')
-                continue
+        try:
+            mdoc = mdocfile.read(input_file.mdoc)
+        except FileNotFoundError:
+             print(f'No MDOC file found for {input_file.path}. \n')
+             continue
         if mdoc.get('Montage', 0) == 1:
-            print(f'Skipping {input_file} because it is a montage. \n')
+            print(f'Skipping {input_file.path} because it is a montage. \n')
             continue
         # Identify batch / anchoring files, using two criteria:
         # 1. Fewer than three sections
         # 2. abs(tilt angle) < 1 for all sections -> feels a bit hacky, but works
         elif len(mdoc["sections"]) < 3:
-            print(f"{input_file} has fewer than three sections. Skipping.")
+            print(f"{input_file.path} has fewer than three sections. Skipping.")
             continue
         elif all(abs(section["TiltAngle"]) < 1 for section in mdoc["sections"]):
             print(
-                f"{input_file} is not a tilt series, all angles near 0. Skipping."
+                f"{input_file.path} is not a tilt series, all angles near 0. Skipping."
             )
             continue
 
         # File is a tilt-series.
-        print(f"\nWorking on {input_file}, which looks like a tilt series")
+        print(f"\nWorking on {input_file.path}, which looks like a tilt series")
 
         # Fix ExposureDose if required
         if exposuredose is not None:
@@ -221,14 +209,14 @@ def batch_prepare_tiltseries(
             and exposuredose is None
         ):
             print(
-                f"{input_file} has no ExposureDose set. This might lead to problems!"
+                f"{input_file.path} has no ExposureDose in mdoc."
             )
 
         # Are any SubFrames present?
         if any("SubFramePath" in section for section in mdoc["sections"]):
             for section in mdoc["sections"]:
                 subframes_root_path = (
-                    path.dirname(input_file) if frames is None else frames
+                    path.dirname(input_file.path) if frames is None else frames
                 )
                 section["SubFramePath"] = mdocfile.find_relative_path(
                     Path(subframes_root_path),
@@ -242,29 +230,36 @@ def batch_prepare_tiltseries(
                 ]
             except FileNotFoundError:
                 print(
-                    f"Movie frames not found for {input_file}, use --frames. Skipping."
+                    f"Movie frames not found for {input_file.path}, use --frames."
                 )
                 continue
 
         else:
             if reorder:
-                print(f'Running newstack -reorder on {input_file}. \n')
+                print(f'Running newstack -reorder on {input_file.path}. \n')
                 subprocess.run(['newstack',
                                 '-reorder', str(1),
                                 '-mdoc',
-                                '-in', input_file,
-                                '-ou', str(output_dir.joinpath(input_file.name))])
+                                '-in', input_file.path,
+                                '-ou', str(output_dir.joinpath(input_file.path.name))])
+                if exposuredose is not None:
+                    os.unlink(output_dir / f"{input_file.path.name}.mdoc")
+                    mdocfile.write(mdoc, output_dir / f"{input_file.path.name}.mdoc")
+
             else:
-                print(f'Just copying {input_file} to {output_dir}. \n')
+                print(f'Just copying {input_file.path} to {output_dir}. \n')
                 subprocess.run(['cp',
-                                input_file,
+                                input_file.path,
                                 output_dir])
-                subprocess.run(['cp',
-                                f'{input_file}.mdoc',
+                if exposuredose is not None:
+                    mdocfile.write(mdoc, output_dir / f"{input_file.path.name}.mdoc")
+                else:
+                    subprocess.run(['cp',
+                                f'{input_file.path.name}.mdoc',
                                 output_dir])
             continue
 
-        print(f'Subframes were found for {input_file}, will run MotionCor2 on them.')
+        print(f'Frames were found for {input_file.path}, will run align using MC2.')
 
         # Get rotation and flip of Gain reference from mdoc file property
         mcrot, mcflip = None, None
@@ -304,9 +299,10 @@ def batch_prepare_tiltseries(
         if stack:
             tilt_series = TiltSeries.from_micrographs(
                 micrographs,
-                output_dir / input_file.name,
+                output_dir / input_file.path.name,
                 orig_mdoc_path=mdoc["path"],
                 reorder=True,
+                overwrite_dose=exposuredose
             )
             shutil.rmtree(frames_corrected_dir)
             print(f'Successfully created {tilt_series.path}. \n')

@@ -134,6 +134,7 @@ class TiltSeries:
         orig_mdoc_path: Optional[Path] = None,
         reorder=False,
         overwrite_titles: Optional[List[str]] = None,
+        overwrite_dose: Optional[float] = None
     ) -> "TiltSeries":
         """Create TiltSeries from Micrographs, aka run newstack."""
         # TODO: Possibly remove overwrite_titles
@@ -163,12 +164,18 @@ class TiltSeries:
             if overwrite_titles is not None:
                 # Update titles and append frameset as new section
                 stack_mdoc["titles"] = overwrite_titles
+            if overwrite_dose is not None:
+                for section in stack_mdoc["sections"]:
+                    section["ExposureDose"] = overwrite_dose
 
         elif orig_mdoc_path is not None:
             stack_mdoc = mdocfile.read(orig_mdoc_path)
             if reorder:
                 stack_mdoc['sections'] = sorted(
                     stack_mdoc['sections'], key=itemgetter('TiltAngle'))
+            if overwrite_dose is not None:
+                for section in stack_mdoc["sections"]:
+                    section["ExposureDose"] = overwrite_dose
         else:
             raise FileNotFoundError(
                 'No original MDOC was provided and the movies don\'t have MDOCs.')
