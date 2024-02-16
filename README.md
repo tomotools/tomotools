@@ -33,6 +33,7 @@ tomotools [subcommand] --help
 - **aretomo2warp**: Takes a list of directories with AreTomo-aligned tiltseries or a file listing them and prepares everything for Warp.
 - **fit-ctf**: Run imod ctfplotter on a set of tiltseries and save results to their folder.
 - **merge-dboxes**: Very beta, merges Dynamo DBoxes.
+- **reconstruct-3dctf**: Perform reconstruction using imods `ctf3d` function.
 
 ### Other
 - **semnavigator**: Display SerialEM navigator files to find back you tomogram positions

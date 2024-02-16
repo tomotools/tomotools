@@ -3,7 +3,7 @@ from os import path
 
 import click
 
-from tomotools.utils import sta_util
+from tomotools.utils import comfile, sta_util, tiltseries, tomogram
 from tomotools.utils.tiltseries import (
     convert_input_to_TiltSeries,
     run_ctfplotter,
@@ -136,3 +136,70 @@ def aretomo2warp(batch_input, name, input_files, project_dir):
 
         print(f"Warp files prepared for {ts.path.name}. \n")
 
+
+@click.command()
+@click.option('--thickness', default = 3000, show_default = True,
+              help="Total thickness in unbinned pixels.")
+@click.option('--bin', default = 1, show_default = True,
+              help="Desired binning level.")
+@click.argument("input_files", nargs=-1, type=click.Path(exists=True))
+def reconstruct_3dctf(thickness, bin, input_files):
+    """Reconstruct tomograms using imod's ctf3d command.
+
+    Assumes that tiltseries have previously been aligned using tomotools reconstruct.
+
+    Prefers imod to aretomo alignment, if both are found.
+    """
+    input_ts = convert_input_to_TiltSeries(input_files)
+
+    print(f'Found {len(input_ts)} TiltSeries to work on. \n')
+
+    for ts_in in input_ts:
+
+        print(f'Now working on {ts_in.path}.')
+
+        # Test whether imod alignment found
+        if path.isfile(ts_in.path.with_suffix(".xf")):
+            ts = ts_in
+            aretomo = False
+
+        # Test whether AreTomo alignment found
+        elif path.isfile(ts_in.path.with_suffix(".aln")):
+            ts = sta_util.aretomo_export(ts_in)
+            sta_util.ctfplotter_aretomo_export(ts_in)
+            aretomo = True
+
+        else:
+            print(f"No previous alignments found for {ts_in.path}.")
+            continue
+
+        # Align
+        ts_ali = tiltseries.align_with_imod(ts, True, False, binning = bin)
+
+        # Perform dose filtration
+        ts_ali_filt = tiltseries.dose_filter(ts_ali, False)
+        ts_ali.delete_files(False)
+
+        # Check that defocus file is there + create ctf com-file
+        # Otherwise, open ctfplotter
+        if ts.defocus_file() is None:
+            print(f'Defocus file not found for {ts.path.name}. Running ctfplotter now.')
+            run_ctfplotter(ts, True)
+
+        comfile.fake_ctfcom(ts_ali_filt, 1)
+
+        dim_x, dim_y = tiltseries.binned_size(ts, 1)
+
+        rec = tomogram.Tomogram.from_tiltseries_3dctf(
+            ts_ali_filt, binning=bin, thickness=thickness,
+            z_slices_nm=25, fullimage=[dim_x,dim_y])
+
+        # Link reconstruction back to main dir, in case AreTomo alignments are used
+        if aretomo:
+            os.symlink(rec.path.absolute(),
+                       ts_in.parent / f'{ts_in.path.name}_3dctf_bin{bin}.mrc')
+
+        print('\n')
+
+
+    return
