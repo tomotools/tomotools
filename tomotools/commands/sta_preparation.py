@@ -203,4 +203,4 @@ def aretomo2tomotwin(batch_input, thickness, bin_round_up, uid, input_files, tom
         ts_imodlike.append(sta_util.aretomo_export(ts))
 
     # Process as normal imod-aligned TS
-    sta_util.tomotwin_prep(tomotwin_dir, ts_imodlike, thickness, uid, bin_round_up=bin_round_up
+    sta_util.tomotwin_prep(tomotwin_dir, ts_imodlike, thickness, uid, bin_round_up=bin_round_up)
