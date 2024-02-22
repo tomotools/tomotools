@@ -142,11 +142,13 @@ def aretomo2warp(batch_input, name, input_files, project_dir):
               help="Read input files as text, each line is a tiltseries (folder)")
 @click.option('-d', '--thickness', default=3000, show_default=True,
               help="Tomogram thickness in unbinned pixels.")
+@click.option('--bin-up/--bin-down', is_flag=True, default=True, show_default=True,
+              help="Default calculates binning closest to 10A and rounds up.")
 @click.option('--uid', default='imod', show_default=True,
               help="Unique identifier to tell apart tomograms from several sessions.")
 @click.argument('input_files', nargs=-1)
 @click.argument('tomotwin_dir', nargs=1)
-def imod2tomotwin(batch_input, thickness, uid, input_files, tomotwin_dir):
+def imod2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_dir):
     """Prepare for TomoTwin picking.
 
     Takes as input several tiltseries (folders) or a file listing them (with -b),
@@ -161,7 +163,7 @@ def imod2tomotwin(batch_input, thickness, uid, input_files, tomotwin_dir):
     """
     ts_list = sta_util.batch_parser(input_files, batch_input)
 
-    sta_util.tomotwin_prep(tomotwin_dir, ts_list, thickness, uid)
+    sta_util.tomotwin_prep(tomotwin_dir, ts_list, thickness, uid, bin_up=bin_up)
 
 
 @click.command()
@@ -169,11 +171,13 @@ def imod2tomotwin(batch_input, thickness, uid, input_files, tomotwin_dir):
               help="Read input files as text, each line is a tiltseries (folder)")
 @click.option('-d', '--thickness', default=3000, show_default=True,
               help="Tomogram thickness in unbinned pixels.")
+@click.option('--bin-up/--bin-down', is_flag=True, default=True, show_default=True,
+              help="Default calculates binning closest to 10A and rounds up.")
 @click.option('--uid', default='aretomo', show_default=True,
               help="Unique identifier to tell apart tomograms from several sessions.")
 @click.argument('input_files', nargs=-1)
 @click.argument('tomotwin_dir', nargs=1)
-def aretomo2tomotwin(batch_input, thickness, uid, input_files, tomotwin_dir):
+def aretomo2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_dir):
     """Prepare for TomoTwin picking.
 
     Takes as input several tiltseries (folders) or a file listing them (with -b),
@@ -199,4 +203,4 @@ def aretomo2tomotwin(batch_input, thickness, uid, input_files, tomotwin_dir):
         ts_imodlike.append(sta_util.aretomo_export(ts))
 
     # Process as normal imod-aligned TS
-    sta_util.tomotwin_prep(tomotwin_dir, ts_imodlike, thickness, uid)
+    sta_util.tomotwin_prep(tomotwin_dir, ts_imodlike, thickness, uid, bin_up=bin_up)

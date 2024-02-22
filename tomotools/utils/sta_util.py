@@ -194,7 +194,7 @@ def ctfplotter_aretomo_export(ts: TiltSeries):
     return ctf_out
 
 
-def tomotwin_prep(tomotwin_dir, ts_list, thickness, uid):
+def tomotwin_prep(tomotwin_dir, ts_list, thickness, uid, bin_up=True):
     """Prepare list of TS for TomoTwin."""
     tomotwin_dir = Path(tomotwin_dir)
     tomo_dir = tomotwin_dir / "tomo"
@@ -206,9 +206,11 @@ def tomotwin_prep(tomotwin_dir, ts_list, thickness, uid):
         os.mkdir(tomo_dir)
 
     for ts in ts_list:
-
         # bin to about 10 Apix, prefer round binning to avoid artifacts
-        binning = math.ceil(10 / ts.angpix / 2) * 2
+        if bin_up is True:
+            binning = math.ceil(10 / ts.angpix / 2) * 2
+        else:
+            binning = math.floor(10 / ts.angpix / 2) * 2
 
         ts_ali = align_with_imod(ts, True, False, binning=binning)
 
