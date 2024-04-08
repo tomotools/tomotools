@@ -130,7 +130,7 @@ def make_warp_dir(ts: TiltSeries, project_dir: Path, imod: bool = False):
     # Create mdoc with SubFramePath and save it to the mdoc subdirectory
     mdoc = mdocfile.read(ts.mdoc)
 
-    subframelist = glob(path.join(project_dir, (ts.path.stem+"_sec_*.mrc")))
+    subframelist = sorted(glob(path.join(project_dir, (ts.path.stem + "_sec_[0-9][0-9].mrc"))))
 
     # Check that mdoc has as many sections as there are tilt images
     if not len(mdoc['sections']) == len(subframelist):
