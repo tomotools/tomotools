@@ -1,5 +1,7 @@
 import os
 from os import path
+from pathlib import Path
+from shutil import copy
 
 import click
 
@@ -204,3 +206,35 @@ def aretomo2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_
 
     # Process as normal imod-aligned TS
     sta_util.tomotwin_prep(tomotwin_dir, ts_imodlike, thickness, uid, bin_up=bin_up)
+
+@click.command()
+@click.argument("input_project", type=click.Path(exists=True, file_okay=False))
+@click.argument("copy_name", type=str)
+def warp_copy(input_project: os.PathLike, copy_name: str):
+    """Copy a Warp/M project the fast way.
+
+    Only copies metadata files and links the rest (directories and images).
+    """
+    input_project = Path(input_project)
+    output_dir = input_project.parent / copy_name
+    link_base = Path('..') / input_project.name
+
+    if not (input_project / "previous.settings").is_file():
+        raise FileNotFoundError("Input project is not a Warp/M dir!")
+    if output_dir.exists():
+        raise FileExistsError("Output project already exists!")
+
+    output_dir.mkdir()
+
+    n_links, n_copies = 0, 0
+    for child in input_project.iterdir():
+        if child.is_dir() or (
+            child.is_file() and child.suffix in ['.mrc', '.st', '.tif', '.tiff']
+        ):
+            link = output_dir / child.name
+            link.symlink_to(link_base / child.name)
+            n_links += 1
+        elif child.is_file():
+            copy(child, output_dir / child.name)
+            n_copies += 1
+    print(f"Copied {n_copies} and linked {n_links} files")
