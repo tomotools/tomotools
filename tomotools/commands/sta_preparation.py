@@ -228,7 +228,11 @@ def warp_copy(input_project: os.PathLike, copy_name: str):
 
     n_links, n_copies = 0, 0
     for child in input_project.iterdir():
-        if child.is_dir() or (
+        if child.is_symlink():
+            link = output_dir / child.name
+            link.symlink_to(child.readlink())
+            n_links += 1
+        elif child.is_dir() or (
             child.is_file() and child.suffix in ['.mrc', '.st', '.tif', '.tiff']
         ):
             link = output_dir / child.name
