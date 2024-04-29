@@ -94,15 +94,18 @@ def aretomo_export(ts: TiltSeries):
     return ali_stack_imod
 
 
-def make_warp_dir(ts: TiltSeries, project_dir: Path, imod: bool = False):
+def make_warp_dir(ts: TiltSeries, project_dir: Path, prefix='', imod: bool = False):
     """Export tiltseries to Warp."""
+    if len(prefix) > 0 and not prefix.endswith("_"):
+        prefix += '_'
+
+    xf_file = ts.path.with_suffix(".xf")
+    tasolution_file = ts.path.parent / "taSolution.log"
     required_files = [ts.path,
                       ts.mdoc,
-                      ts.path.with_suffix(".xf")]
-
+                      xf_file]
     if imod:
-        required_files.append(ts.path.parent/"taSolution.log")
-
+        required_files.append(tasolution_file)
     # Check that all files are present
     if (all(path.isfile(req) for req in required_files) and
         any([path.isfile(ts.path.with_suffix(".rawtlt")),
@@ -115,23 +118,25 @@ def make_warp_dir(ts: TiltSeries, project_dir: Path, imod: bool = False):
 
     # Create imod subdirectory
     # copy alignment files (to protect against later modification)
-    ts_dir = path.join(project_dir,"imod",ts.path.stem)
-    os.mkdir(ts_dir)
+    ts_dir = project_dir / 'imod' / (prefix + ts.path.stem)
+    ts_dir.mkdir()
 
-    [shutil.copy(file,ts_dir) for file in required_files[2:]]
+    shutil.copy(xf_file, ts_dir / (prefix + xf_file.name))
+    if imod:
+        shutil.copy(tasolution_file, ts_dir)
 
     # tilt images go to warp root directory
     subprocess.run(['newstack','-quiet',
                    '-split','0',
                    '-append','mrc',
                    '-in',ts.path,
-                   path.join(project_dir,(ts.path.stem+"_sec_"))])
+                   path.join(project_dir, (prefix + ts.path.stem + "_sec_"))])
 
     # Create mdoc with SubFramePath and save it to the mdoc subdirectory
     mdoc = mdocfile.read(ts.mdoc)
 
     subframelist = sorted(glob(
-        path.join(project_dir, (ts.path.stem + "_sec_[0-9][0-9].mrc"))
+        path.join(project_dir, (prefix + ts.path.stem + "_sec_[0-9][0-9].mrc"))
     ))
 
     # Check that mdoc has as many sections as there are tilt images
@@ -143,11 +148,12 @@ def make_warp_dir(ts: TiltSeries, project_dir: Path, imod: bool = False):
         mdoc['sections'][i]['SubFramePath'] = 'X:\\WarpDir\\' + \
             Path(subframelist[i]).name
 
+    if "path" in mdoc:
+        mdoc["path"] = prefix + mdoc["path"]
+    if "ImageFile" in mdoc:
+        mdoc["ImageFile"] = prefix + mdoc["ImageFile"]
     mdoc = mdocfile.downgrade_DateTime(mdoc)
-
-    mdocfile.write(mdoc, path.join(project_dir, "mdoc", ts.path.stem+".mdoc"))
-
-    return
+    mdocfile.write(mdoc, path.join(project_dir, "mdoc", prefix + ts.path.stem + ".mdoc"))
 
 
 def batch_parser(input_files: [], batch: bool):
