@@ -1,5 +1,7 @@
 import os
 from os import path
+from pathlib import Path
+from shutil import copy
 
 import click
 
@@ -29,11 +31,11 @@ def fit_ctf(input_files):
 @click.command()
 @click.option('-b', '--batch-input', is_flag=True, default=False, show_default=True,
               help="Read input files as text, each line is a tiltseries (folder)")
-@click.option('-n', '--name', default='warp', show_default=True,
-              help="Warp working directory will be created as project_dir/name.")
+@click.option('-p', '--prefix', default='',
+              help="Prefix files to avoid name collisions")
 @click.argument('input_files', nargs=-1)
 @click.argument('project_dir', nargs=1)
-def imod2warp(batch_input, name, input_files, project_dir):
+def imod2warp(batch_input, prefix, input_files, project_dir):
     """Prepares Warp/M project.
 
     Takes as input several tiltseries (folders) or a file listing them (with -b),
@@ -53,19 +55,14 @@ def imod2warp(batch_input, name, input_files, project_dir):
         ./m/
 
     """
-    out_dir = path.join(project_dir, name)
-
-    if not path.isdir(project_dir):
-        os.mkdir(project_dir)
-
-    if path.isdir(out_dir):
-        input(f'Exporting to existing directory {out_dir}. Continue?')
-
+    project_dir: Path = Path(project_dir)
+    if project_dir.is_dir():
+        input(f'Exporting to existing directory {project_dir}. Continue?')
     else:
-        os.mkdir(out_dir)
-        os.mkdir(path.join(out_dir, 'imod'))
-        os.mkdir(path.join(out_dir, 'mdoc'))
-        print(f"Created Warp folder at {out_dir}.")
+        project_dir.mkdir()
+        print(f"Created Warp folder at {project_dir}.")
+    (project_dir / 'imod').mkdir(exist_ok=True)
+    (project_dir / 'mdoc').mkdir(exist_ok=True)
 
     # Parse input files
     ts_list = sta_util.batch_parser(input_files, batch_input)
@@ -74,9 +71,7 @@ def imod2warp(batch_input, name, input_files, project_dir):
 
     for ts in ts_list:
         print(f"Now working on {ts.path.name}")
-
-        sta_util.make_warp_dir(ts, out_dir, imod = True)
-
+        sta_util.make_warp_dir(ts, project_dir, prefix=prefix, imod=True)
         print(f"Warp files prepared for {ts.path.name}. \n")
 
 
@@ -204,3 +199,39 @@ def aretomo2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_
 
     # Process as normal imod-aligned TS
     sta_util.tomotwin_prep(tomotwin_dir, ts_imodlike, thickness, uid, bin_up=bin_up)
+
+@click.command()
+@click.argument("input_project", type=click.Path(exists=True, file_okay=False))
+@click.argument("copy_name", type=str)
+def warp_copy(input_project: os.PathLike, copy_name: str):
+    """Copy a Warp/M project the fast way.
+
+    Only copies metadata files and links the rest (directories and images).
+    """
+    input_project = Path(input_project)
+    output_dir = input_project.parent / copy_name
+    link_base = Path('..') / input_project.name
+
+    if not (input_project / "previous.settings").is_file():
+        raise FileNotFoundError("Input project is not a Warp/M dir!")
+    if output_dir.exists():
+        raise FileExistsError("Output project already exists!")
+
+    output_dir.mkdir()
+
+    n_links, n_copies = 0, 0
+    for child in input_project.iterdir():
+        if child.is_symlink():
+            link = output_dir / child.name
+            link.symlink_to(child.readlink())
+            n_links += 1
+        elif child.is_dir() or (
+            child.is_file() and child.suffix in ['.mrc', '.st', '.tif', '.tiff']
+        ):
+            link = output_dir / child.name
+            link.symlink_to(link_base / child.name)
+            n_links += 1
+        elif child.is_file():
+            copy(child, output_dir / child.name)
+            n_copies += 1
+    print(f"Copied {n_copies} and linked {n_links} files")
