@@ -1,3 +1,4 @@
+import math
 import os
 import shutil
 import subprocess
@@ -7,9 +8,10 @@ from pathlib import Path
 
 import mrcfile
 
-from tomotools.utils import mdocfile
+from tomotools.utils import mdocfile, tomogram
 from tomotools.utils.tiltseries import (
     TiltSeries,
+    align_with_imod,
     aretomo_executable,
     convert_input_to_TiltSeries,
     parse_ctfplotter,
@@ -128,7 +130,9 @@ def make_warp_dir(ts: TiltSeries, project_dir: Path, imod: bool = False):
     # Create mdoc with SubFramePath and save it to the mdoc subdirectory
     mdoc = mdocfile.read(ts.mdoc)
 
-    subframelist = glob(path.join(project_dir, (ts.path.stem+"_sec_*.mrc")))
+    subframelist = sorted(glob(
+        path.join(project_dir, (ts.path.stem + "_sec_[0-9][0-9].mrc"))
+    ))
 
     # Check that mdoc has as many sections as there are tilt images
     if not len(mdoc['sections']) == len(subframelist):
@@ -190,3 +194,32 @@ def ctfplotter_aretomo_export(ts: TiltSeries):
                                f'{ts.path.stem}_ali.defocus')
 
     return ctf_out
+
+
+def tomotwin_prep(tomotwin_dir, ts_list, thickness, uid, bin_up=True):
+    """Prepare list of TS for TomoTwin."""
+    tomotwin_dir = Path(tomotwin_dir)
+    tomo_dir = tomotwin_dir / "tomo"
+
+    if not path.isdir(tomotwin_dir):
+        os.mkdir(tomotwin_dir)
+
+    if not path.isdir(tomo_dir):
+        os.mkdir(tomo_dir)
+
+    for ts in ts_list:
+        # bin to about 10 Apix, prefer round binning to avoid artifacts
+        if bin_up is True:
+            binning = math.ceil(10 / ts.angpix / 2) * 2
+        else:
+            binning = math.floor(10 / ts.angpix / 2) * 2
+
+        ts_ali = align_with_imod(ts, True, False, binning=binning)
+
+        rec = tomogram.Tomogram.from_tiltseries(ts_ali, bin=1, sirt=0,
+                                                thickness=round(thickness/binning),
+                                                convert_to_byte=False)
+
+        unique_name = f'{uid}_{ts.path.parent.absolute().name}.mrc'
+
+        os.symlink(rec.path.absolute(), tomo_dir / unique_name)

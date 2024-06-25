@@ -199,12 +199,14 @@ class Tomogram:
                             '-UseGPU', '0'],
                             stdout=subprocess.DEVNULL)
 
-            os.remove(binned_stack_evn)
-            os.remove(binned_stack_odd)
+            if bin != 1:
+                os.remove(binned_stack_evn)
+                os.remove(binned_stack_odd)
 
             print(f'{tiltseries.path}: Finished reconstruction of EVN/ODD stacks.')
 
-        os.remove(binned_stack)
+        if bin != 1:
+            os.remove(binned_stack)
 
         if trim:
             # Trim: Read in dimensions of full_rec (as YZX)
