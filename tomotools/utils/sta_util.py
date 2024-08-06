@@ -149,7 +149,7 @@ def make_warp_dir(ts: TiltSeries, project_dir: Path, prefix='', imod: bool = Fal
             Path(subframelist[i]).name
 
     if "path" in mdoc:
-        mdoc["path"] = prefix + mdoc["path"]
+        mdoc["path"] = prefix + str(mdoc["path"])
     if "ImageFile" in mdoc:
         mdoc["ImageFile"] = prefix + mdoc["ImageFile"]
     mdoc = mdocfile.downgrade_DateTime(mdoc)
