@@ -23,7 +23,7 @@ jobs:
       - name: Lint and fix with ruff
         uses: chartboost/ruff-action@v1
         with:
-            args: --fix
+            args: check --fix .
       - name: Test with pytest
         run: |
           pytest -q .
