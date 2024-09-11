@@ -1,6 +1,6 @@
 # Tilt Series Acquisition
 
-> Benedikt Wimmer, Medalia Lab, UZH - Version 231017
+> Benedikt Wimmer, Medalia Lab, UZH - Version 240911
 
 ### This Protocol covers:
 
@@ -17,7 +17,7 @@ All images should be acquired in counting mode.
 
 | Parameter Set         | Search    | View    | Record      | Focus         | Trial         | Preview       |
 |-----------------------|-----------|---------|-------------|---------------|---------------|---------------|
-| Use                   | For Atlas | For MMM |             |               |               |               |
+| Use                   |For Atlas |For MMM |             |               |               |               |
 |                       |           |         |             |               |               |               |
 | Magnification         | 175x      | 4,800x  | 64,000x     | 64,000x       | 64,000x       | 64,000x       |
 | C2 Aperture           | 70        | 50      | 50          | 50            | 50            | 50            |
@@ -26,9 +26,9 @@ All images should be acquired in counting mode.
 | Objective Aperture    | out       | 100     | 100         | 100           | 100           | 100           |
 |                       |           |         |             |               |               |               |
 | GIF Slit Width [eV]   | 50        | 20      | 20          | 20            | 20            | 20            |
-| Flux [e/px/s]         | 20        | 25      | 8 - 10      | 8 - 10        | 8 - 10        | 8 - 10        |
+| Flux on sample [e/px/s]         | 20        | 25      | 8 - 10      | 8 - 10        | 8 - 10        | 8 - 10        |
 | Defocus [µm]          | -160      | -80     | -4          | -4            | -4            | -4            |
-| Exposure Time [s]     | 1         | 1       | *calibrate* | 50% of Record | 50% of Record | 30% of Record |
+| Exposure Time [s]     | 1         | 1       | **calibrate** | 50% of Record | 50% of Record | 30% of Record |
 | Image binned          | 2         | 1       | 1           | 4             | 2             | 2             |
 
 ## A) Automated Mapping of Entire Grids.
@@ -67,8 +67,9 @@ DM is Digital Micrograph.
 ```
 Alignments start with **no objective lens.**
 1. **Prepare gain reference (after cryo-cycle or K2 restart)**:
-   - Go to empty square on the grid. Insert FloScreen. Go to record magnification, C2 150, Spot size 2, illuminated area ca. 6 µm, microprobe mode. 
+   - Go to empty square on the grid. Insert FloScreen. Go to record magnification.
    - **Make sure that K2 is in linear mode**
+   - Adapt your imaging settings to reach a high flux of approx. 500 counts/px/s (bottom right corner of DM). E.g. for 81kx, C2 50, Spot size 2, illuminated area ca. 2 µm, nanoprobe mode works, but larger C2 aperture may help. 
    - Click *Camera > Prepare Gain Reference*. If *Camera* is not visible, go to *Help > User Mode > Power User*. Accept default settings. 
    - A view is started which shows the read counts. Adjust illuminated area, until these are around 500 (within 1%). Click ok to prepare linear mode reference.
    - **After this, click yes to prepare a counting mode reference. Do not dismiss the warning message!**
