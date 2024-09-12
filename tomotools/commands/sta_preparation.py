@@ -199,7 +199,7 @@ def reconstruct_3dctf(thickness, bin, input_files):
             os.symlink(rec.path.absolute(),
                        ts_in.path.parent / f'{ts_in.path.stem}_3dctf_bin{bin}.mrc')
         else:
-            os.rename(rec.path.absolute(), 
+            os.rename(rec.path.absolute(),
                       ts_in.path.parent / f'{ts_in.path.stem}_3dctf_bin{bin}.mrc')
 
         print('\n')
@@ -274,4 +274,3 @@ def aretomo2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_
     # Process as normal imod-aligned TS
     sta_util.tomotwin_prep(tomotwin_dir, ts_imodlike, thickness, uid, bin_up=bin_up)
 
-   

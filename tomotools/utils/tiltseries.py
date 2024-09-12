@@ -131,7 +131,7 @@ class TiltSeries:
     def from_micrographs(
         micrographs: List[Micrograph],
         ts_path: Path,
-        orig_mdoc_path: Optional[Path] = None,
+        mdoc: Optional[dict] = None,
         reorder=False,
         overwrite_titles: Optional[List[str]] = None,
         overwrite_dose: Optional[float] = None
@@ -168,8 +168,8 @@ class TiltSeries:
                 for section in stack_mdoc["sections"]:
                     section["ExposureDose"] = overwrite_dose
 
-        elif orig_mdoc_path is not None:
-            stack_mdoc = mdocfile.read(orig_mdoc_path)
+        elif mdoc is not None:
+            stack_mdoc = mdoc
             if reorder:
                 stack_mdoc['sections'] = sorted(
                     stack_mdoc['sections'], key=itemgetter('TiltAngle'))
