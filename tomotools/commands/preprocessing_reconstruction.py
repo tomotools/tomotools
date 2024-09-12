@@ -7,6 +7,7 @@ from os.path import abspath, basename, join
 from pathlib import Path
 
 import click
+import mrcfile
 
 from tomotools.utils import mdocfile
 from tomotools.utils.micrograph import Micrograph, sem2mc2
@@ -204,10 +205,7 @@ def batch_prepare_tiltseries(
             for section in mdoc["sections"]:
                 section["ExposureDose"] = exposuredose
 
-        if (
-            any(section["ExposureDose"] == 0 for section in mdoc["sections"])
-            and exposuredose is None
-        ):
+        if any(section["ExposureDose"] == 0 for section in mdoc["sections"]):
             print(
                 f"{input_file.path} has no ExposureDose in mdoc."
             )
@@ -269,6 +267,8 @@ def batch_prepare_tiltseries(
             mdoc_rotflip = mdoc["sections"][0]["RotationAndFlip"]
             mcrot, mcflip = sem2mc2(mdoc_rotflip)
 
+
+
         # Grab frame size to estimate appropriate patch numbers
         # Will only be used if --patch is specified
         patch_x, patch_y = [
@@ -296,11 +296,35 @@ def batch_prepare_tiltseries(
             patch_y=patch_y,
         )
 
+        # Update pixel size and dimensions in mdoc, if mcbin != 1
+        if mcbin != 1:
+
+            # check the size of the MC2 output
+            with mrcfile.open(micrographs[0].path, 'r') as mrc:
+                real_y, real_x = mrc.data.shape
+
+            # Calculate expected binned size
+            expected_x = int(mdoc['ImageSize'][0] / mcbin)
+            expected_y = int(mdoc['ImageSize'][1] / mcbin)
+
+            if expected_x%2 != 0:
+                expected_x = expected_x -1
+            if expected_y%2 != 0:
+                expected_y = expected_y -1
+
+            # If the expected size and the real size match, update mdoc
+            if expected_x == real_x and expected_y == real_y:
+                mdoc['ImageSize'] = [expected_x, expected_y]
+                mdoc['PixelSpacing'] = mdoc['PixelSpacing'] * mcbin
+
+                for section in mdoc['sections']:
+                    section['PixelSpacing'] = section['PixelSpacing'] * mcbin
+
         if stack:
             tilt_series = TiltSeries.from_micrographs(
                 micrographs,
                 output_dir / input_file.path.name,
-                orig_mdoc_path=mdoc["path"],
+                mdoc=mdoc,
                 reorder=True,
                 overwrite_dose=exposuredose
             )
@@ -309,7 +333,11 @@ def batch_prepare_tiltseries(
 
         else:
             for micrograph in micrographs:
+                with mrcfile.mmap(micrograph.path, mode='r+') as mrc:
+                    mrc.voxel_size = mdoc['PixelSpacing']
                 micrograph.path.rename(output_dir.joinpath(micrograph.path.name))
+
+
             shutil.rmtree(frames_corrected_dir)
             print(f'Successfully created micrograph images in {output_dir}. \n')
 
