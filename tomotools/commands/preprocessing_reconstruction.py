@@ -141,7 +141,7 @@ def blend_montages(cpus, input_files, output_dir):
 @click.argument("input_files", nargs=-1, type=click.Path(exists=True))
 @click.argument("output_dir", type=click.Path(writable=True))
 # TODO: Fix complexity error C901
-def batch_prepare_tiltseries(
+def preprocess(
     splitsum,
     mcbin,
     reorder,
