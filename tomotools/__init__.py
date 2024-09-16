@@ -8,7 +8,7 @@ from .commands import commands
 @click.group()
 def tomotools():
     """Scripts for cryo-ET data processing."""
-    click.echo("Tomotools version 0.3.3 \n")
+    click.echo("Tomotools version 0.3.4 \n")
 
 
 for command in commands:
