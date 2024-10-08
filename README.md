@@ -17,7 +17,7 @@ tomotools [subcommand] --help
 - **preprocess**: Prepare tiltseries for reconstruction.
   - Takes data directory from SerialEM as input and writes the final stacks to the target directory.
   - Frames are aligned using MotionCor2 and reordered if desired. Supports GainRef conversion from dm4 to mrc and the SerialEM-generated defects.txt.
-  - Example: ```tomotools batch-prepare-tiltseries --mcbin 1 --gainref frames/GainRef.dm4 *.mrc ts-aligned```
+  - Example: ```tomotools preprocess --mcbin 1 --gainref frames/GainRef.dm4 *.mrc ts-aligned```
 - **reconstruct**: Perform batch reconstruction using AreTomo or imod.
   - Takes tiltseries and their associated mdoc files as input, automatically identified associated EVN/ODD stacks. Finds alignment using AreTomo, then applies it to EVN/ODD stacks. Alternatively, can move files and then open ```etomo```. Reconstruction is done using imod's ```tilt```.
   - Example: ```tomotools reconstruct --move --bin 4 --sirt 12 --do-evn-odd *.mrc```
