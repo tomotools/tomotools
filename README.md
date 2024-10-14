@@ -48,7 +48,7 @@ MotionCor2 and AreTomo can either be in PATH as `motioncor2` or `aretomo` respec
 
 ## Installation
 We suggest installing tomotools into its own conda / mamba environment. 
-If you can only access your userspace, consider using [micromamba](https://mamba.readthedocs.io/en/latest/installation.html).
+If you can only access your userspace, consider using [micromamba](https://mamba.readthedocs.io/en/latest/user_guide/micromamba.html).
 
 If you want to use the scripts interfacing with cryoCARE denoising, please install ```tomotools[cryocare]```. 
 
