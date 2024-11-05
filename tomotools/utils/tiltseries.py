@@ -184,13 +184,10 @@ class TiltSeries:
         micrograph_paths = [str(micrograph.path) for micrograph in micrographs]
         subprocess.run(["newstack"] + micrograph_paths + [ts_path, "-quiet"])
 
-        # Remove MRC header and MDOC, remove unnecessary entries
+        # Sync MRC header and MDOC
         TiltSeries._update_mrc_header_from_mdoc(ts_path, stack_mdoc)
         TiltSeries._update_mdoc_from_mrc_header(ts_path, stack_mdoc)
-        for section in stack_mdoc["sections"]:
-            for key in ("SubFramePath", "NumSubFrames", "FrameDosesAndNumber"):
-                if key in section:
-                    del section[key]
+
         mdocfile.write(stack_mdoc, str(ts_path) + '.mdoc')
 
         if all(micrograph.is_split for micrograph in micrographs):
