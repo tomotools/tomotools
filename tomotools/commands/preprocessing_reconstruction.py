@@ -433,16 +433,18 @@ def reconstruct(
     batch_file,
     input_files,
 ):
-    r"""Align and reconstruct the given tiltseries.
+    """Align and reconstruct the given tiltseries.
 
     Optionally moves tilt series and excludes specified tilts.
     Then runs AreTomo alignment, dose-filtration and imod WBP reconstruction.
     EVN/ODD stacks will always be moved and tilts excluded, but alignment and
     reconstruction will only be performed if the --do-evn-odd flag is passed.
 
+    \b
     Batch file for tilt exclusion should look like this (tab-separated):
-    TS_01.mrc    1,39-41 \n
-    TS_02.mrc    1-4,41
+    TS_01.mrc 1,39-41
+    TS_02.mrc 1-4,41
+
     """
     # Exclusion and previous clash with each other!
     if previous and batch_file is not None:
