@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "Tomotools"
 description = "Scripts to make cryo-electron tomography a bit easier."
 readme = "README.md"
-version = "0.3.4"
+version = "0.4"
 
 requires-python = ">=3.7"
 license = {text = "None so far"}
