@@ -75,6 +75,7 @@ lint.extend-ignore = [
     "RUF005", # Interferes with subprocess.run,
     "RUF015", # Prefer next(iter) over iter[0] 
     "B012", # We use try/ finally a lot to avoid raising exceptions
+    "D301" # Use backslash for proper formatting in docstring
 ]
 
 [tool.ruff.format]

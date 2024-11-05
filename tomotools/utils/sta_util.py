@@ -52,13 +52,12 @@ def aretomo_export(ts: TiltSeries):
                         mrc.add_label(label)
                 mrc.update_header_stats()
 
-        return ali_stack_imod
-
-    if not path.isfile(aln_file):
+    elif not path.isfile(aln_file):
         raise FileNotFoundError(
             f'{ts.path}: No previous alignment was found at {aln_file}.')
 
-    subprocess.run([aretomo_executable(),
+    else:
+        subprocess.run([aretomo_executable(),
                     '-InMrc', ts.path,
                     '-OutMrc', ali_stack,
                     '-AngFile', tlt_file,
@@ -68,18 +67,18 @@ def aretomo_export(ts: TiltSeries):
                     '-OutImod', '2'],
                    stdout=subprocess.DEVNULL)
 
-    ali_stack_imod = TiltSeries(
-        Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
+        ali_stack_imod = TiltSeries(
+            Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
 
-    with mrcfile.mmap(ali_stack, mode='r+') as mrc:
-        mrc.voxel_size = str(angpix)
-        mrc.update_header_stats()
+        with mrcfile.mmap(ali_stack, mode='r+') as mrc:
+            mrc.voxel_size = str(angpix)
+            mrc.update_header_stats()
 
-    with mrcfile.mmap(ali_stack_imod.path, mode='r+') as mrc:
-        mrc.voxel_size = str(angpix)
-        for label in labels:
-            mrc.add_label(label)
-        mrc.update_header_stats()
+        with mrcfile.mmap(ali_stack_imod.path, mode='r+') as mrc:
+            mrc.voxel_size = str(angpix)
+            for label in labels:
+                mrc.add_label(label)
+            mrc.update_header_stats()
 
     # Get view exclusion list and create appropriate mdoc
     exclude = parse_darkimgs(ts)
@@ -94,7 +93,11 @@ def aretomo_export(ts: TiltSeries):
     return ali_stack_imod
 
 
-def make_warp_dir(ts: TiltSeries, project_dir: Path, imod: bool = False):
+def make_warp_dir(ts: TiltSeries,
+                  project_dir: Path,
+                  frames_dir: Path,
+                  ensure_frames: bool = True,
+                  imod: bool = False):
     """Export tiltseries to Warp."""
     required_files = [ts.path,
                       ts.mdoc,
@@ -121,31 +124,62 @@ def make_warp_dir(ts: TiltSeries, project_dir: Path, imod: bool = False):
     [shutil.copy(file,ts_dir) for file in required_files[2:]]
 
     # tilt images go to warp root directory
-    subprocess.run(['newstack','-quiet',
-                   '-split','0',
-                   '-append','mrc',
-                   '-in',ts.path,
-                   path.join(project_dir,(ts.path.stem+"_sec_"))])
 
-    # Create mdoc with SubFramePath and save it to the mdoc subdirectory
+    # Check, whether all tilts have SubFrameImages
     mdoc = mdocfile.read(ts.mdoc)
-
-    subframelist = sorted(glob(
-        path.join(project_dir, (ts.path.stem + "_sec_[0-9][0-9].mrc"))
-    ))
-
-    # Check that mdoc has as many sections as there are tilt images
-    if not len(mdoc['sections']) == len(subframelist):
-        raise FileNotFoundError(
-            "Error: Mismatch between mdoc entries and frames!")
-
-    for i in range(0, len(mdoc['sections'])):
-        mdoc['sections'][i]['SubFramePath'] = 'X:\\WarpDir\\' + \
-            Path(subframelist[i]).name
-
     mdoc = mdocfile.downgrade_DateTime(mdoc)
 
-    mdocfile.write(mdoc, path.join(project_dir, "mdoc", ts.path.stem+".mdoc"))
+
+    if all("SubFramePath" in section for section in mdoc["sections"]):
+
+        subframe_list = []
+
+        for section in mdoc["sections"]:
+
+            subframe_list.append(mdocfile.find_relative_path(
+                Path(frames_dir),
+                Path(section.get("SubFramePath", "").replace("\\", path.sep)),))
+
+        # Symlink doesn't work with windows!
+        [shutil.copy(file,project_dir / file.name) for file in subframe_list]
+
+        # Fix SubFramePath
+        for section in mdoc["sections"]:
+
+            input_path = Path(section["SubFramePath"])
+
+            section["SubFramePath"] = 'X:\\WarpDir\\' + Path(input_path).name
+
+        mdocfile.write(mdoc, project_dir / "mdoc" / f'{ts.path.stem}.mdoc')
+
+    elif ensure_frames:
+        raise FileNotFoundError(f"{ts.path.stem}: not all frames found.")
+
+    else:
+        subprocess.run(['newstack','-quiet',
+                       '-split','0',
+                       '-append','mrc',
+                       '-in',ts.path,
+                       path.join(project_dir,(ts.path.stem+"_sec_"))])
+
+        # Create mdoc with SubFramePath and save it to the mdoc subdirectory
+
+        subframelist = sorted(glob(
+            path.join(project_dir, (ts.path.stem + "_sec_[0-9][0-9].mrc"))
+        ))
+
+        # Check that mdoc has as many sections as there are tilt images
+        if not len(mdoc['sections']) == len(subframelist):
+            raise FileNotFoundError(
+                "Error: Mismatch between mdoc entries and frames!")
+
+        for i in range(0, len(mdoc['sections'])):
+            mdoc['sections'][i]['SubFramePath'] = 'X:\\WarpDir\\' + \
+                Path(subframelist[i]).name
+
+        mdoc = mdocfile.downgrade_DateTime(mdoc)
+
+        mdocfile.write(mdoc, path.join(project_dir, "mdoc", ts.path.stem+".mdoc"))
 
     return
 
