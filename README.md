@@ -41,6 +41,7 @@ tomotools [subcommand] --help
 - **semnavigator**: Display SerialEM navigator files to find back you tomogram positions
 - **create-movie**: Create a movie from a series of image files.
 - **update**: Automatically pulls the most recent version from GitHub and runs ```pip install --upgrade``` on it.
+- **restore-frames**: Restore SubFramePath to mdoc of tiltseries preprocessed with tomotools < 0.4. 
 
 ## Dependencies
 `tomotools` depends on commands from MotionCor2, IMOD, and AreTomo for full functionality. IMOD should be in PATH. 

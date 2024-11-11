@@ -1,5 +1,6 @@
 import os
 from os import path
+from pathlib import Path
 
 import click
 
@@ -31,9 +32,14 @@ def fit_ctf(input_files):
               help="Read input files as text, each line is a tiltseries (folder)")
 @click.option('-n', '--name', default='warp', show_default=True,
               help="Warp working directory will be created as project_dir/name.")
+@click.option('--ensure-frames', is_flag=True, default=False, show_default=True,
+              help="Ensure that the frames for each tilt image are exported.")
+@click.option('--frames-dir', default=None, show_default=True,
+              type=click.Path(exists=True, file_okay=False, dir_okay=True),
+              help="Directory containing the original frames.")
 @click.argument('input_files', nargs=-1)
 @click.argument('project_dir', nargs=1)
-def imod2warp(batch_input, name, input_files, project_dir):
+def imod2warp(batch_input, name, ensure_frames, frames_dir, input_files, project_dir):
     """Prepares Warp/M project.
 
     Takes as input several tiltseries (folders) or a file listing them (with -b),
@@ -45,15 +51,17 @@ def imod2warp(batch_input, name, input_files, project_dir):
 
     Suggested structure is something like this:
 
-    project_dir/
-        ./warpdir1/
-        ./warpdir2/
-        ./warpdir3/
+    \b
+    project_dir
+        ./name_1/
+        ./name_2/
         ./relion/
         ./m/
 
     """
-    out_dir = path.join(project_dir, name)
+    out_dir = Path(path.join(project_dir, name))
+
+    frames_dir = Path(frames_dir)
 
     if not path.isdir(project_dir):
         os.mkdir(project_dir)
@@ -75,7 +83,11 @@ def imod2warp(batch_input, name, input_files, project_dir):
     for ts in ts_list:
         print(f"Now working on {ts.path.name}")
 
-        sta_util.make_warp_dir(ts, out_dir, imod = True)
+        sta_util.make_warp_dir(ts,
+                               out_dir,
+                               frames_dir = frames_dir,
+                               ensure_frames = ensure_frames,
+                               imod = True)
 
         print(f"Warp files prepared for {ts.path.name}. \n")
 
@@ -85,9 +97,19 @@ def imod2warp(batch_input, name, input_files, project_dir):
               help="Read input files as text, each line is a tiltseries (folder)")
 @click.option('-n', '--name', default='warp', show_default=True,
               help="Warp working directory will be created as project_dir/name.")
+@click.option('--ensure-frames', is_flag=True, default=False, show_default=True,
+              help="Ensure that the frames for each tilt image are exported.")
+@click.option('--frames-dir', default=None, show_default=True,
+              type=click.Path(exists=True, file_okay=False, dir_okay=True),
+              help="Directory containing the original frames.")
 @click.argument('input_files', nargs=-1)
 @click.argument('project_dir', nargs=1)
-def aretomo2warp(batch_input, name, input_files, project_dir):
+def aretomo2warp(batch_input,
+                 name,
+                 ensure_frames,
+                 frames_dir,
+                 input_files,
+                 project_dir):
     """Prepares Warp/M project.
 
     Takes as input several tiltseries (folders) or a file listing them (with -b),
@@ -99,15 +121,17 @@ def aretomo2warp(batch_input, name, input_files, project_dir):
 
     Suggested structure is something like this:
 
-    project_dir/
-        ./warpdir1/
-        ./warpdir2/
-        ./warpdir3/
+    \b
+    project_dir
+        ./name_1/
+        ./name_2/
         ./relion/
         ./m/
 
     """
-    out_dir = path.join(project_dir, name)
+    out_dir = Path(path.join(project_dir, name))
+
+    frames_dir = Path(frames_dir)
 
     if not path.isdir(project_dir):
         os.mkdir(project_dir)
@@ -132,7 +156,11 @@ def aretomo2warp(batch_input, name, input_files, project_dir):
 
         print(f'Performed AreTomo export of {ts.path.stem}.')
 
-        sta_util.make_warp_dir(ts_out_imod, out_dir)
+        sta_util.make_warp_dir(ts_out_imod,
+                               out_dir,
+                               frames_dir = frames_dir,
+                               ensure_frames = ensure_frames,
+                               imod = False)
 
         print(f"Warp files prepared for {ts.path.name}. \n")
 

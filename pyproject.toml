@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "Tomotools"
 description = "Scripts to make cryo-electron tomography a bit easier."
 readme = "README.md"
-version = "0.3.4"
+version = "0.4"
 
 requires-python = ">=3.7"
 license = {text = "None so far"}
@@ -75,6 +75,7 @@ lint.extend-ignore = [
     "RUF005", # Interferes with subprocess.run,
     "RUF015", # Prefer next(iter) over iter[0] 
     "B012", # We use try/ finally a lot to avoid raising exceptions
+    "D301" # Use backslash for proper formatting in docstring
 ]
 
 [tool.ruff.format]
