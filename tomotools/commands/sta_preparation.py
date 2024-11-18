@@ -30,6 +30,8 @@ def fit_ctf(input_files):
 @click.command()
 @click.option('-b', '--batch-input', is_flag=True, default=False, show_default=True,
               help="Read input files as text, each line is a tiltseries (folder)")
+@click.option('--v2', is_flag=True, default=False, show_default=True,
+              help="Project is for WarpTools 2.x, not Warp 1.x.")
 @click.option('-n', '--name', default='warp', show_default=True,
               help="Warp working directory will be created as project_dir/name.")
 @click.option('--ensure-frames', is_flag=True, default=False, show_default=True,
@@ -39,7 +41,13 @@ def fit_ctf(input_files):
               help="Directory containing the original frames.")
 @click.argument('input_files', nargs=-1)
 @click.argument('project_dir', nargs=1)
-def imod2warp(batch_input, name, ensure_frames, frames_dir, input_files, project_dir):
+def imod2warp(batch_input,
+              v2,
+              name,
+              ensure_frames,
+              frames_dir,
+              input_files,
+              project_dir):
     """Prepares Warp/M project.
 
     Takes as input several tiltseries (folders) or a file listing them (with -b),
@@ -71,8 +79,12 @@ def imod2warp(batch_input, name, ensure_frames, frames_dir, input_files, project
 
     else:
         os.mkdir(out_dir)
-        os.mkdir(path.join(out_dir, 'imod'))
-        os.mkdir(path.join(out_dir, 'mdoc'))
+        os.mkdir(out_dir / 'imod')
+        os.mkdir(out_dir / 'mdoc')
+
+        if v2:
+            os.mkdir(out_dir / "frames")
+
         print(f"Created Warp folder at {out_dir}.")
 
     # Parse input files
@@ -87,7 +99,8 @@ def imod2warp(batch_input, name, ensure_frames, frames_dir, input_files, project
                                out_dir,
                                frames_dir = frames_dir,
                                ensure_frames = ensure_frames,
-                               imod = True)
+                               imod = True,
+                               v2 = v2)
 
         print(f"Warp files prepared for {ts.path.name}. \n")
 
@@ -95,6 +108,8 @@ def imod2warp(batch_input, name, ensure_frames, frames_dir, input_files, project
 @click.command()
 @click.option('-b', '--batch-input', is_flag=True, default=False, show_default=True,
               help="Read input files as text, each line is a tiltseries (folder)")
+@click.option('--v2', is_flag=True, default=False, show_default=True,
+              help="Project is for WarpTools 2.x, not Warp 1.x.")
 @click.option('-n', '--name', default='warp', show_default=True,
               help="Warp working directory will be created as project_dir/name.")
 @click.option('--ensure-frames', is_flag=True, default=False, show_default=True,
@@ -105,6 +120,7 @@ def imod2warp(batch_input, name, ensure_frames, frames_dir, input_files, project
 @click.argument('input_files', nargs=-1)
 @click.argument('project_dir', nargs=1)
 def aretomo2warp(batch_input,
+                 v2,
                  name,
                  ensure_frames,
                  frames_dir,
@@ -141,8 +157,12 @@ def aretomo2warp(batch_input,
 
     else:
         os.mkdir(out_dir)
-        os.mkdir(path.join(out_dir, 'imod'))
-        os.mkdir(path.join(out_dir, 'mdoc'))
+        os.mkdir(out_dir / 'imod')
+        os.mkdir(out_dir / 'mdoc')
+
+        if v2:
+            os.mkdir(out_dir / "frames")
+
         print(f"Created Warp folder at {out_dir}.")
 
     ts_list = sta_util.batch_parser(input_files, batch_input)
@@ -160,7 +180,8 @@ def aretomo2warp(batch_input,
                                out_dir,
                                frames_dir = frames_dir,
                                ensure_frames = ensure_frames,
-                               imod = False)
+                               imod = False,
+                               v2 = v2)
 
         print(f"Warp files prepared for {ts.path.name}. \n")
 

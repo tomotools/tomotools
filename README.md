@@ -29,8 +29,8 @@ tomotools [subcommand] --help
 - **deconv**: Python implementation of Dimitry Tegunov's _tom_deconv.m_ script.
 
 ### Subtomogram Averaging Preparation
-- **imod2warp**: Takes a list of imod directories or a file listing them and prepares everything for Warp.
-- **aretomo2warp**: Takes a list of directories with AreTomo-aligned tiltseries or a file listing them and prepares everything for Warp.
+- **imod2warp**: Takes a list of imod directories or a file listing them and prepares everything for Warp or WarpTools.
+- **aretomo2warp**: Takes a list of directories with AreTomo-aligned tiltseries or a file listing them and prepares everything for Warp or WarpTools.
 - **imod2tomotwin**: Takes a list of imod directories and reconstructs for TomoTwin picking.
 - **aretomo2tomotwin**: Takes a list of AreTomo directories and reconstructs for TomoTwin picking.
 - **fit-ctf**: Run imod ctfplotter on a set of tiltseries and save results to their folder.

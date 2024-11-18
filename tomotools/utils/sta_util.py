@@ -97,7 +97,8 @@ def make_warp_dir(ts: TiltSeries,
                   project_dir: Path,
                   frames_dir: Path,
                   ensure_frames: bool = True,
-                  imod: bool = False):
+                  imod: bool = False,
+                  v2: bool = False):
     """Export tiltseries to Warp."""
     required_files = [ts.path,
                       ts.mdoc,
@@ -118,25 +119,33 @@ def make_warp_dir(ts: TiltSeries,
 
     # Create imod subdirectory
     # copy alignment files (to protect against later modification)
-    ts_dir = path.join(project_dir,"imod",ts.path.stem)
+    ts_dir = project_dir / "imod" / ts.path.stem
     os.mkdir(ts_dir)
 
     [shutil.copy(file,ts_dir) for file in required_files[2:]]
-    
-    # Copy tilt file, for WarpTools
+
     if path.isfile(ts.path.with_suffix(".tlt")):
-        shutil.copy(ts.path.with_suffix(".tlt"), ts_dir)
+            shutil.copy(ts.path.with_suffix(".tlt"), ts_dir)
     else: #one or the other must be there, checked above!
-        shutil.copy(ts.path.with_suffix(".rawtlt"), 
-                    ts_dir / ts.name.with_suffix(".tlt"))
+            shutil.copy(ts.path.with_suffix(".rawtlt"),
+                        ts_dir / ts.name.with_suffix(".tlt"))
 
-    # tilt images go to warp root directory
+    if v2:
+        # invert tilt-angles in tlt file (done during import in Warp 1.X)
+        invert_tlt_files(ts_dir)
 
-    # Check, whether all tilts have SubFrameImages
+        # copy frames to frames subfolder instead of main folder
+        frame_target_dir = project_dir / "frames"
+
+    else:
+        # tilt images go to warp root directory
+        frame_target_dir = project_dir
+
+    # Read mdoc, fix date bug
     mdoc = mdocfile.read(ts.mdoc)
     mdoc = mdocfile.downgrade_DateTime(mdoc)
 
-
+    # Check, whether all tilts have SubFrameImages
     if all("SubFramePath" in section for section in mdoc["sections"]):
 
         subframe_list = []
@@ -148,7 +157,7 @@ def make_warp_dir(ts: TiltSeries,
                 Path(section.get("SubFramePath", "").replace("\\", path.sep)),))
 
         # Symlink doesn't work with windows!
-        [shutil.copy(file,project_dir / file.name) for file in subframe_list]
+        [shutil.copy(file,frame_target_dir / file.name) for file in subframe_list]
 
         # Fix SubFramePath
         for section in mdoc["sections"]:
@@ -164,34 +173,32 @@ def make_warp_dir(ts: TiltSeries,
 
         if ensure_frames:
             raise FileNotFoundError("ensure_frames was passed, so cannot continue.")
-    
+
         else:
-            
+
             print("Will export tilt images to Warp.")
-            
+
             subprocess.run(['newstack','-quiet',
                            '-split','0',
                            '-append','mrc',
                            '-in',ts.path,
-                           path.join(project_dir,(ts.path.stem+"_sec_"))])
-    
+                           path.join(frame_target_dir,(ts.path.stem+"_sec_"))])
+
             # Create mdoc with SubFramePath and save it to the mdoc subdirectory
-    
+
             subframelist = sorted(glob(
-                path.join(project_dir, (ts.path.stem + "_sec_[0-9][0-9].mrc"))
+                path.join(frame_target_dir, (ts.path.stem + "_sec_[0-9][0-9].mrc"))
             ))
-    
+
             # Check that mdoc has as many sections as there are tilt images
             if not len(mdoc['sections']) == len(subframelist):
                 raise FileNotFoundError(
                     "Error: Mismatch between mdoc entries and frames!")
-    
+
             for i in range(0, len(mdoc['sections'])):
                 mdoc['sections'][i]['SubFramePath'] = 'X:\\WarpDir\\' + \
                     Path(subframelist[i]).name
-    
-            mdoc = mdocfile.downgrade_DateTime(mdoc)
-    
+
             mdocfile.write(mdoc, path.join(project_dir, "mdoc", ts.path.stem+".mdoc"))
 
     return
@@ -270,3 +277,34 @@ def tomotwin_prep(tomotwin_dir, ts_list, thickness, uid, bin_up=True):
         unique_name = f'{uid}_{ts.path.parent.absolute().name}.mrc'
 
         os.symlink(rec.path.absolute(), tomo_dir / unique_name)
+
+def invert_tlt_files(ts_dir: Path):
+    """Invert tilt angles in tlt file for WarpTools."""
+    for tlt in ts_dir.glob('*.tlt'):
+
+        print(f'Inverting tilt angles in {tlt.name}')
+
+        tlt_inverted = []
+
+        with open(tlt) as file:
+            data = file.readlines()
+
+        for line in data:
+
+            # Remove whitespace, produced by imod
+            line = line.strip()
+
+            if len(line) == 0:
+                continue
+
+            elif line.startswith("-"):
+                tlt_inverted.append(line[1:])
+
+            else:
+                tlt_inverted.append("-"+line)
+
+        with open(tlt, 'w+') as file:
+            for line in tlt_inverted:
+                file.write(f'{line}\n')
+
+    return
