@@ -328,7 +328,7 @@ def cryocare_train(
 @click.option(
     "--tiles",
     type=(int, int, int),
-    default=(1, 1, 1),
+    default=(2, 2, 2),
     show_default=True,
     help="Specify number of tiles.",
 )
