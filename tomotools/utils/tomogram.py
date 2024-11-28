@@ -83,6 +83,8 @@ class Tomogram:
         [full_reconstruction_y,full_reconstruction_x] = tiltseries.dimZYX[1:3]
 
         # Bring stack to desired binning level
+        
+        # TODO: skip here if passed pre-binned aligned stack
         if bin != 1:
             binned_stack = tiltseries.path.with_name(
                 f'{tiltseries.path.stem}_bin_{bin}.mrc')

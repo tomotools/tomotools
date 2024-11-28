@@ -44,8 +44,8 @@ tomotools [subcommand] --help
 - **restore-frames**: Restore SubFramePath to mdoc of tiltseries preprocessed with tomotools < 0.4. 
 
 ## Dependencies
-`tomotools` depends on commands from MotionCor2, IMOD, and AreTomo for full functionality. IMOD should be in PATH. 
-MotionCor2 and AreTomo can either be in PATH as `motioncor2` or `aretomo` respectively, or set using the envar `MOTIONCOR2_EXECUTABLE` or `ARETOMO_EXECUTABLE`.
+`tomotools` depends on commands from MotionCor2 or MotionCor3, IMOD, and AreTomo 1.X or AreTomo2 for full functionality. IMOD should be in PATH. 
+MotionCor2/3 and AreTomo2/3 can either be in PATH as `motioncor2` /  `motioncor3` or `aretomo` / `aretomo2` respectively, or set using the envar `MOTIONCOR2_EXECUTABLE` or `ARETOMO_EXECUTABLE`.
 
 ## Installation
 We suggest installing tomotools into its own conda / mamba environment. 
