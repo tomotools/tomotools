@@ -520,6 +520,7 @@ def reconstruct(
         # If previous is passed, respect --imod flag.
         # Otherwise, use AreTomo.
 
+        #TODO: bin during alignment
         if previous and imod:
             tiltseries_ali = align_with_imod(tiltseries, previous, do_evn_odd)
         else:
@@ -590,6 +591,8 @@ def reconstruct(
             tomo_pitch.path.unlink(missing_ok=True)
 
         # Perform final reconstruction
+        
+        # TODO: don't bin here anymore!
         Tomogram.from_tiltseries(tiltseries_dosefiltered,
                                  bin=bin,
                                  thickness=thickness,

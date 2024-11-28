@@ -211,11 +211,11 @@ class TiltSeries:
 
 
 def aretomo_executable() -> Optional[str]:
-    """Return AreTomo executable.
+    """Return AreTomo1/2 executable.
 
     Path can be set with one of the following ways (in order of priority):
     1. Setting the ARETOMO_EXECUTABLE variable to the full path of the executable
-    2. Putting the appropriate executable into the PATH and renaming it to "aretomo"
+    2. Putting the appropriate executable into the PATH and renaming it to "AreTomo"
     """
     if "ARETOMO_EXECUTABLE" in os.environ:
         aretomo_exe = os.environ["ARETOMO_EXECUTABLE"]
@@ -225,9 +225,13 @@ def aretomo_executable() -> Optional[str]:
             raise FileNotFoundError(
                 f'Variable for AreTomo is set to "{aretomo_exe}", but file is missing.'
             )
-    return shutil.which("AreTomo")
+    elif shutil.which("AreTomo2") is not None:
+        return shutil.which("AreTomo2")
+    else:
+        return shutil.which("AreTomo")
 
 
+#TODO: implement binning using -OutBin X
 def align_with_areTomo(
     ts: TiltSeries, local: bool, previous: bool, do_evn_odd: bool, gpu: str,
         volz: int = 250):

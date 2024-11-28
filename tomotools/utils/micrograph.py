@@ -241,7 +241,7 @@ class Micrograph:
 
 
 def motioncor2_executable() -> Optional[str]:
-    """Return MotionCor2 executable.
+    """Return MotionCor2/3 executable.
 
     Path can be set with one of the following ways (in order of priority):
     1. Setting the MOTIONCOR2_EXECUTABLE variable to the full path of the executable
@@ -253,27 +253,13 @@ def motioncor2_executable() -> Optional[str]:
             return mc2_exe
         else:
             raise FileNotFoundError(
-                f'Variable for MC2 is set to "{mc2_exe}", but file is missing.'
+                f'Variable for MotionCorX is set to "{mc2_exe}", but file is missing.'
             )
-    return shutil.which("motioncor2")
 
-
-def aretomo_executable() -> Optional[str]:
-    """Return AreTomo executable.
-
-    Path can be set with one of the following ways (in order of priority):
-    1. Setting the ARETOMO_EXECUTABLE variable to the full path of the executable
-    2. Putting the appropriate executable into the PATH and renaming it to "aretomo"
-    """
-    if "ARETOMO_EXECUTABLE" in os.environ:
-        aretomo_exe = os.environ["ARETOMO_EXECUTABLE"]
-        if isfile(aretomo_exe):
-            return aretomo_exe
-        else:
-            raise FileNotFoundError(
-                f'Variable for AreTomo is set to "{aretomo_exe}", but file is missing.'
-            )
-    return shutil.which("AreTomo")
+    elif shutil.which("MotionCor3") is not None:
+        return shutil.which("MotionCor3")
+    else:
+        return shutil.which("MotionCor2")
 
 
 def sem2mc2(RotationAndFlip: int = 0):
