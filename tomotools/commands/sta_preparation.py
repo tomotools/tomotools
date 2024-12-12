@@ -214,7 +214,7 @@ def reconstruct_3dctf(thickness, bin, input_files):
     for ts_in in input_ts:
 
         print(f'Now working on {ts_in.path}.')
-        
+
         # Test whether imod alignment found
         if path.isfile(ts_in.path.with_suffix(".xf")):
             ts = ts_in
