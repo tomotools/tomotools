@@ -561,10 +561,17 @@ def run_ctfplotter(ts: TiltSeries, overwrite: bool):
         kV = 300
         cs = 2.7
 
+        if path.isfile(ts.path.with_suffix('.tlt')):
+            tlt_file = ts.path.with_suffix('.tlt')
+        elif path.isfile(ts.path.with_name(f'{ts.path.stem}_ali.tlt')):
+            tlt_file = ts.path.with_name(f'{ts.path.stem}_ali.tlt')
+        else:
+            tlt_file = ts.path.with_suffix('.rawtlt')
+
         with open(path.join(ts.path.parent, 'ctfplotter.log'), 'a') as out:
             subprocess.run(['ctfplotter',
                             '-InputStack', ts.path,
-                            '-angleFn', ts.path.with_suffix('.tlt'),
+                            '-angleFn', tlt_file,
                             '-defFn', ts.path.with_name(
                                 f'{ts.path.stem}.defocus'),
                             '-pixelSize', str(nmpix),

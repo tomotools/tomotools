@@ -31,7 +31,14 @@ def aretomo_export(ts: TiltSeries):
         labels = mrc.get_labels()
 
     aln_file = ts.path.with_suffix('.aln')
-    tlt_file = ts.path.with_suffix('.tlt')
+    
+    if path.isfile(ts.path.with_suffix('.tlt')):
+        tlt_file = ts.path.with_suffix('.tlt')
+    elif path.isfile(ts.path.with_suffix('.rawtlt')):
+        tlt_file = ts.path.with_suffix('.rawtlt')
+    else:
+        raise FileNotFoundError(f'No tilt file found for {ts.stem}!')
+    
     ali_stack = ts.path.with_name(f'{ts.path.stem}_ali.mrc')
 
     imod_dir = path.join(ts.path.parent, (ali_stack.stem + "_Imod"))

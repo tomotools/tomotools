@@ -203,10 +203,18 @@ def reconstruct_3dctf(thickness, bin, input_files):
 
     print(f'Found {len(input_ts)} TiltSeries to work on. \n')
 
+    # First, check whether all defocus files are there
+    for ts_in in input_ts:
+        # Test, whether .defocus file is found
+        if not path.isfile(ts_in.path.with_suffix(".defocus")):
+            run_ctfplotter(ts_in, True)
+
+    print('All defocus files found or created.')
+
     for ts_in in input_ts:
 
         print(f'Now working on {ts_in.path}.')
-
+        
         # Test whether imod alignment found
         if path.isfile(ts_in.path.with_suffix(".xf")):
             ts = ts_in
