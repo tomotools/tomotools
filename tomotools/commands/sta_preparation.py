@@ -34,17 +34,19 @@ def fit_ctf(input_files):
               help="Project is for WarpTools 2.x, not Warp 1.x.")
 @click.option('-n', '--name', default='warp', show_default=True,
               help="Warp working directory will be created as project_dir/name.")
-@click.option('--ensure-frames', is_flag=True, default=False, show_default=True,
-              help="Ensure that the frames for each tilt image are exported.")
-@click.option('--frames-dir', default=None, show_default=True,
-              type=click.Path(exists=True, file_okay=False, dir_okay=True),
+@click.option('--include-frames/--skip-frames', is_flag=True,
+              default=False,
+              show_default=True,
+              help="Export also frames for each tilt.")
+@click.option('--frames-dir', default="~", show_default=True,
+              type=click.Path(file_okay=False, dir_okay=True),
               help="Directory containing the original frames.")
 @click.argument('input_files', nargs=-1)
 @click.argument('project_dir', nargs=1)
 def imod2warp(batch_input,
               v2,
               name,
-              ensure_frames,
+              include_frames,
               frames_dir,
               input_files,
               project_dir):
@@ -98,7 +100,7 @@ def imod2warp(batch_input,
         sta_util.make_warp_dir(ts,
                                out_dir,
                                frames_dir = frames_dir,
-                               ensure_frames = ensure_frames,
+                               ensure_frames = include_frames,
                                imod = True,
                                v2 = v2)
 
@@ -112,17 +114,19 @@ def imod2warp(batch_input,
               help="Project is for WarpTools 2.x, not Warp 1.x.")
 @click.option('-n', '--name', default='warp', show_default=True,
               help="Warp working directory will be created as project_dir/name.")
-@click.option('--ensure-frames', is_flag=True, default=False, show_default=True,
-              help="Ensure that the frames for each tilt image are exported.")
-@click.option('--frames-dir', default=None, show_default=True,
-              type=click.Path(exists=True, file_okay=False, dir_okay=True),
+@click.option('--include-frames--skip-frames/', is_flag=True,
+              default=False,
+              show_default=True,
+              help="Export also frames for each tilt.")
+@click.option('--frames-dir', default="~", show_default=True,
+              type=click.Path(file_okay=False, dir_okay=True),
               help="Directory containing the original frames.")
 @click.argument('input_files', nargs=-1)
 @click.argument('project_dir', nargs=1)
 def aretomo2warp(batch_input,
                  v2,
                  name,
-                 ensure_frames,
+                 include_frames,
                  frames_dir,
                  input_files,
                  project_dir):
@@ -179,7 +183,7 @@ def aretomo2warp(batch_input,
         sta_util.make_warp_dir(ts_out_imod,
                                out_dir,
                                frames_dir = frames_dir,
-                               ensure_frames = ensure_frames,
+                               ensure_frames = include_frames,
                                imod = False,
                                v2 = v2)
 
