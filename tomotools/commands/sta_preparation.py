@@ -114,7 +114,7 @@ def imod2warp(batch_input,
               help="Project is for WarpTools 2.x, not Warp 1.x.")
 @click.option('-n', '--name', default='warp', show_default=True,
               help="Warp working directory will be created as project_dir/name.")
-@click.option('--include-frames--skip-frames/', is_flag=True,
+@click.option('--include-frames/--skip-frames', is_flag=True,
               default=False,
               show_default=True,
               help="Export also frames for each tilt.")
