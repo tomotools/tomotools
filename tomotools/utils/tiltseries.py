@@ -240,10 +240,57 @@ def aretomo_executable() -> Optional[str]:
         raise FileNotFoundError("AreTomo not found. Check README.md for setup info.")
 
 
-#TODO: implement binning using -OutBin X
-def align_with_areTomo(
-    ts: TiltSeries, local: bool, previous: bool, do_evn_odd: bool, gpu: str,
-        volz: int = 250):
+def bin_tiltseries(ts: TiltSeries,
+                   bin: int,
+                   do_even_odd: bool = False) -> "TiltSeries":
+    """Bin a TiltSeries object."""
+    binned_stack = ts.path.with_name(f'{ts.path.stem}_bin_{bin}.mrc')
+
+    subprocess.run(['newstack',
+                    '-in', ts.path,
+                    '-bin', str(bin),
+                    '-antialias', '-1',
+                    '-ou', binned_stack,
+                    '-quiet'],
+                    stdout=subprocess.DEVNULL)
+
+    print(f"{ts.path}: Binned to {bin}.")
+
+    if do_even_odd and ts.is_split:
+        binned_stack_evn = ts.evn_path.with_name(f'{ts.path.stem}_bin_{bin}_EVN.mrc')
+        binned_stack_odd = ts.odd_path.with_name(f'{ts.path.stem}_bin_{bin}_ODD.mrc')
+
+        subprocess.run(['newstack',
+                        '-in', ts.evn_path,
+                        '-bin', str(bin),
+                        '-antialias', '-1',
+                        '-ou', binned_stack_evn,
+                        '-quiet'],
+                        stdout=subprocess.DEVNULL)
+
+        subprocess.run(['newstack',
+                        '-in', ts.odd_path,
+                        '-bin', str(bin),
+                        '-antialias', '-1',
+                        '-ou', binned_stack_odd,
+                        '-quiet'],
+                        stdout=subprocess.DEVNULL)
+
+        print(f"{ts.path}: Binned EVN/ODD to {bin}.")
+
+        return TiltSeries(binned_stack).with_split_files(binned_stack_evn,
+                                                         binned_stack_odd).with_mdoc(ts.mdoc)
+
+    return TiltSeries(binned_stack).with_mdoc(ts.mdoc)
+
+
+def align_with_areTomo(ts: TiltSeries,
+                       local: bool,
+                       previous: bool,
+                       do_evn_odd: bool,
+                       gpu: str,
+                       volz: int = 250,
+                       bin: int = 1):
     """Takes a TiltSeries as input and runs AreTomo on it.
 
     Optional: do local alignment.
@@ -270,7 +317,7 @@ def align_with_areTomo(
         gpu_id = [int(gpu) for gpu in gpu_id]
 
     with mrcfile.mmap(ts.path) as mrc:
-        angpix = float(mrc.voxel_size.x)
+        angpix = float(mrc.voxel_size.x) * bin
 
     tlt_file = ts.path.with_suffix('.rawtlt')
 
@@ -288,6 +335,7 @@ def align_with_areTomo(
                         '-OutMrc', ali_stack,
                         '-AngFile', tlt_file,
                         '-AlnFile', aln_file,
+                        '-OutBin', bin,
                         '-VolZ', '0'],
                        stdout=subprocess.DEVNULL)
 
@@ -307,6 +355,7 @@ def align_with_areTomo(
                         '-OutMrc', ali_stack,
                         '-AngFile', tlt_file,
                         '-VolZ', '0',
+                        '-OutBin', bin,
                         '-TiltCor', f'0 {pretilt}',
                         '-AlignZ', alignZ] +
                        (['-Gpu'] + [str(i) for i in gpu_id]) +
@@ -333,16 +382,12 @@ def align_with_areTomo(
         subprocess.run(
             [
                 aretomo_executable(),
-                "-InMrc",
-                ts.evn_path,
-                "-OutMrc",
-                ali_stack_evn,
-                "-AngFile",
-                tlt_file,
-                "-AlnFile",
-                aln_file,
-                "-VolZ",
-                "0",
+                "-InMrc", ts.evn_path,
+                "-OutMrc", ali_stack_evn,
+                "-AngFile", tlt_file,
+                "-AlnFile", aln_file,
+                "-VolZ", "0",
+                '-OutBin', bin,
             ],
             stdout=subprocess.DEVNULL,
         )
@@ -350,16 +395,12 @@ def align_with_areTomo(
         subprocess.run(
             [
                 aretomo_executable(),
-                "-InMrc",
-                ts.odd_path,
-                "-OutMrc",
-                ali_stack_odd,
-                "-AngFile",
-                tlt_file,
-                "-AlnFile",
-                aln_file,
-                "-VolZ",
-                "0",
+                "-InMrc", ts.odd_path,
+                "-OutMrc", ali_stack_odd,
+                "-AngFile", tlt_file,
+                "-AlnFile", aln_file,
+                "-VolZ", "0",
+                '-OutBin', bin,
             ],
             stdout=subprocess.DEVNULL,
         )
@@ -402,7 +443,12 @@ def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
         orig_mdoc = ts.mdoc
         filtered_stack = ts.path.with_name(f"{ts.path.stem}_filtered.mrc")
         subprocess.run(
-            ["mtffilter", "-dtype", "4", "-dfile", ts.mdoc, ts.path, filtered_stack],
+            [
+                "mtffilter",
+                "-dtype", "4",
+                "-dfile", ts.mdoc,
+                 ts.path, filtered_stack,
+                 ],
             stdout=subprocess.DEVNULL,
         )
 
@@ -413,24 +459,18 @@ def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
             subprocess.run(
                 [
                     "mtffilter",
-                    "-dtype",
-                    "4",
-                    "-dfile",
-                    ts.mdoc,
-                    ts.evn_path,
-                    filtered_evn,
+                    "-dtype", "4",
+                    "-dfile", ts.mdoc,
+                    ts.evn_path, filtered_evn,
                 ],
                 stdout=subprocess.DEVNULL,
             )
             subprocess.run(
                 [
                     "mtffilter",
-                    "-dtype",
-                    "4",
-                    "-dfile",
-                    ts.mdoc,
-                    ts.odd_path,
-                    filtered_odd,
+                    "-dtype", "4",
+                    "-dfile", ts.mdoc,
+                    ts.odd_path, filtered_odd,
                 ],
                 stdout=subprocess.DEVNULL,
             )
@@ -690,7 +730,7 @@ def parse_darkimgs(ts: TiltSeries):
     return dark_tilts
 
 
-def convert_input_to_TiltSeries(input_files:[], mdoc_ok = False):
+def convert_input_to_TiltSeries(input_files:List[Path], mdoc_ok = False):
     """Takes list of input files or folders from Click.
 
     Returns list of TiltSeries objects with or without split frames.

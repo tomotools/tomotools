@@ -16,6 +16,7 @@ from tomotools.utils.tiltseries import (
     TiltSeries,
     align_with_areTomo,
     align_with_imod,
+    bin_tiltseries,
     convert_input_to_TiltSeries,
     dose_filter,
 )
@@ -522,11 +523,18 @@ def reconstruct(
 
         #TODO: bin during alignment
         if previous and imod:
-            tiltseries_ali = align_with_imod(tiltseries, previous, do_evn_odd)
+            tiltseries_ali = align_with_imod(tiltseries,
+                                             previous,
+                                             do_evn_odd,
+                                             binning=bin)
         else:
-            tiltseries_ali = align_with_areTomo(
-                tiltseries, local, previous, do_evn_odd, gpu, volz=ali_d
-            )
+            tiltseries_ali = align_with_areTomo(tiltseries,
+                                                local,
+                                                previous,
+                                                do_evn_odd,
+                                                gpu,
+                                                volz=ali_d,
+                                                bin = bin)
 
         # Do dose filtration.
         tiltseries_dosefiltered = dose_filter(tiltseries_ali, do_evn_odd)
@@ -542,9 +550,16 @@ def reconstruct(
 
         if do_positioning:
             print(f"Trying to run automatic positioning on {tiltseries.path.name}.")
+
             # Perform reconstruction at bin 8 to find pitch / thickness
-            tomo_pitch = Tomogram.from_tiltseries(tiltseries_dosefiltered,
-                                                  bin=8,
+            if bin < 8:
+                binned_ts = bin_tiltseries(tiltseries_dosefiltered,
+                                           int(8 / bin))
+            else:
+                binned_ts = tiltseries_dosefiltered
+
+            tomo_pitch = Tomogram.from_tiltseries(binned_ts,
+                                                  bin = 8,
                                                   do_EVN_ODD=False,
                                                   trim=False,
                                                   thickness=round(10000 / pix_xy))
@@ -592,7 +607,6 @@ def reconstruct(
 
         # Perform final reconstruction
 
-        # TODO: don't bin here anymore!
         Tomogram.from_tiltseries(tiltseries_dosefiltered,
                                  bin=bin,
                                  thickness=thickness,

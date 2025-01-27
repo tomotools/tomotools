@@ -82,50 +82,6 @@ class Tomogram:
         # Get dimensions of aligned stack - assumption is that tilt is around the y axis
         [full_reconstruction_y,full_reconstruction_x] = tiltseries.dimZYX[1:3]
 
-        # Bring stack to desired binning level
-
-        # TODO: skip here if passed pre-binned aligned stack
-        if bin != 1:
-            binned_stack = tiltseries.path.with_name(
-                f'{tiltseries.path.stem}_bin_{bin}.mrc')
-
-            subprocess.run(['newstack',
-                            '-in', tiltseries.path,
-                            '-bin', str(bin),
-                            '-antialias', '-1',
-                            '-ou', binned_stack,
-                            '-quiet'],
-                           stdout=subprocess.DEVNULL)
-
-            ali_stack = binned_stack
-            print(f"{tiltseries.path}: Binned to {bin}.")
-
-            if do_EVN_ODD and tiltseries.is_split:
-                binned_stack_evn = tiltseries.evn_path.with_name(
-                    f'{tiltseries.path.stem}_bin_{bin}_EVN.mrc')
-                binned_stack_odd = tiltseries.odd_path.with_name(
-                    f'{tiltseries.path.stem}_bin_{bin}_ODD.mrc')
-
-                subprocess.run(['newstack',
-                                '-in', tiltseries.evn_path,
-                                '-bin', str(bin),
-                                '-antialias', '-1',
-                                '-ou', binned_stack_evn,
-                                '-quiet'],
-                               stdout=subprocess.DEVNULL)
-
-                subprocess.run(['newstack',
-                                '-in', tiltseries.odd_path,
-                                '-bin', str(bin),
-                                '-antialias', '-1',
-                                '-ou', binned_stack_odd,
-                                '-quiet'],
-                               stdout=subprocess.DEVNULL)
-
-                ali_stack_evn = binned_stack_evn
-                ali_stack_odd = binned_stack_odd
-                print(f"{tiltseries.path}: Binned EVN/ODD to {bin}.")
-
         # Perform imod WBP
         full_rec = tiltseries.path.with_name(f'{tiltseries.path.stem}_full_rec.mrc')
 
@@ -201,14 +157,7 @@ class Tomogram:
                             '-UseGPU', '0'],
                             stdout=subprocess.DEVNULL)
 
-            if bin != 1:
-                os.remove(binned_stack_evn)
-                os.remove(binned_stack_odd)
-
             print(f'{tiltseries.path}: Finished reconstruction of EVN/ODD stacks.')
-
-        if bin != 1:
-            os.remove(binned_stack)
 
         if trim:
             # Trim: Read in dimensions of full_rec (as YZX)
