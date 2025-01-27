@@ -726,7 +726,7 @@ def convert_input_to_TiltSeries(input_files:[], mdoc_ok = False):
     for file in return_list:
         if file.path is None and mdoc_ok:
             print(f'Found mdoc for {file.mdoc}.')
-            
+
         else:
             if (path.isfile(file.path.with_name(f'{file.path.stem}_EVN.mrc')) and
                 path.isfile(file.path.with_name(f'{file.path.stem}_ODD.mrc'))):
