@@ -26,7 +26,7 @@ class TiltSeries:
     def __init__(self, ts_path: Path):
         if ts_path is None:
             pass
-        elif not os.path.isfile(ts_path):
+        elif not path.isfile(ts_path):
             raise FileNotFoundError(f"File not found: {ts_path}")
         self.path: Path = ts_path
         self.mdoc: Path = Path(f"{ts_path}.mdoc")
@@ -724,20 +724,24 @@ def convert_input_to_TiltSeries(input_files:[], mdoc_ok = False):
                                               )])
 
     for file in return_list:
-        if (path.isfile(file.path.with_name(f'{file.path.stem}_EVN.mrc')) and
-            path.isfile(file.path.with_name(f'{file.path.stem}_ODD.mrc'))):
-            file = file.with_split_files(file.path.with_name(f'{file.path.stem}_EVN.mrc'), #noqa: E501
-                                         file.path.with_name(f'{file.path.stem}_ODD.mrc'))
-
-        elif (path.isfile(file.path.with_name(f'{file.path.stem}_even.mrc')) and
-              path.isfile(file.path.with_name(f'{file.path.stem}_odd.mrc'))):
-            file = file.with_split_files(file.path.with_name(f'{file.path.stem}_even.mrc'), #noqa: E501
-                                         file.path.with_name(f'{file.path.stem}_odd.mrc'))
-
-        if file.is_split:
-            print(f'Found TiltSeries {file.path} with EVN and ODD stacks.')
+        if file.path is None and mdoc_ok:
+            print(f'Found mdoc for {file.mdoc}.')
+            
         else:
-            print(f'Found TiltSeries {file.path}.')
+            if (path.isfile(file.path.with_name(f'{file.path.stem}_EVN.mrc')) and
+                path.isfile(file.path.with_name(f'{file.path.stem}_ODD.mrc'))):
+                file = file.with_split_files(file.path.with_name(f'{file.path.stem}_EVN.mrc'), #noqa: E501
+                                            file.path.with_name(f'{file.path.stem}_ODD.mrc'))
+
+            elif (path.isfile(file.path.with_name(f'{file.path.stem}_even.mrc')) and
+                path.isfile(file.path.with_name(f'{file.path.stem}_odd.mrc'))):
+                file = file.with_split_files(file.path.with_name(f'{file.path.stem}_even.mrc'), #noqa: E501
+                                            file.path.with_name(f'{file.path.stem}_odd.mrc'))
+
+            if file.is_split:
+                print(f'Found TiltSeries {file.path} with EVN and ODD stacks.')
+            else:
+                print(f'Found TiltSeries {file.path}.')
 
     return return_list
 
