@@ -591,7 +591,7 @@ def reconstruct(
             tomo_pitch.path.unlink(missing_ok=True)
 
         # Perform final reconstruction
-        
+
         # TODO: don't bin here anymore!
         Tomogram.from_tiltseries(tiltseries_dosefiltered,
                                  bin=bin,

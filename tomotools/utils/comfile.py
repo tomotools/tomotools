@@ -1,3 +1,5 @@
+from typing import List
+
 from tomotools.utils.tiltseries import TiltSeries
 
 
@@ -82,7 +84,7 @@ def fake_ctfcom(ts: TiltSeries, binning: int):
 
 
 def fix_tiltcom(ts: TiltSeries, thickness: int, fsirt: int, bin: int,
-                fullimage: []):
+                fullimage: List[int, int]):
     """
     Make sure tilt.com file has the right parameters.
 

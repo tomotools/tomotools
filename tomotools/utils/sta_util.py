@@ -5,6 +5,7 @@ import subprocess
 from glob import glob
 from os import path
 from pathlib import Path
+from typing import List
 
 import mrcfile
 
@@ -204,7 +205,7 @@ def make_warp_dir(ts: TiltSeries,
     return
 
 
-def batch_parser(input_files: [], batch: bool):
+def batch_parser(input_files: List, batch: bool):
     """Batch-parse tiltseries to work on from textfile."""
     input_files_parsed = []
 

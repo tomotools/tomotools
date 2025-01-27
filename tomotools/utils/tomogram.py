@@ -3,7 +3,7 @@ import subprocess
 from glob import glob
 from os import path
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import mrcfile
 
@@ -83,7 +83,7 @@ class Tomogram:
         [full_reconstruction_y,full_reconstruction_x] = tiltseries.dimZYX[1:3]
 
         # Bring stack to desired binning level
-        
+
         # TODO: skip here if passed pre-binned aligned stack
         if bin != 1:
             binned_stack = tiltseries.path.with_name(
@@ -284,7 +284,7 @@ class Tomogram:
     @staticmethod
     def from_tiltseries_3dctf(tiltseries: TiltSeries, binning=1,
                               thickness=3000, z_slices_nm=25,
-                              fullimage: [] = None) -> 'Tomogram':
+                              fullimage: Optional[List] = None) -> 'Tomogram':
         """
         Calculate Tomogram with imod ctf3d.
 
@@ -371,7 +371,7 @@ def find_Tomogram_halves(tomo: Tomogram, split_dir: Optional[Path] = None):
     else:
         return tomo
 
-def convert_input_to_Tomogram(input_files:[]):
+def convert_input_to_Tomogram(input_files: List[Path]):
     """Takes list of input files or folders from Click.
 
     Returns list of Tomogram objects with or without split reconstructions.
