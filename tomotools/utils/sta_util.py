@@ -5,6 +5,7 @@ import subprocess
 from glob import glob
 from os import path
 from pathlib import Path
+from typing import List
 
 import mrcfile
 
@@ -199,7 +200,7 @@ def make_warp_dir(ts: TiltSeries,
     return
 
 
-def batch_parser(input_files: [], batch: bool):
+def batch_parser(input_files: List, batch: bool):
     """Batch-parse tiltseries to work on from textfile."""
     input_files_parsed = []
 
@@ -265,7 +266,7 @@ def tomotwin_prep(tomotwin_dir, ts_list, thickness, uid, bin_up=True):
 
         ts_ali = align_with_imod(ts, True, False, binning=binning)
 
-        rec = tomogram.Tomogram.from_tiltseries(ts_ali, bin=1, sirt=0,
+        rec = tomogram.Tomogram.from_tiltseries(ts_ali, bin=binning, sirt=0,
                                                 thickness=round(thickness/binning),
                                                 convert_to_byte=False)
 
