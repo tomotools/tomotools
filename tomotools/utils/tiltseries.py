@@ -17,11 +17,17 @@ from tomotools.utils.micrograph import Micrograph
 
 
 class TiltSeries:
-    """Class for TiltSeries."""
+    """Class for TiltSeries.
 
-    def __init__(self, path: Path):
-        if not path.is_file():
-            raise FileNotFoundError(f"File not found: {path}")
+    Pass either Path to mrc/st file or None if only mdoc exists.
+
+    """
+
+    def __init__(self, ts_path: Path):
+        if ts_path is None:
+            pass
+        elif not path.is_file(ts_path):
+            raise FileNotFoundError(f"File not found: {ts_path}")
         self.path: Path = path
         self.mdoc: Path = Path(f"{path}.mdoc")
         self.is_split: bool = False
@@ -677,11 +683,14 @@ def parse_darkimgs(ts: TiltSeries):
     return dark_tilts
 
 
-def convert_input_to_TiltSeries(input_files:[]):
+def convert_input_to_TiltSeries(input_files:[], mdoc_ok = False):
     """Takes list of input files or folders from Click.
 
     Returns list of TiltSeries objects with or without split frames.
     If a folder is given, identify it by corresponding mdoc file.
+
+    If mdoc_ok is passed, accept mdoc files without mrc.
+    This is used for preprocessing step.
     """
     return_list = []
 
@@ -693,7 +702,12 @@ def convert_input_to_TiltSeries(input_files:[]):
         if input_file.is_file():
             if not (input_file.name.endswith('.st') or
                      input_file.name.endswith('.mrc')):
+                
+                if input_file.name.endswith(".mdoc") and mdoc_ok:
+                    return_list.append(TiltSeries(None).with_mdoc(input_file))
+                
                 continue
+
             if (input_file.name.endswith('_EVN.mrc') or
                 input_file.name.endswith('_ODD.mrc') or
                 input_file.name.endswith('_even.mrc') or
