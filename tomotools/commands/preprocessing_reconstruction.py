@@ -214,7 +214,7 @@ def preprocess(
         if any("SubFramePath" in section for section in mdoc["sections"]):
             for section in mdoc["sections"]:
                 subframes_root_path = (
-                    path.dirname(input_file.path) if frames is None else frames
+                    path.dirname(input_file.mdoc) if frames is None else frames
                 )
                 section["SubFramePath"] = mdocfile.find_relative_path(
                     Path(subframes_root_path),
@@ -228,7 +228,7 @@ def preprocess(
                 ]
             except FileNotFoundError:
                 print(
-                    f"Movie frames not found for {input_file.path}, use --frames."
+                    f"Movie frames not found for {input_file.mdoc}, use --frames."
                 )
                 continue
 
@@ -257,7 +257,7 @@ def preprocess(
                                 output_dir])
             continue
 
-        print(f'Frames were found for {input_file.path}, will run align using MC2.')
+        print(f'Frames were found for {input_file.mdoc}, will run align using MC2.')
 
         # Get rotation and flip of Gain reference from mdoc file property
         mcrot, mcflip = None, None
