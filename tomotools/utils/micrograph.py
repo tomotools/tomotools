@@ -61,20 +61,13 @@ class Micrograph:
         override_gainref: Optional[Path] = None,
         gpu: Optional[str] = None,
     ) -> "List[Micrograph]":
-        """Create micrograph from a list of movies using MotionCor2."""
+        """Create micrograph from a list of movies using MotionCor."""
         # TODO: Reduce complexity C901
 
         tempdir = output_dir.joinpath("motioncor2_temp")
         tempdir.mkdir(parents=True)
         gain_ref_dm4 = None
         gain_ref_mrc = None
-        mc2_exe = motioncor2_executable()
-        if mc2_exe is None:
-            raise FileNotFoundError(
-                "The MotionCor2 executable could not be found. "
-                "Either specify it by setting MOTIONCOR2_EXECUTABLE "
-                'or put it into the PATH and rename it to "motioncor2"'
-            )
 
         # If override_gainref is given, check if it is already mrc
         # Otherwise, convert.
@@ -130,24 +123,15 @@ class Micrograph:
                 "No gainref is given or found, continuing without gain correction."
             )
 
-        # Link the input files to the working dir
-        # so that files that should not be motioncor'ed are not
-        for movie in movies:
-            tempdir.joinpath(movie.path.name).symlink_to(movie.path.absolute())
-
+        # Generate MotionCor command
         command = [
-            mc2_exe,
+            motioncor_executable(),
             "-OutMrc",
             str(output_dir.absolute()) + os.path.sep,
             "-FtBin",
             str(binning),
-            "-Serial",
-            "1",
         ]
-        if movies[0].is_mrc:
-            command += ["-InMrc", str(tempdir.absolute()) + "/"]
-        elif movies[0].is_tiff:
-            command += ["-InTiff", str(tempdir.absolute()) + "/"]
+
         if gpu is None:
             command += (
                 ["-Gpu"] + [str(i) for i in range(util.num_gpus())]
@@ -156,6 +140,7 @@ class Micrograph:
             )
         else:
             command += ["-Gpu", gpu]
+
         if splitsum:
             command += ["-SplitSum", "1"]
 
@@ -184,10 +169,20 @@ class Micrograph:
         else:
             command += ["-Group", str(group)]
 
-        with open(join(output_dir, "motioncor2.log"), "a") as out, open(
-            join(output_dir, "motioncor2.err"), "a"
-        ) as err:
-            subprocess.run(command, cwd=tempdir, stdout=out, stderr=err)
+        # Now, correct every movie separately, since -Serial 1 causes issues
+
+        for movie in movies:
+            tempdir.joinpath(movie.path.name).symlink_to(movie.path.absolute())
+
+            if movie.is_mrc:
+                command_temp = command + ["-InMrc", movie.path.absolute()]
+            elif movie.is_tiff:
+                command_temp = command + ["-InTiff", movie.path.absolute()]
+
+            with open(join(output_dir, "motioncor2.log"), "a") as out, open(
+                join(output_dir, "motioncor2.err"), "a"
+            ) as err:
+                subprocess.run(command_temp, cwd=tempdir, stdout=out, stderr=err)
 
         # If present, copy the mdoc files to the output dir
         # Rename from .tif.mdoc to .mrc.mdoc
@@ -214,13 +209,13 @@ class Micrograph:
                 )
         shutil.rmtree(tempdir)
 
-        print("Checking MotionCor2 output files")
+        print("Checking MotionCor output files")
 
         if gain_ref_mrc is not None:
             with open(join(output_dir, "motioncor2.log")) as log:
                 if any(line.startswith("Warning: Gain ref not found.") for line in log):
                     raise Exception(
-                        "Gain reference was specified, but not applied by MotionCor2."
+                        "Gain reference was specified, but not applied by MotionCor."
                     )
 
         if gain_ref_dm4 is not None:
@@ -240,26 +235,32 @@ class Micrograph:
         return output_micrographs
 
 
-def motioncor2_executable() -> Optional[str]:
+def motioncor_executable() -> Optional[str]:
     """Return MotionCor2/3 executable.
 
     Path can be set with one of the following ways (in order of priority):
-    1. Setting the MOTIONCOR2_EXECUTABLE variable to the full path of the executable
-    2. Putting the appropriate executable into the PATH and renaming it to "motioncor2"
+    1. Setting the MOTIONCOR_EXECUTABLE variable to the full path of the executable.
+    2. Putting "MotionCor3" in PATH.
+    3. Putting "MotionCor2" in PATH.
+
     """
-    if "MOTIONCOR2_EXECUTABLE" in os.environ:
-        mc2_exe = os.environ["MOTIONCOR2_EXECUTABLE"]
-        if isfile(mc2_exe):
-            return mc2_exe
+    if "MOTIONCOR_EXECUTABLE" in os.environ:
+        mc_exe = os.environ["MOTIONCOR_EXECUTABLE"]
+        if isfile(mc_exe):
+            return mc_exe
         else:
             raise FileNotFoundError(
-                f'Variable for MotionCorX is set to "{mc2_exe}", but file is missing.'
+                f'MOTIONCOR_EXECUTABLE is set to "{mc_exe}", but file is missing.'
             )
 
     elif shutil.which("MotionCor3") is not None:
         return shutil.which("MotionCor3")
-    else:
+    elif shutil.which("MotionCor2") is not None:
         return shutil.which("MotionCor2")
+    else:
+        raise FileNotFoundError(
+                'MotionCor not found. Check README.md for setup info.'
+            )
 
 
 def sem2mc2(RotationAndFlip: int = 0):
