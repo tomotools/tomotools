@@ -126,8 +126,6 @@ class Micrograph:
         # Generate MotionCor command
         command = [
             motioncor_executable(),
-            "-OutMrc",
-            str(output_dir.absolute()) + os.path.sep,
             "-FtBin",
             str(binning),
         ]
@@ -170,14 +168,17 @@ class Micrograph:
             command += ["-Group", str(group)]
 
         # Now, correct every movie separately, since -Serial 1 causes issues
-
         for movie in movies:
-            tempdir.joinpath(movie.path.name).symlink_to(movie.path.absolute())
 
             if movie.is_mrc:
                 command_temp = command + ["-InMrc", movie.path.absolute()]
             elif movie.is_tiff:
                 command_temp = command + ["-InTiff", movie.path.absolute()]
+
+            command_temp += ["-OutMrc",
+                             str(output_dir.absolute()) +
+                             os.path.sep +
+                             movie.path.with_suffix(".mrc".name)]
 
             with open(join(output_dir, "motioncor2.log"), "a") as out, open(
                 join(output_dir, "motioncor2.err"), "a"

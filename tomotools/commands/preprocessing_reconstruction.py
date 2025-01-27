@@ -257,7 +257,7 @@ def preprocess(
                                 output_dir])
             continue
 
-        print(f'Frames were found for {input_file.path}, will run align using MC2.')
+        print(f'Frames were found for {input_file.path}, will run MotionCor.')
 
         # Get rotation and flip of Gain reference from mdoc file property
         mcrot, mcflip = None, None
