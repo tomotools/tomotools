@@ -394,7 +394,7 @@ def align_with_areTomo(ts: TiltSeries,
                         '-OutMrc', ali_stack,
                         '-AngFile', tlt_file,
                         '-AlnFile', aln_file,
-                        '-OutBin', bin,
+                        '-OutBin', str(bin),
                         '-VolZ', '0'],
                        stdout=subprocess.DEVNULL)
 
@@ -414,7 +414,7 @@ def align_with_areTomo(ts: TiltSeries,
                         '-AngFile', tlt_file,
                         '-VolZ', '0',
                         '-TiltCor', '0',
-                        '-OutBin', bin,
+                        '-OutBin', str(bin,
                         '-AlignZ', alignZ] +
                        (['-TiltAxis', override_axis]
                         if override_axis is not None else []) +
@@ -447,7 +447,7 @@ def align_with_areTomo(ts: TiltSeries,
                 "-AngFile", tlt_file,
                 "-AlnFile", aln_file,
                 "-VolZ", "0",
-                '-OutBin', bin,
+                '-OutBin', str(bin),
             ],
             stdout=subprocess.DEVNULL,
         )
@@ -460,7 +460,7 @@ def align_with_areTomo(ts: TiltSeries,
                 "-AngFile", tlt_file,
                 "-AlnFile", aln_file,
                 "-VolZ", "0",
-                '-OutBin', bin,
+                '-OutBin', str(bin),
             ],
             stdout=subprocess.DEVNULL,
         )
