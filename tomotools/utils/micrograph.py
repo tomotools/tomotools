@@ -178,7 +178,7 @@ class Micrograph:
             command_temp += ["-OutMrc",
                              str(output_dir.absolute()) +
                              os.path.sep +
-                             movie.path.with_suffix(".mrc".name)]
+                             movie.path.with_suffix(".mrc").name]
 
             with open(join(output_dir, "motioncor2.log"), "a") as out, open(
                 join(output_dir, "motioncor2.err"), "a"
