@@ -17,13 +17,19 @@ from tomotools.utils.micrograph import Micrograph
 
 
 class TiltSeries:
-    """Class for TiltSeries."""
+    """Class for TiltSeries.
 
-    def __init__(self, path: Path):
-        if not path.is_file():
-            raise FileNotFoundError(f"File not found: {path}")
-        self.path: Path = path
-        self.mdoc: Path = Path(f"{path}.mdoc")
+    Pass either Path to mrc/st file or None if only mdoc exists.
+
+    """
+
+    def __init__(self, ts_path: Path):
+        if ts_path is None:
+            pass
+        elif not path.isfile(ts_path):
+            raise FileNotFoundError(f"File not found: {ts_path}")
+        self.path: Path = ts_path
+        self.mdoc: Path = Path(f"{ts_path}.mdoc")
         self.is_split: bool = False
         self.evn_path: Optional[Path] = None
         self.odd_path: Optional[Path] = None
@@ -568,10 +574,17 @@ def run_ctfplotter(ts: TiltSeries, overwrite: bool):
         kV = 300
         cs = 2.7
 
+        if path.isfile(ts.path.with_suffix('.tlt')):
+            tlt_file = ts.path.with_suffix('.tlt')
+        elif path.isfile(ts.path.with_name(f'{ts.path.stem}_ali.tlt')):
+            tlt_file = ts.path.with_name(f'{ts.path.stem}_ali.tlt')
+        else:
+            tlt_file = ts.path.with_suffix('.rawtlt')
+
         with open(path.join(ts.path.parent, 'ctfplotter.log'), 'a') as out:
             subprocess.run(['ctfplotter',
                             '-InputStack', ts.path,
-                            '-angleFn', ts.path.with_suffix('.tlt'),
+                            '-angleFn', tlt_file,
                             '-defFn', ts.path.with_name(
                                 f'{ts.path.stem}.defocus'),
                             '-pixelSize', str(nmpix),
@@ -677,11 +690,14 @@ def parse_darkimgs(ts: TiltSeries):
     return dark_tilts
 
 
-def convert_input_to_TiltSeries(input_files: List[Path]):
+def convert_input_to_TiltSeries(input_files:[], mdoc_ok = False):
     """Takes list of input files or folders from Click.
 
     Returns list of TiltSeries objects with or without split frames.
     If a folder is given, identify it by corresponding mdoc file.
+
+    If mdoc_ok is passed, accept mdoc files without mrc.
+    This is used for preprocessing step.
     """
     return_list = []
 
@@ -693,7 +709,12 @@ def convert_input_to_TiltSeries(input_files: List[Path]):
         if input_file.is_file():
             if not (input_file.name.endswith('.st') or
                      input_file.name.endswith('.mrc')):
+
+                if input_file.name.endswith(".mdoc") and mdoc_ok:
+                    return_list.append(TiltSeries(None).with_mdoc(input_file))
+
                 continue
+
             if (input_file.name.endswith('_EVN.mrc') or
                 input_file.name.endswith('_ODD.mrc') or
                 input_file.name.endswith('_even.mrc') or
@@ -710,20 +731,24 @@ def convert_input_to_TiltSeries(input_files: List[Path]):
                                               )])
 
     for file in return_list:
-        if (path.isfile(file.path.with_name(f'{file.path.stem}_EVN.mrc')) and
-            path.isfile(file.path.with_name(f'{file.path.stem}_ODD.mrc'))):
-            file = file.with_split_files(file.path.with_name(f'{file.path.stem}_EVN.mrc'), #noqa: E501
-                                         file.path.with_name(f'{file.path.stem}_ODD.mrc'))
+        if file.path is None and mdoc_ok:
+            print(f'Found mdoc for {file.mdoc}.')
 
-        elif (path.isfile(file.path.with_name(f'{file.path.stem}_even.mrc')) and
-              path.isfile(file.path.with_name(f'{file.path.stem}_odd.mrc'))):
-            file = file.with_split_files(file.path.with_name(f'{file.path.stem}_even.mrc'), #noqa: E501
-                                         file.path.with_name(f'{file.path.stem}_odd.mrc'))
-
-        if file.is_split:
-            print(f'Found TiltSeries {file.path} with EVN and ODD stacks.')
         else:
-            print(f'Found TiltSeries {file.path}.')
+            if (path.isfile(file.path.with_name(f'{file.path.stem}_EVN.mrc')) and
+                path.isfile(file.path.with_name(f'{file.path.stem}_ODD.mrc'))):
+                file = file.with_split_files(file.path.with_name(f'{file.path.stem}_EVN.mrc'), #noqa: E501
+                                            file.path.with_name(f'{file.path.stem}_ODD.mrc'))
+
+            elif (path.isfile(file.path.with_name(f'{file.path.stem}_even.mrc')) and
+                path.isfile(file.path.with_name(f'{file.path.stem}_odd.mrc'))):
+                file = file.with_split_files(file.path.with_name(f'{file.path.stem}_even.mrc'), #noqa: E501
+                                            file.path.with_name(f'{file.path.stem}_odd.mrc'))
+
+            if file.is_split:
+                print(f'Found TiltSeries {file.path} with EVN and ODD stacks.')
+            else:
+                print(f'Found TiltSeries {file.path}.')
 
     return return_list
 

@@ -15,7 +15,7 @@ tomotools [subcommand] --help
 - **blend-montages**: Blends SerialEM montages, write results to separate folder.
   - Example: ```tomotools blend-montages MMM*.mrc montages-blended```
 - **preprocess**: Prepare tiltseries for reconstruction.
-  - Takes data directory from SerialEM as input and writes the final stacks to the target directory.
+  - Takes data directory from SerialEM or Tomo5 as input and writes the final stacks to the target directory.
   - Frames are aligned using MotionCor2 and reordered if desired. Supports GainRef conversion from dm4 to mrc and the SerialEM-generated defects.txt.
   - Example: ```tomotools preprocess --mcbin 1 --gainref frames/GainRef.dm4 *.mrc ts-aligned```
 - **reconstruct**: Perform batch reconstruction using AreTomo or imod.

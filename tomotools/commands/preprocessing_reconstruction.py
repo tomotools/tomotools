@@ -161,16 +161,16 @@ def preprocess(
     This function runs MotionCor2 on movie frames, stacks the motion-corrected frames
     and sorts them by tilt-angle.
 
-    The input files may be individual .mrc/.st tilt-series files
-    or directories containing them.
-    In the latter case, a simple search for MRC and ST files will be run
-    (using the globs *.mrc and *.st).
+    The input files may be individual .mrc/.st tilt-series files,
+    their mdocs, or directories containing them.
+
     Every input file requires a corresponding .mdoc file.
 
     The last argument is the output dir. It will be created if it doesn't exist.
     """
-    # Convert all directories into a list of MRC/ST files
-    input_files = convert_input_to_TiltSeries(input_files)
+    # Convert all directories into a list of TiltSeries objects
+    input_files = convert_input_to_TiltSeries(input_files,
+                                              mdoc_ok=True)
 
     output_dir = Path(output_dir)
     if not output_dir.is_dir():
@@ -214,7 +214,7 @@ def preprocess(
         if any("SubFramePath" in section for section in mdoc["sections"]):
             for section in mdoc["sections"]:
                 subframes_root_path = (
-                    path.dirname(input_file.path) if frames is None else frames
+                    path.dirname(input_file.mdoc) if frames is None else frames
                 )
                 section["SubFramePath"] = mdocfile.find_relative_path(
                     Path(subframes_root_path),
@@ -228,7 +228,7 @@ def preprocess(
                 ]
             except FileNotFoundError:
                 print(
-                    f"Movie frames not found for {input_file.path}, use --frames."
+                    f"Movie frames not found for {input_file.mdoc}, use --frames."
                 )
                 continue
 
@@ -323,7 +323,7 @@ def preprocess(
         if stack:
             tilt_series = TiltSeries.from_micrographs(
                 micrographs,
-                output_dir / input_file.path.name,
+                output_dir / input_file.mdoc.stem,
                 mdoc=mdoc,
                 reorder=True,
                 overwrite_dose=exposuredose
