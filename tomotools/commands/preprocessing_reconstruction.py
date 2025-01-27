@@ -323,7 +323,7 @@ def preprocess(
         if stack:
             tilt_series = TiltSeries.from_micrographs(
                 micrographs,
-                output_dir / input_file.path.name,
+                output_dir / input_file.mdoc.stem,
                 mdoc=mdoc,
                 reorder=True,
                 overwrite_dose=exposuredose
