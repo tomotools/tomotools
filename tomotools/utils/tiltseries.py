@@ -414,7 +414,7 @@ def align_with_areTomo(ts: TiltSeries,
                         '-AngFile', tlt_file,
                         '-VolZ', '0',
                         '-TiltCor', '0',
-                        '-OutBin', str(bin,
+                        '-OutBin', str(bin),
                         '-AlignZ', alignZ] +
                        (['-TiltAxis', override_axis]
                         if override_axis is not None else []) +
@@ -447,7 +447,11 @@ def align_with_areTomo(ts: TiltSeries,
                 "-AngFile", tlt_file,
                 "-AlnFile", aln_file,
                 "-VolZ", "0",
+<<<<<<< HEAD
                 '-OutBin', str(bin),
+=======
+                '-OutBin', bin,
+>>>>>>> bc524ca (implemented initial version of reconstruct workflow with binning during alignment)
             ],
             stdout=subprocess.DEVNULL,
         )
@@ -460,7 +464,11 @@ def align_with_areTomo(ts: TiltSeries,
                 "-AngFile", tlt_file,
                 "-AlnFile", aln_file,
                 "-VolZ", "0",
+<<<<<<< HEAD
                 '-OutBin', str(bin),
+=======
+                '-OutBin', bin,
+>>>>>>> bc524ca (implemented initial version of reconstruct workflow with binning during alignment)
             ],
             stdout=subprocess.DEVNULL,
         )
