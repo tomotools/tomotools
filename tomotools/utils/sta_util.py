@@ -266,7 +266,7 @@ def tomotwin_prep(tomotwin_dir, ts_list, thickness, uid, bin_up=True):
 
         ts_ali = align_with_imod(ts, True, False, binning=binning)
 
-        rec = tomogram.Tomogram.from_tiltseries(ts_ali, bin=1, sirt=0,
+        rec = tomogram.Tomogram.from_tiltseries(ts_ali, bin=binning, sirt=0,
                                                 thickness=round(thickness/binning),
                                                 convert_to_byte=False)
 
