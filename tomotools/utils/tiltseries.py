@@ -26,7 +26,7 @@ class TiltSeries:
     def __init__(self, ts_path: Path):
         if ts_path is None:
             pass
-        elif not os.path.is_file(ts_path):
+        elif not os.path.isfile(ts_path):
             raise FileNotFoundError(f"File not found: {ts_path}")
         self.path: Path = ts_path
         self.mdoc: Path = Path(f"{ts_path}.mdoc")
