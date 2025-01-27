@@ -26,10 +26,10 @@ class TiltSeries:
     def __init__(self, ts_path: Path):
         if ts_path is None:
             pass
-        elif not path.is_file(ts_path):
+        elif not os.path.is_file(ts_path):
             raise FileNotFoundError(f"File not found: {ts_path}")
-        self.path: Path = path
-        self.mdoc: Path = Path(f"{path}.mdoc")
+        self.path: Path = ts_path
+        self.mdoc: Path = Path(f"{ts_path}.mdoc")
         self.is_split: bool = False
         self.evn_path: Optional[Path] = None
         self.odd_path: Optional[Path] = None
@@ -702,10 +702,10 @@ def convert_input_to_TiltSeries(input_files:[], mdoc_ok = False):
         if input_file.is_file():
             if not (input_file.name.endswith('.st') or
                      input_file.name.endswith('.mrc')):
-                
+
                 if input_file.name.endswith(".mdoc") and mdoc_ok:
                     return_list.append(TiltSeries(None).with_mdoc(input_file))
-                
+
                 continue
 
             if (input_file.name.endswith('_EVN.mrc') or
