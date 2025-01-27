@@ -215,7 +215,8 @@ def aretomo_executable() -> Optional[str]:
 
     Path can be set with one of the following ways (in order of priority):
     1. Setting the ARETOMO_EXECUTABLE variable to the full path of the executable
-    2. Putting the appropriate executable into the PATH and renaming it to "AreTomo"
+    2. Putting "AreTomo" in PATH.
+    3. Putting "AreTomo2" in PATH.
     """
     if "ARETOMO_EXECUTABLE" in os.environ:
         aretomo_exe = os.environ["ARETOMO_EXECUTABLE"]
@@ -223,12 +224,14 @@ def aretomo_executable() -> Optional[str]:
             return aretomo_exe
         else:
             raise FileNotFoundError(
-                f'Variable for AreTomo is set to "{aretomo_exe}", but file is missing.'
+                f'ARETOMO_EXECUTABLE is set to "{aretomo_exe}", but file is missing.'
             )
+    elif shutil.which("AreTomo") is not None:
+        return shutil.which("AreTomo")
     elif shutil.which("AreTomo2") is not None:
         return shutil.which("AreTomo2")
     else:
-        return shutil.which("AreTomo")
+        raise FileNotFoundError("AreTomo not found. Check README.md for setup info.")
 
 
 #TODO: implement binning using -OutBin X
@@ -615,7 +618,7 @@ def parse_ctfplotter(file: Path):
     return df_file
 
 
-def write_ctfplotter(df: pd.DataFrame(), file: Path):
+def write_ctfplotter(df: pd.DataFrame, file: Path):
     """Writes Pandas dataframe as ctfplotter .defocus file."""
     # Somehow this header is present in ctfplotter files, so also add here.
     header = pd.DataFrame(['1', '0', '0.0', '0.0', '0.0', '3']).T
@@ -674,7 +677,7 @@ def parse_darkimgs(ts: TiltSeries):
     return dark_tilts
 
 
-def convert_input_to_TiltSeries(input_files:[]):
+def convert_input_to_TiltSeries(input_files: List[Path]):
     """Takes list of input files or folders from Click.
 
     Returns list of TiltSeries objects with or without split frames.
