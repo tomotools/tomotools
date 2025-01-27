@@ -45,7 +45,7 @@ tomotools [subcommand] --help
 
 ## Dependencies
 `tomotools` depends on commands from MotionCor2 or MotionCor3, IMOD, and AreTomo 1.X or AreTomo2 for full functionality. IMOD should be in PATH. 
-MotionCor2/3 and AreTomo2/3 can either be in PATH as `motioncor2` /  `motioncor3` or `aretomo` / `aretomo2` respectively, or set using the envar `MOTIONCOR2_EXECUTABLE` or `ARETOMO_EXECUTABLE`.
+MotionCor2/3 and AreTomo2/3 can either be in PATH as `MotionCor2` /  `MotionCor3` or `AreTomo` / `AreTomo2` respectively, or set using the envar `MOTIONCOR_EXECUTABLE` or `ARETOMO_EXECUTABLE`.
 
 ## Installation
 We suggest installing tomotools into its own conda / mamba environment. 
