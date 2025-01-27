@@ -448,10 +448,14 @@ def align_with_areTomo(ts: TiltSeries,
                 "-AlnFile", aln_file,
                 "-VolZ", "0",
 <<<<<<< HEAD
+<<<<<<< HEAD
                 '-OutBin', str(bin),
 =======
                 '-OutBin', bin,
 >>>>>>> bc524ca (implemented initial version of reconstruct workflow with binning during alignment)
+=======
+                '-OutBin', str(bin),
+>>>>>>> 59cc49c (added error with int in subprocess.run)
             ],
             stdout=subprocess.DEVNULL,
         )
@@ -465,10 +469,14 @@ def align_with_areTomo(ts: TiltSeries,
                 "-AlnFile", aln_file,
                 "-VolZ", "0",
 <<<<<<< HEAD
+<<<<<<< HEAD
                 '-OutBin', str(bin),
 =======
                 '-OutBin', bin,
 >>>>>>> bc524ca (implemented initial version of reconstruct workflow with binning during alignment)
+=======
+                '-OutBin', str(bin),
+>>>>>>> 59cc49c (added error with int in subprocess.run)
             ],
             stdout=subprocess.DEVNULL,
         )
