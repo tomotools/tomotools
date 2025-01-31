@@ -298,16 +298,15 @@ def align_with_areTomo(
         patch_x, patch_y = [
             str(round(full_dimensions[0] / 1000)),
             str(round(full_dimensions[1] / 1000))]
-        alignZ = str(round(volz / angpix))
-
-        pretilt = -1 * round(mdocfile.get_start_tilt(mdoc))
+        
+        alignZ = str(round(volz * 10 / angpix))
 
         subprocess.run([aretomo_executable(),
                         '-InMrc', ts.path,
                         '-OutMrc', ali_stack,
                         '-AngFile', tlt_file,
                         '-VolZ', '0',
-                        '-TiltCor', f'0 {pretilt}',
+                        '-TiltCor', '0',
                         '-AlignZ', alignZ] +
                        (['-Gpu'] + [str(i) for i in gpu_id]) +
                        (['-Patch', patch_x, patch_y] if local else []),
