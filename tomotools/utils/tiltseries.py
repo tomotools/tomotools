@@ -217,11 +217,12 @@ class TiltSeries:
 
 
 def aretomo_executable() -> Optional[str]:
-    """Return AreTomo executable.
+    """Return AreTomo1/2 executable.
 
     Path can be set with one of the following ways (in order of priority):
     1. Setting the ARETOMO_EXECUTABLE variable to the full path of the executable
-    2. Putting the appropriate executable into the PATH and renaming it to "aretomo"
+    2. Putting "AreTomo" in PATH.
+    3. Putting "AreTomo2" in PATH.
     """
     if "ARETOMO_EXECUTABLE" in os.environ:
         aretomo_exe = os.environ["ARETOMO_EXECUTABLE"]
@@ -229,11 +230,17 @@ def aretomo_executable() -> Optional[str]:
             return aretomo_exe
         else:
             raise FileNotFoundError(
-                f'Variable for AreTomo is set to "{aretomo_exe}", but file is missing.'
+                f'ARETOMO_EXECUTABLE is set to "{aretomo_exe}", but file is missing.'
             )
-    return shutil.which("AreTomo")
+    elif shutil.which("AreTomo") is not None:
+        return shutil.which("AreTomo")
+    elif shutil.which("AreTomo2") is not None:
+        return shutil.which("AreTomo2")
+    else:
+        raise FileNotFoundError("AreTomo not found. Check README.md for setup info.")
 
 
+#TODO: implement binning using -OutBin X
 def align_with_areTomo(
     ts: TiltSeries, local: bool, previous: bool, do_evn_odd: bool, gpu: str,
         volz: int = 250):
@@ -291,16 +298,15 @@ def align_with_areTomo(
         patch_x, patch_y = [
             str(round(full_dimensions[0] / 1000)),
             str(round(full_dimensions[1] / 1000))]
-        alignZ = str(round(volz / angpix))
-
-        pretilt = -1 * round(mdocfile.get_start_tilt(mdoc))
+        
+        alignZ = str(round(volz * 10 / angpix))
 
         subprocess.run([aretomo_executable(),
                         '-InMrc', ts.path,
                         '-OutMrc', ali_stack,
                         '-AngFile', tlt_file,
                         '-VolZ', '0',
-                        '-TiltCor', f'0 {pretilt}',
+                        '-TiltCor', '0',
                         '-AlignZ', alignZ] +
                        (['-Gpu'] + [str(i) for i in gpu_id]) +
                        (['-Patch', patch_x, patch_y] if local else []),
@@ -624,7 +630,7 @@ def parse_ctfplotter(file: Path):
     return df_file
 
 
-def write_ctfplotter(df: pd.DataFrame(), file: Path):
+def write_ctfplotter(df: pd.DataFrame, file: Path):
     """Writes Pandas dataframe as ctfplotter .defocus file."""
     # Somehow this header is present in ctfplotter files, so also add here.
     header = pd.DataFrame(['1', '0', '0.0', '0.0', '0.0', '3']).T
