@@ -298,7 +298,7 @@ def align_with_areTomo(
         patch_x, patch_y = [
             str(round(full_dimensions[0] / 1000)),
             str(round(full_dimensions[1] / 1000))]
-        
+
         alignZ = str(round(volz * 10 / angpix))
 
         subprocess.run([aretomo_executable(),
