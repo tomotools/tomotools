@@ -1,0 +1,28 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: tomotools
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Moritz
+    family-names: Wachsmuth-Melm
+    orcid: 'https://orcid.org/0000-0002-9033-1705'
+    email: moritz.wachsmuth@bioquant.uni-heidelberg.de
+    affiliation: >-
+      Department of Infectious Diseases, Virology,
+      Heidelberg University
+  - given-names: Benedikt H
+    family-names: Wimmer
+    email: b.wimmer@bioc.uzh.ch
+    affiliation: 'Department of Biochemistry, University of Zurich'
+    orcid: 'https://orcid.org/0000-0002-6916-9360'
+abstract: ' Scripts to make cryo-electron tomography a bit easier '
+keywords:
+  - cryoet
+  - processing
+  - tomography
+license: GPL-2.0
