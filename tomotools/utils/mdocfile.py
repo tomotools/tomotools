@@ -58,6 +58,10 @@ def find_relative_path(working_dir: Path, abs_path: Path):
         try:
             # Cut off first part
             abs_path = Path(*abs_path.parts[1:])
+
+            # Stop, if path is gone
+            if abs_path == Path("."):
+                return None
         except IndexError:
             return None
     # print(f'Found subframe path: "{join(working_dir, abs_path)}')

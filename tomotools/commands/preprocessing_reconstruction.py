@@ -239,7 +239,8 @@ def preprocess(
                                 '-reorder', str(1),
                                 '-mdoc',
                                 '-in', input_file.path,
-                                '-ou', str(output_dir.joinpath(input_file.path.name))])
+                                '-ou', str(output_dir.joinpath(input_file.path.name)),
+                                '-quiet'])
                 if exposuredose is not None:
                     os.unlink(output_dir / f"{input_file.path.name}.mdoc")
                     mdocfile.write(mdoc, output_dir / f"{input_file.path.name}.mdoc")

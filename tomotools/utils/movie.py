@@ -8,7 +8,7 @@ class Movie:
     """Object for frameseries / movie."""
 
     def __init__(self, path: Path, tilt_angle: float = 0.0):
-        if not path.is_file():
+        if path is None or not path.is_file():
             raise FileNotFoundError(f"File {path} does not exist!")
         self.path: Path = path
         self.tilt_angle: float = tilt_angle
