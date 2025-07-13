@@ -183,22 +183,22 @@ def preprocess(
              print(f'No MDOC file found for {input_file.path}. \n')
              continue
         if mdoc.get('Montage', 0) == 1:
-            print(f'Skipping {input_file.path} because it is a montage. \n')
+            print(f'Skipping {input_file.mdoc.name} because it is a montage. \n')
             continue
         # Identify batch / anchoring files, using two criteria:
         # 1. Fewer than three sections
         # 2. abs(tilt angle) < 1 for all sections -> feels a bit hacky, but works
         elif len(mdoc["sections"]) < 3:
-            print(f"{input_file.path} has fewer than three sections. Skipping.")
+            print(f"{input_file.mdoc.name} has fewer than three sections. Skipping.")
             continue
         elif all(abs(section["TiltAngle"]) < 1 for section in mdoc["sections"]):
             print(
-                f"{input_file.path} is not a tilt series, all angles near 0. Skipping."
+                f"All angles in {input_file.mdoc.name} are near 0. Skipping."
             )
             continue
 
         # File is a tilt-series.
-        print(f"\nWorking on {input_file.path}, which looks like a tilt series")
+        print(f"\nWorking on {input_file.mdoc.name}, which looks like a tilt series")
 
         # Fix ExposureDose if required
         if exposuredose is not None:
@@ -207,7 +207,7 @@ def preprocess(
 
         if any(section["ExposureDose"] == 0 for section in mdoc["sections"]):
             print(
-                f"{input_file.path} has no ExposureDose in mdoc."
+                f"{input_file.mdoc.name} has no ExposureDose in mdoc."
             )
 
         # Are any SubFrames present?
@@ -228,13 +228,13 @@ def preprocess(
                 ]
             except FileNotFoundError:
                 print(
-                    f"Movie frames not found for {input_file.mdoc}, use --frames."
+                    f"Movie frames not found for {input_file.mdoc.name}, use --frames."
                 )
                 continue
 
         else:
             if reorder:
-                print(f'Running newstack -reorder on {input_file.path}. \n')
+                print(f'Running newstack -reorder on {input_file.mdoc.name}. \n')
                 subprocess.run(['newstack',
                                 '-reorder', str(1),
                                 '-mdoc',
@@ -258,7 +258,7 @@ def preprocess(
                                 output_dir])
             continue
 
-        print(f'Frames were found for {input_file.path}, will run MotionCor.')
+        print(f'Frames were found for {input_file.mdoc.name}, will run MotionCor.')
 
         # Get rotation and flip of Gain reference from mdoc file property
         mcrot, mcflip = None, None
@@ -322,9 +322,18 @@ def preprocess(
                     section['PixelSpacing'] = section['PixelSpacing'] * mcbin
 
         if stack:
+
+            # If the mdoc is .mrc.mdoc (SerialEM-style), use .mrc
+            if input_file.mdoc.stem.endswith(".mrc"):
+                output_file = output_dir / input_file.mdoc.stem
+
+            # Else, add the .mrc (Tomo5-style) to the output file
+            else:
+                output_file = output_dir / input_file.mdoc.with_suffix(".mrc")
+
             tilt_series = TiltSeries.from_micrographs(
                 micrographs,
-                output_dir / input_file.mdoc.stem,
+                output_file,
                 mdoc=mdoc,
                 reorder=True,
                 overwrite_dose=exposuredose
