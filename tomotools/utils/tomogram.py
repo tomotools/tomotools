@@ -364,10 +364,15 @@ def find_Tomogram_halves(tomo: Tomogram, split_dir: Optional[Path] = None):
     even_file = parent_dir / f'{tomo.path.stem[:-3]}even_rec.mrc'
     odd_file = parent_dir / f'{tomo.path.stem[:-3]}odd_rec.mrc'
 
+    even_file_warp2 = parent_dir / "even" / tomo.path.name
+    odd_file_warp2 = parent_dir / "odd" / tomo.path.name
+
     if path.isfile(EVN_file) and path.isfile(ODD_file):
         return tomo.with_split_files(EVN_file, ODD_file)
     elif path.isfile(even_file) and path.isfile(odd_file):
         return tomo.with_split_files(even_file, odd_file)
+    elif path.isfile(even_file_warp2) and path.isfile(odd_file_warp2):
+        return tomo.with_split_files(even_file_warp2, odd_file_warp2)
     else:
         return tomo
 
