@@ -16,8 +16,8 @@ authors = [
 ]
 dependencies = [
     "Click",
-    "numpy",
-    "pandas",
+    "numpy~=1.19.2",
+    "pandas~=1.4.4",
     "mrcfile",
     "emfile",
     "dynamotable",
