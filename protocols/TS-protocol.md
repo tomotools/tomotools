@@ -79,7 +79,7 @@ Alignments start with **no objective lens.**
    - Make sure K2 is in linear mode. Insert FloScreen. Make sure that you are in an empty area (no carbon, no sample). Go to high-beam settings from Step 1.
    - Press *Normalize all lenses* (= L2), press *eucentric focus*. Adjust beam shift if needed with track ball. 
    - Check magnetic field compensator (next to door). Values should be close to zero (< 0.01). Otherwise, reset it. 
-   - Adjust illuminated area so beam is parallel (can be checked in *beam settings*) and counts are around 500 e/px/s.
+   - Adjust illuminated area so beam is parallel (can be checked in *beam settings*) and counts are > 500 cts/px/s (~ 1000 cts/px/s works well).
    - On the left side, select *Tune GIF*. Perform a *full tune*. 
    - Make sure all steps are completed, otherwise perform them individually using the *quick tune* setting. 
    - Often, *Distortion tuning* will give an error message. Select *undo* and perform *XY Magnification* tuning instead. 
