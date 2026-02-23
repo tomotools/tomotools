@@ -6,13 +6,13 @@ build-backend = "setuptools.build_meta"
 name = "Tomotools"
 description = "Scripts to make cryo-electron tomography a bit easier."
 readme = "README.md"
-version = "0.4.5"
+version = "0.4.6"
 
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 license = {text = "None so far"}
 authors = [
   {email = "moritz.wachsmuth@bioquant.uni-heidelberg.de", name = "Moritz Wachsmuth-Melm"},
-  {email = "b.wimmer@bioc.uzh.ch", name = "Benedikt Wimmer"},
+  {email = "wimmer@stanford.edu", name = "Benedikt Wimmer"},
 ]
 dependencies = [
     "Click",

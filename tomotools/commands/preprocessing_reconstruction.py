@@ -133,6 +133,12 @@ def blend_montages(cpus, input_files, output_dir):
     help="Pass ExposureDose per tilt to override value in mdoc file.",
 )
 @click.option(
+    "--axisangle",
+    type=float,
+    default=None,
+    help="Pass TiltAxisAngle to override value in header.",
+)
+@click.option(
     "--stack/--nostack",
     is_flag=True,
     default=True,
@@ -152,6 +158,7 @@ def preprocess(
     gpu,
     patch,
     exposuredose,
+    axisangle,
     stack,
     input_files,
     output_dir,
@@ -339,6 +346,10 @@ def preprocess(
                 overwrite_dose=exposuredose
             )
             shutil.rmtree(frames_corrected_dir)
+
+            if axisangle is not None:
+                tilt_series._update_axis_angle(axisangle)
+
             print(f'Successfully created {tilt_series.path}. \n')
 
         else:
@@ -616,3 +627,27 @@ def reconstruct(
 
         tiltseries_dosefiltered.delete_files(delete_mdoc=False)
         print("\n")
+
+@click.command()
+@click.option(
+    "--override_angle",
+    type=float,
+    help="New tilt axis angle to store in header.",
+)
+@click.argument("input_files", nargs=-1, type=click.Path(exists=True))
+def fix_header_angle(
+    override_angle,
+    input_files,
+):
+    """Update TiltAxisAngle in mrc header.
+
+    Sometimes needed for Tomo5-style tomograms.
+    """
+    # Iterate over the tiltseries objects and align and reconstruct
+    input_ts = convert_input_to_TiltSeries(input_files)
+
+    for tiltseries in input_ts:
+
+        tiltseries._update_axis_angle(override_angle)
+
+        print(f"\nSet angle in {tiltseries.path.name} to {override_angle}.")
