@@ -66,22 +66,14 @@ class Micrograph:
 
         tempdir = output_dir.joinpath("motioncor2_temp")
         tempdir.mkdir(parents=True)
-        gain_ref_dm4 = None
-        gain_ref_mrc = None
+        #gain_ref_dm4 = None
+        #gain_ref_mrc = None
 
-        # If override_gainref is given, check if it is already mrc
-        # Otherwise, convert.
+        # If override_gainref is given, keep
         if override_gainref is not None:
             override_gainref = Path(override_gainref)
-            if override_gainref.suffix == ".dm4":
-                gain_ref_dm4 = override_gainref
-            elif override_gainref.suffix == ".mrc":
-                gain_ref_mrc = override_gainref
-            else:
-                raise AttributeError(
-                    "Gain reference can only be in .dm4 or .mrc format!"
-                )
-        elif movies[0].mdoc is not None:
+
+        elif override_gainref is None and movies[0].mdoc is not None:
             # Check if there is a subframe mdoc and if it contains a gain reference path
             gain_refs = {movie.mdoc["framesets"][0].get("GainReference", None)
                          for movie in movies}
@@ -90,27 +82,67 @@ class Micrograph:
                 raise Exception(
                     f'Only 0 or 1 gainref supported, {len(gain_refs)} found in mdoc.'
                 )
-            gain_ref_dm4 = gain_refs.pop()
-            if gain_ref_dm4 is not None:
+            override_gainref = gain_refs.pop()
+            if override_gainref is not None:
                 # The gain ref should be in the same folder as the input file(s)
                 # Check if it's there.
-                gain_ref_dm4 = movies[0].path.parent / gain_ref_dm4
-                if not gain_ref_dm4.is_file():
+                override_gainref = movies[0].path.parent / override_gainref
+                if not override_gainref.is_file():
                     raise FileNotFoundError(
-                        f"Expected gain reference at {gain_ref_dm4}, aborting"
+                        f"Couldn't find gain reference at {override_gainref}, aborting"
                     )
 
-        if gain_ref_dm4 is not None and gain_ref_mrc is None:
-            # The gain ref is saved in dm4 format, convert to MRC for MotionCor2
-            # Write to a separate directory to keep it away from MC2.
+        def _conv_dm_mrc(gain_in, out_path):
+
             temp_gain = output_dir.joinpath("motioncor2_gain")
             temp_gain.mkdir()
-            gain_ref_mrc = temp_gain.joinpath(gain_ref_dm4.stem + ".mrc")
+            gain_out = temp_gain.joinpath(gain_in.stem + ".mrc")
             print(
-                f"Found gain reference {gain_ref_dm4}, converting to {gain_ref_mrc}"
+                f"Found gain reference {gain_in}, converting to {gain_out}"
             )
-            subprocess.run(["dm2mrc", gain_ref_dm4, gain_ref_mrc],
+
+            subprocess.run(["dm2mrc", gain_in, gain_out],
                            stdout=subprocess.DEVNULL)
+
+            return gain_out
+
+        def _conv_tiff_mrc(gain_in, out_path):
+
+            temp_gain = output_dir.joinpath("motioncor2_gain")
+            temp_gain.mkdir()
+            gain_out = temp_gain.joinpath(gain_in.stem + ".mrc")
+            print(
+                f"Found gain reference {gain_in}, converting to {gain_out}"
+            )
+
+            subprocess.run(["tif2mrc", gain_in, gain_out],
+                           stdout=subprocess.DEVNULL)
+
+            return gain_out
+
+        # Check file type, then directly convert to mrc
+        if override_gainref is None:
+            gain_ref_mrc = None
+        elif override_gainref.suffix == ".mrc":
+            gain_ref_mrc = override_gainref
+
+        elif override_gainref.suffix == ".dm4":
+            gain_ref_mrc = _conv_dm_mrc(override_gainref,
+                                        output_dir)
+
+        elif override_gainref.suffix in [".tif",".tiff"]:
+            gain_ref_mrc = _conv_tiff_mrc(override_gainref,
+                                          output_dir)
+        elif override_gainref.suffix == ".gain":
+            gain_ref_mrc = _conv_tiff_mrc(override_gainref,
+                                          output_dir)
+            print('Gain reference as .gain format. Assuming newer Falcon camera!')
+
+        else:
+            raise AttributeError(
+                "Gain reference can only be in .tif(f), .dm4 or .mrc format!"
+            )
+
 
         if gain_ref_mrc is not None:
             if not gain_ref_mrc.is_file():
@@ -148,10 +180,11 @@ class Micrograph:
         if mcrot is not None and mcflip is not None:
             command += ["-RotGain", str(mcrot), "-FlipGain", str(mcflip)]
 
-        if gain_ref_dm4 is not None and check_defects(gain_ref_dm4) is not None:
+        if (override_gainref.suffix == '.dm4' and
+            check_defects(override_gainref) is not None):
             command += [
                 "-DefectMap",
-                defects_tif(gain_ref_dm4, tempdir, movies[0].path).absolute(),
+                defects_tif(override_gainref, tempdir, movies[0].path).absolute(),
             ]
 
         # Patch alignment takes two groupings, for global and local alignments.
@@ -219,8 +252,8 @@ class Micrograph:
                         "Gain reference was specified, but not applied by MotionCor."
                     )
 
-        if gain_ref_dm4 is not None:
-            shutil.rmtree(temp_gain)
+        if  os.isdir(output_dir.joinpath("motioncor2_gain")):
+            shutil.rmtree(output_dir.joinpath("motioncor2_gain"))
 
         output_micrographs = [
             Micrograph(
@@ -321,3 +354,10 @@ def defects_tif(gainref, tempdir, template):
     subprocess.run(["clip", "defect", "-D", defects_txt, template, defects_tif])
     print(f"Found and converted defects file {defects_tif}")
     return defects_tif
+
+def make_mrc_gainref(gainref):
+    """Convert DM4 or TIF(F) GainRef to MRC.
+
+    Checks for existence of converted GainRef.
+    """
+    pass
