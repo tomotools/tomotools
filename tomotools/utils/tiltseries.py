@@ -108,7 +108,7 @@ class TiltSeries:
         """Return tilt axis angle from header."""
         if hasattr(self, '_axis_angle'):
             return self._axis_angle
-        with mrcfile.open(self.path, header_only=True) as mrc:
+        with mrcfile.mmap(self.path) as mrc:
 
             # Check SerialEM-type header spelling first
             header = str(mrc.header).split('Tilt axis angle = ', 1)
@@ -126,7 +126,7 @@ class TiltSeries:
 
     def _update_axis_angle(self, tilt_axis_angle: float):
         """Update TiltAxisAngle in header."""
-        with mrcfile.open(self.path, mode = 'r+', header_only = True) as mrc:
+        with mrcfile.mmap(self.path, mode = 'r+') as mrc:
 
             labels = mrc.header.label
 
