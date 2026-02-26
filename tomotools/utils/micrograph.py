@@ -252,7 +252,7 @@ class Micrograph:
                         "Gain reference was specified, but not applied by MotionCor."
                     )
 
-        if  os.isdir(output_dir.joinpath("motioncor2_gain")):
+        if  os.path.isdir(output_dir.joinpath("motioncor2_gain")):
             shutil.rmtree(output_dir.joinpath("motioncor2_gain"))
 
         output_micrographs = [

@@ -30,7 +30,7 @@ class TiltSeries:
             pass
         elif not path.isfile(ts_path):
             raise FileNotFoundError(f"File not found: {ts_path}")
-        self.path: Path = ts_path
+        self.path: Path = Path(ts_path)
         self.mdoc: Path = Path(f"{ts_path}.mdoc")
         self.is_split: bool = False
         self.evn_path: Optional[Path] = None
@@ -382,7 +382,7 @@ def align_with_areTomo(
         os.rename(f"{ts.path}.aln", aln_file)
 
     # Keep compatibility with AreTomo < 1.3, which output the file
-    if not path.isfile(ali_stack.with_suffix('.tlt')):
+    if not path.isfile(ts.path.with_suffix('.tlt')):
         aln_to_tlt(aln_file)
 
     if do_evn_odd and ts.is_split:
@@ -609,7 +609,7 @@ def aln_to_tlt(aln_file: Path):
 
                 tilts.append(tilt)
 
-    tlt_out = aln_file.with_name(f"{aln_file.stem}_ali.tlt")
+    tlt_out = aln_file.with_name(f"{aln_file.stem}.tlt")
 
     with open(tlt_out, mode="w+") as f:
         f.write("\n".join(tilts))
@@ -636,10 +636,10 @@ def run_ctfplotter(ts: TiltSeries, overwrite: bool):
 
         if path.isfile(ts.path.with_suffix('.tlt')):
             tlt_file = ts.path.with_suffix('.tlt')
-        elif path.isfile(ts.path.with_name(f'{ts.path.stem}_ali.tlt')):
-            tlt_file = ts.path.with_name(f'{ts.path.stem}_ali.tlt')
-        else:
+        elif path.isfile(ts.path.with_suffix('.rawtlt')):
             tlt_file = ts.path.with_suffix('.rawtlt')
+        else:
+            raise FileNotFoundError(f'Tlt file not found for {ts.path}.')
 
         with open(path.join(ts.path.parent, 'ctfplotter.log'), 'a') as out:
             subprocess.run(['ctfplotter',
