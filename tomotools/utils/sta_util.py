@@ -202,6 +202,10 @@ def make_warp_dir(ts: TiltSeries,
         mdocfile.write(mdoc, path.join(project_dir, "mdoc", ts.path.stem+".mdoc"))
     else:
         print(f"No frames will be exported for {ts.path.stem}")
+        for section in mdoc["sections"]:
+            input_path = Path(section["SubFramePath"])
+            section["SubFramePath"] = 'X:\\WarpDir\\' + Path(input_path).name
+        mdocfile.write(mdoc, project_dir / "mdoc" / f'{ts.path.stem}.mdoc')
 
 
 def batch_parser(input_files: List, batch: bool):
