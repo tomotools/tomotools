@@ -5,7 +5,7 @@ import subprocess
 from glob import glob
 from os import path
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import mrcfile
 
@@ -95,48 +95,47 @@ def aretomo_export(ts: TiltSeries):
 
 def make_warp_dir(ts: TiltSeries,
                   project_dir: Path,
-                  frames_dir: Path,
-                  ensure_frames: bool = True,
+                  frames_mode: str,
+                  frames_dir: Optional[Path] = None,
                   imod: bool = False,
                   v2: bool = False):
     """Export tiltseries to Warp."""
-    required_files = [ts.path,
-                      ts.mdoc,
-                      ts.path.with_suffix(".xf")]
-
+    ts_path = ts.path
+    mdoc_path = ts.mdoc
+    xf_path = ts_path.with_suffix(".xf")
+    ta_solution_path = ts.path.parent / "taSolution.log"
+    tlt_file = ts_path.with_suffix(".tlt")
+    rawtlt_file = ts_path.with_suffix(".rawtlt")
+    required_files = [ts_path, mdoc_path, xf_path]
     if imod:
-        required_files.append(ts.path.parent/"taSolution.log")
+        required_files.append(ta_solution_path)
 
     # Check that all files are present
-    if (all(path.isfile(req) for req in required_files) and
-        any([path.isfile(ts.path.with_suffix(".rawtlt")),
-             path.isfile(ts.path.with_suffix(".tlt"))])
-        ):
-        print("All required alignment files found.")
-
-    else:
-        raise FileNotFoundError(f"Not all alignment files found for {ts.path.name}.")
-
+    for file in required_files:
+        if not path.isfile(file):
+            print(f"Required file {file} not found for {ts.path.name}.")
+            return
+    if not (path.isfile(tlt_file) or path.isfile(rawtlt_file)):
+        print(f"Required tlt or rawtlt file not found for {ts.path.name}.")
+        return
     # Create imod subdirectory
     # copy alignment files (to protect against later modification)
     ts_dir = project_dir / "imod" / ts.path.stem
-    os.mkdir(ts_dir)
+    ts_dir.mkdir()
 
-    [shutil.copy(file,ts_dir) for file in required_files[2:]]
-
-    if path.isfile(ts.path.with_suffix(".tlt")):
-            shutil.copy(ts.path.with_suffix(".tlt"), ts_dir)
-    else: #one or the other must be there, checked above!
-            shutil.copy(ts.path.with_suffix(".rawtlt"),
-                        ts_dir / ts.name.with_suffix(".tlt"))
+    shutil.copy(xf_path, ts_dir)
+    if imod:
+        shutil.copy(ta_solution_path, ts_dir)
+    if tlt_file.is_file():
+        shutil.copy(tlt_file, ts_dir)
+    elif rawtlt_file.is_file():
+        shutil.copy(rawtlt_file, ts_dir / ts.name.with_suffix(".tlt"))
 
     if v2:
         # invert tilt-angles in tlt file (done during import in Warp 1.X)
         invert_tlt_files(ts_dir)
-
         # copy frames to frames subfolder instead of main folder
         frame_target_dir = project_dir / "frames"
-
     else:
         # tilt images go to warp root directory
         frame_target_dir = project_dir
@@ -145,13 +144,12 @@ def make_warp_dir(ts: TiltSeries,
     mdoc = mdocfile.read(ts.mdoc)
     mdoc = mdocfile.downgrade_DateTime(mdoc)
 
-    if ensure_frames:
-
+    if frames_dir is not None and frames_mode in ("link", "copy"):
         # Check, whether all tilts have SubFrameImages
         if not all("SubFramePath" in section for section in mdoc["sections"]):
             raise FileNotFoundError(f'No SubFramePath in mdoc for {ts.path.stem}')
 
-        subframe_list = []
+        subframe_list: List[Path] = []
 
         for section in mdoc["sections"]:
 
@@ -159,45 +157,51 @@ def make_warp_dir(ts: TiltSeries,
                 Path(frames_dir),
                 Path(section.get("SubFramePath", "").replace("\\", path.sep)),))
 
-        # Symlink doesn't work with windows!
-        [shutil.copy(file,frame_target_dir / file.name) for file in subframe_list]
+        if frames_mode == "link":
+            print(f"Linking {len(subframe_list)} frames for {ts.path.stem} from {frames_dir}")
+            [os.symlink(file, frame_target_dir / file.name) for file in subframe_list]
+        else:
+            print(f"Copying {len(subframe_list)} frames for {ts.path.stem} from {frames_dir}")
+            [shutil.copy(file,frame_target_dir / file.name) for file in subframe_list]
 
         # Fix SubFramePath
         for section in mdoc["sections"]:
-
             input_path = Path(section["SubFramePath"])
-
             section["SubFramePath"] = 'X:\\WarpDir\\' + Path(input_path).name
-
         mdocfile.write(mdoc, project_dir / "mdoc" / f'{ts.path.stem}.mdoc')
 
-    else:
-        print(f"{ts.path.stem}: Exporting just tilt images.")
-
-        subprocess.run(['newstack','-quiet',
+    elif frames_mode == "extract":
+        print(f"Extracting frames for {ts.path.stem}")
+        try:
+            subprocess.run(
+                ['newstack',
                        '-split','0',
                        '-append','mrc',
                        '-in',ts.path,
-                       path.join(frame_target_dir,(ts.path.stem+"_sec_"))])
-
+                       path.join(frame_target_dir,(ts.path.stem + "_sec_"))],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        except subprocess.CalledProcessError as e:
+            print("Command failed:", e.returncode)
+            print("stdout:", e.stdout)
+            print("stderr:", e.stderr)
+            return
         # Create mdoc with SubFramePath and save it to the mdoc subdirectory
-
         subframelist = sorted(glob(
             path.join(frame_target_dir, (ts.path.stem + "_sec_[0-9][0-9].mrc"))
         ))
-
         # Check that mdoc has as many sections as there are tilt images
         if not len(mdoc['sections']) == len(subframelist):
             raise FileNotFoundError(
                 "Error: Mismatch between mdoc entries and frames!")
-
         for i in range(0, len(mdoc['sections'])):
             mdoc['sections'][i]['SubFramePath'] = 'X:\\WarpDir\\' + \
                 Path(subframelist[i]).name
-
         mdocfile.write(mdoc, path.join(project_dir, "mdoc", ts.path.stem+".mdoc"))
-
-    return
+    else:
+        print(f"No frames will be exported for {ts.path.stem}")
 
 
 def batch_parser(input_files: List, batch: bool):

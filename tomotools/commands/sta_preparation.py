@@ -1,6 +1,7 @@
 import os
 from os import path
 from pathlib import Path
+from typing import Optional, Tuple
 
 import click
 
@@ -30,26 +31,25 @@ def fit_ctf(input_files):
 @click.command()
 @click.option('-b', '--batch-input', is_flag=True, default=False, show_default=True,
               help="Read input files as text, each line is a tiltseries (folder)")
-@click.option('--v2', is_flag=True, default=False, show_default=True,
-              help="Project is for WarpTools 2.x, not Warp 1.x.")
-@click.option('-n', '--name', default='warp', show_default=True,
-              help="Warp working directory will be created as project_dir/name.")
-@click.option('--include-frames/--skip-frames', is_flag=True,
-              default=False,
-              show_default=True,
-              help="Export also frames for each tilt.")
-@click.option('--frames-dir', default="~", show_default=True,
-              type=click.Path(file_okay=False, dir_okay=True),
-              help="Directory containing the original frames.")
-@click.argument('input_files', nargs=-1)
-@click.argument('project_dir', nargs=1)
-def imod2warp(batch_input,
-              v2,
-              name,
-              include_frames,
-              frames_dir,
-              input_files,
-              project_dir):
+@click.option('--v2/--v1', is_flag=True, default=True, show_default=True,
+                help="WarpTools (2.x) or Warp (1.x) project. Default is WarpTools.")
+@click.option('--link-frames',
+              type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+              help="Link frames from this directory.")
+@click.option("--copy-frames",
+              type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+              help="Copy frames from this directory.")
+@click.option("--extract-frames", is_flag=True, default=False, show_default=True,
+              help="Extract frames from raw tilt files. Only use if no separate frames are available.")
+@click.argument('input_files', type=click.Path(file_okay=False, dir_okay=True, path_type=Path), nargs=-1)
+@click.argument('project_dir', type=click.Path(file_okay=False, writable=True, path_type=Path), nargs=1)
+def imod2warp(batch_input: bool,
+              v2: bool,
+              link_frames: Optional[Path],
+              copy_frames: Optional[Path],
+              extract_frames: bool,
+              input_files: Tuple[Path],
+              project_dir: Path):
     """Prepares Warp/M project.
 
     Takes as input several tiltseries (folders) or a file listing them (with -b),
@@ -61,7 +61,6 @@ def imod2warp(batch_input,
 
     Suggested structure is something like this:
 
-    \b
     project_dir
         ./name_1/
         ./name_2/
@@ -69,40 +68,31 @@ def imod2warp(batch_input,
         ./m/
 
     """
-    out_dir = Path(path.join(project_dir, name))
-
-    frames_dir = Path(frames_dir)
-
-    if not path.isdir(project_dir):
-        os.mkdir(project_dir)
-
-    if path.isdir(out_dir):
-        input(f'Exporting to existing directory {out_dir}. Continue?')
-
-    else:
-        os.mkdir(out_dir)
-        os.mkdir(out_dir / 'imod')
-        os.mkdir(out_dir / 'mdoc')
-
-        if v2:
-            os.mkdir(out_dir / "frames")
-
-        print(f"Created Warp folder at {out_dir}.")
+    if sum([bool(link_frames), bool(copy_frames), extract_frames]) > 1:
+        click.echo("Cannot both link frames, copy frames and extract frames. Please choose one option.")
+        return
+    if project_dir.exists():
+        if not click.confirm('Project dir exists. Do you want to continue?'):
+            return
+    project_dir.mkdir(exist_ok=True)
+    (project_dir / "imod").mkdir(exist_ok=True)
+    (project_dir / "mdoc").mkdir(exist_ok=True)
+    if v2:
+        (project_dir / "frames").mkdir(exist_ok=True)
 
     # Parse input files
     ts_list = sta_util.batch_parser(input_files, batch_input)
 
     print(f'Found {len(ts_list)} TiltSeries to work on. \n')
-
     for ts in ts_list:
         print(f"Now working on {ts.path.name}")
 
         sta_util.make_warp_dir(ts,
-                               out_dir,
-                               frames_dir = frames_dir,
-                               ensure_frames = include_frames,
-                               imod = True,
-                               v2 = v2)
+                               project_dir,
+                               frames_mode = "extract" if extract_frames else ("copy" if copy_frames else "link"),
+                               frames_dir=link_frames or copy_frames,
+                               imod=True,
+                               v2=v2)
 
         print(f"Warp files prepared for {ts.path.name}. \n")
 
@@ -182,7 +172,7 @@ def aretomo2warp(batch_input,
 
         sta_util.make_warp_dir(ts_out_imod,
                                out_dir,
-                               frames_dir = frames_dir,
+                               warp_dir = frames_dir,
                                ensure_frames = include_frames,
                                imod = False,
                                v2 = v2)
