@@ -159,7 +159,10 @@ def make_warp_dir(ts: TiltSeries,
 
         if frames_mode == "link":
             print(f"Linking {len(subframe_list)} frames for {ts.path.stem} from {frames_dir}")
-            [os.symlink(file, frame_target_dir / file.name) for file in subframe_list]
+            for file in subframe_list:
+                target = frame_target_dir / file.name
+                source = file if file.is_absolute() else Path.cwd() / file
+                os.symlink(os.path.relpath(source, start=target.parent), target)
         else:
             print(f"Copying {len(subframe_list)} frames for {ts.path.stem} from {frames_dir}")
             [shutil.copy(file,frame_target_dir / file.name) for file in subframe_list]
