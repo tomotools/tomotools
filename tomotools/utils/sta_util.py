@@ -158,23 +158,18 @@ def make_warp_dir(ts: TiltSeries,
                 Path(section.get("SubFramePath", "").replace("\\", path.sep)),))
 
         if frames_mode == "link":
-            print(f"Linking {len(subframe_list)} frames for {ts.path.stem} from {frames_dir}")
             for file in subframe_list:
                 target = frame_target_dir / file.name
                 source = file if file.is_absolute() else Path.cwd() / file
                 os.symlink(os.path.relpath(source, start=target.parent), target)
         else:
-            print(f"Copying {len(subframe_list)} frames for {ts.path.stem} from {frames_dir}")
             [shutil.copy(file,frame_target_dir / file.name) for file in subframe_list]
-
         # Fix SubFramePath
         for section in mdoc["sections"]:
             input_path = Path(section["SubFramePath"])
             section["SubFramePath"] = 'X:\\WarpDir\\' + Path(input_path).name
         mdocfile.write(mdoc, project_dir / "mdoc" / f'{ts.path.stem}.mdoc')
-
     elif frames_mode == "extract":
-        print(f"Extracting frames for {ts.path.stem}")
         try:
             subprocess.run(
                 ['newstack',
@@ -204,7 +199,6 @@ def make_warp_dir(ts: TiltSeries,
                 Path(subframelist[i]).name
         mdocfile.write(mdoc, path.join(project_dir, "mdoc", ts.path.stem+".mdoc"))
     else:
-        print(f"No frames will be exported for {ts.path.stem}")
         for section in mdoc["sections"]:
             input_path = Path(section["SubFramePath"])
             section["SubFramePath"] = 'X:\\WarpDir\\' + Path(input_path).name
@@ -288,9 +282,6 @@ def tomotwin_prep(tomotwin_dir, ts_list, thickness, uid, bin_up=True):
 def invert_tlt_files(ts_dir: Path):
     """Invert tilt angles in tlt file for WarpTools."""
     for tlt in ts_dir.glob('*.tlt'):
-
-        print(f'Inverting tilt angles in {tlt.name}')
-
         tlt_inverted = []
 
         with open(tlt) as file:

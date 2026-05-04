@@ -86,17 +86,15 @@ def imod2warp(batch_input: bool,
     ts_list = sta_util.batch_parser(input_files, batch_input)
 
     print(f'Found {len(ts_list)} TiltSeries to work on. \n')
-    for ts in ts_list:
-        print(f"Now working on {ts.path.name}")
-
-        sta_util.make_warp_dir(ts,
-                               project_dir,
-                               frames_mode = "extract" if extract_frames else ("copy" if copy_frames else "link"),
-                               frames_dir=link_frames or copy_frames,
-                               imod=not aretomo,
-                               v2=v2)
-
-        print(f"Warp files prepared for {ts.path.name}. \n")
+    with click.progressbar(ts_list) as progress:
+        for ts in progress:
+            progress.label = f'Processing {ts.path.name}'
+            sta_util.make_warp_dir(ts,
+                                project_dir,
+                                frames_mode = "extract" if extract_frames else ("copy" if copy_frames else "link"),
+                                frames_dir=link_frames or copy_frames,
+                                imod=not aretomo,
+                                v2=v2)
 
 
 @click.command()
