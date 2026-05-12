@@ -36,7 +36,6 @@ cryocare = [
 dev = [
     "pytest",
     "ruff",
-    "tomotools-testfiles-lfs@git+https://github.com/tomotools/tomotools-testfiles-lfs.git"
 ]
 
 [project.scripts]
