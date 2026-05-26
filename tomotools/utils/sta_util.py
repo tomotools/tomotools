@@ -247,16 +247,12 @@ def _extract_frames(ts: TiltSeries, mdoc: dict, target_dir: Path):
     return written_files
 
 
-def batch_parser(input_files: List, batch: bool):
+def batch_parser(input_files: List[Path]):
     """Batch-parse tiltseries to work on from textfile."""
     input_files_parsed = []
+    for file in input_files:
+        if file.is_dir():
 
-    # Check whether you already received a correctly formatted list of TiltSeries
-    if isinstance(input_files[0], TiltSeries):
-        return input_files
-
-    if isinstance(input_files[0], list):
-        return input_files[0]
 
     # Parse input files
     if batch:

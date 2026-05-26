@@ -1,12 +1,13 @@
 import os
 from os import path
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import click
 
 from tomotools.utils import comfile, sta_util, tiltseries, tomogram
 from tomotools.utils.tiltseries import (
+    TiltSeries,
     convert_input_to_TiltSeries,
     run_ctfplotter,
 )
@@ -29,7 +30,7 @@ def fit_ctf(input_files):
 
 
 @click.command()
-@click.option('-b', '--batch-input', is_flag=True, default=False, show_default=True,
+@click.option('-b', '--batch-input', is_flag=True, default=False, show_default=True, deprecated=True,
               help="Read input files as text, each line is a tiltseries (folder)")
 @click.option('--v2/--v1', is_flag=True, default=True, show_default=True,
                 help="WarpTools (2.x) or Warp (1.x) project. Default is WarpTools.")
@@ -68,7 +69,9 @@ def imod2warp(batch_input: bool,
         (project_dir / "frames").mkdir(exist_ok=True)
 
     # Parse input files
-    ts_list = sta_util.batch_parser(input_files, batch_input)
+    ts_list: List[TiltSeries] = []
+    for input_file in input_files:
+        ts_list.extend(TiltSeries.from_path(input_file))
 
     if copy_frames:
         frames_strategy = ("copy", copy_frames)
@@ -235,4 +238,3 @@ def aretomo2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_
 
     # Process as normal imod-aligned TS
     sta_util.tomotwin_prep(tomotwin_dir, ts_imodlike, thickness, uid, bin_up=bin_up)
-
