@@ -5,7 +5,9 @@ import subprocess
 from glob import glob
 from os import path
 from pathlib import Path
-from typing import List
+from typing import List, Tuple, Union
+import click
+from typing_extensions import Literal
 
 import mrcfile
 
@@ -31,50 +33,60 @@ def aretomo_export(ts: TiltSeries):
     with mrcfile.mmap(ts.path) as mrc:
         labels = mrc.get_labels()
 
-    aln_file = ts.path.with_suffix('.aln')
+    aln_file = ts.path.with_suffix(".aln")
 
-    ali_stack = ts.path.with_name(f'{ts.path.stem}_ali.mrc')
+    ali_stack = ts.path.with_name(f"{ts.path.stem}_ali.mrc")
 
     imod_dir = path.join(ts.path.parent, (ali_stack.stem + "_Imod"))
 
-    if path.isdir(imod_dir) and path.isfile(path.join(imod_dir,
-                                                      (ali_stack.stem + ".st"))):
-        print(f'Previous AreTomo export found for {ts.path.name}. Re-using.')
+    if path.isdir(imod_dir) and path.isfile(
+        path.join(imod_dir, (ali_stack.stem + ".st"))
+    ):
+        print(f"Previous AreTomo export found for {ts.path.name}. Re-using.")
 
-        ali_stack_imod = TiltSeries(
-            Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
+        ali_stack_imod = TiltSeries(Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
 
-        with mrcfile.mmap(ali_stack_imod.path, mode='r+') as mrc:
-                mrc.voxel_size = str(angpix)
+        with mrcfile.mmap(ali_stack_imod.path, mode="r+") as mrc:
+            mrc.voxel_size = str(angpix)
 
-                # Check whether labels were already added
-                if len(mrc.get_labels()) == 0:
-                    for label in labels:
-                        mrc.add_label(label)
-                mrc.update_header_stats()
+            # Check whether labels were already added
+            if len(mrc.get_labels()) == 0:
+                for label in labels:
+                    mrc.add_label(label)
+            mrc.update_header_stats()
 
     elif not path.isfile(aln_file):
         raise FileNotFoundError(
-            f'{ts.path}: No previous alignment was found at {aln_file}.')
+            f"{ts.path}: No previous alignment was found at {aln_file}."
+        )
 
     else:
-        subprocess.run([aretomo_executable(),
-                    '-InMrc', ts.path,
-                    '-OutMrc', ali_stack,
-                    '-AlnFile', aln_file,
-                    '-TiltCor', '0',
-                    '-VolZ', '0',
-                    '-OutImod', '2'],
-                   stdout=subprocess.DEVNULL)
+        subprocess.run(
+            [
+                aretomo_executable(),
+                "-InMrc",
+                ts.path,
+                "-OutMrc",
+                ali_stack,
+                "-AlnFile",
+                aln_file,
+                "-TiltCor",
+                "0",
+                "-VolZ",
+                "0",
+                "-OutImod",
+                "2",
+            ],
+            stdout=subprocess.DEVNULL,
+        )
 
-        ali_stack_imod = TiltSeries(
-            Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
+        ali_stack_imod = TiltSeries(Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
 
-        with mrcfile.mmap(ali_stack, mode='r+') as mrc:
+        with mrcfile.mmap(ali_stack, mode="r+") as mrc:
             mrc.voxel_size = str(angpix)
             mrc.update_header_stats()
 
-        with mrcfile.mmap(ali_stack_imod.path, mode='r+') as mrc:
+        with mrcfile.mmap(ali_stack_imod.path, mode="r+") as mrc:
             mrc.voxel_size = str(angpix)
             for label in labels:
                 mrc.add_label(label)
@@ -85,58 +97,66 @@ def aretomo_export(ts: TiltSeries):
 
     mdoc_cleaned = mdoc
 
-    mdoc_cleaned['sections'] = [ele for idx, ele in enumerate(mdoc['sections'])
-                                if idx not in exclude]
+    mdoc_cleaned["sections"] = [
+        ele for idx, ele in enumerate(mdoc["sections"]) if idx not in exclude
+    ]
 
     mdocfile.write(mdoc_cleaned, ali_stack_imod.mdoc)
 
     return ali_stack_imod
 
 
-def make_warp_dir(ts: TiltSeries,
-                  project_dir: Path,
-                  frames_dir: Path,
-                  ensure_frames: bool = True,
-                  imod: bool = False,
-                  v2: bool = False):
+def make_warp_dir(
+    ts: TiltSeries,
+    project_dir: Path,
+    frames_strategy: Union[
+        Tuple[Literal["skip"], None],
+        Tuple[Literal["extract"], None],
+        Tuple[Literal["copy"], Path],
+        Tuple[Literal["link"], Path],
+    ],
+    imod: bool = False,
+    v2: bool = False,
+):
     """Export tiltseries to Warp."""
-    required_files = [ts.path,
-                      ts.mdoc,
-                      ts.path.with_suffix(".xf")]
-
+    ts_path = ts.path
+    mdoc_path = ts.mdoc
+    xf_path = ts_path.with_suffix(".xf")
+    ta_solution_path = ts.path.parent / "taSolution.log"
+    tlt_file = ts_path.with_suffix(".tlt")
+    rawtlt_file = ts_path.with_suffix(".rawtlt")
+    required_files = [ts_path, mdoc_path, xf_path]
     if imod:
-        required_files.append(ts.path.parent/"taSolution.log")
+        required_files.append(ta_solution_path)
 
     # Check that all files are present
-    if (all(path.isfile(req) for req in required_files) and
-        any([path.isfile(ts.path.with_suffix(".rawtlt")),
-             path.isfile(ts.path.with_suffix(".tlt"))])
-        ):
-        print("All required alignment files found.")
-
-    else:
-        raise FileNotFoundError(f"Not all alignment files found for {ts.path.name}.")
-
+    for file in required_files:
+        if not file.is_file():
+            click.echo(f"Required file {file} not found for {ts.path.name}.", err=True)
+            return
+    if not (tlt_file.is_file() or rawtlt_file.is_file()):
+        click.echo(
+            f"Required tlt or rawtlt file not found for {ts.path.name}.", err=True
+        )
+        return
     # Create imod subdirectory
     # copy alignment files (to protect against later modification)
     ts_dir = project_dir / "imod" / ts.path.stem
-    os.mkdir(ts_dir)
+    ts_dir.mkdir()
 
-    [shutil.copy(file,ts_dir) for file in required_files[2:]]
-
-    if path.isfile(ts.path.with_suffix(".tlt")):
-            shutil.copy(ts.path.with_suffix(".tlt"), ts_dir)
-    else: #one or the other must be there, checked above!
-            shutil.copy(ts.path.with_suffix(".rawtlt"),
-                        ts_dir / ts.name.with_suffix(".tlt"))
+    shutil.copy(xf_path, ts_dir)
+    if imod:
+        shutil.copy(ta_solution_path, ts_dir)
+    if tlt_file.is_file():
+        shutil.copy(tlt_file, ts_dir)
+    elif rawtlt_file.is_file():
+        shutil.copy(rawtlt_file, ts_dir / ts.name.with_suffix(".tlt"))
 
     if v2:
         # invert tilt-angles in tlt file (done during import in Warp 1.X)
         invert_tlt_files(ts_dir)
-
         # copy frames to frames subfolder instead of main folder
         frame_target_dir = project_dir / "frames"
-
     else:
         # tilt images go to warp root directory
         frame_target_dir = project_dir
@@ -145,59 +165,86 @@ def make_warp_dir(ts: TiltSeries,
     mdoc = mdocfile.read(ts.mdoc)
     mdoc = mdocfile.downgrade_DateTime(mdoc)
 
-    if ensure_frames:
-
-        # Check, whether all tilts have SubFrameImages
-        if not all("SubFramePath" in section for section in mdoc["sections"]):
-            raise FileNotFoundError(f'No SubFramePath in mdoc for {ts.path.stem}')
-
-        subframe_list = []
-
-        for section in mdoc["sections"]:
-
-            subframe_list.append(mdocfile.find_relative_path(
-                Path(frames_dir),
-                Path(section.get("SubFramePath", "").replace("\\", path.sep)),))
-
-        # Symlink doesn't work with windows!
-        [shutil.copy(file,frame_target_dir / file.name) for file in subframe_list]
-
-        # Fix SubFramePath
-        for section in mdoc["sections"]:
-
-            input_path = Path(section["SubFramePath"])
-
-            section["SubFramePath"] = 'X:\\WarpDir\\' + Path(input_path).name
-
-        mdocfile.write(mdoc, project_dir / "mdoc" / f'{ts.path.stem}.mdoc')
-
+    if frames_strategy[0] in ("copy", "link"):
+        frames_mode, frames_dir = frames_strategy
+        try:
+            written_files = _link_or_copy_frames(
+                mdoc, frames_dir, frame_target_dir, frames_mode
+            )
+        except ValueError as e:
+            click.echo(f"Error processing frames for {ts.name}: {e}", err=True)
+            return
+    elif frames_strategy[0] == "extract":
+        written_files = _extract_frames(ts, mdoc, frame_target_dir)
     else:
-        print(f"{ts.path.stem}: Exporting just tilt images.")
+        written_files = []
+    if len(written_files) > 0 and not len(mdoc["sections"]) == len(written_files):
+        click.echo(
+            f"Error: mismatch between mdoc entries and frames in {ts.name}", err=True
+        )
+        return
+    for subframe_path, section in zip(written_files, mdoc["sections"]):
+        section["SubFramePath"] = "X:\\WarpDir\\" + subframe_path.name
+    mdocfile.write(mdoc, project_dir / "mdoc" / f"{ts.path.stem}.mdoc")
 
-        subprocess.run(['newstack','-quiet',
-                       '-split','0',
-                       '-append','mrc',
-                       '-in',ts.path,
-                       path.join(frame_target_dir,(ts.path.stem+"_sec_"))])
 
-        # Create mdoc with SubFramePath and save it to the mdoc subdirectory
+def _get_subframes(mdoc: dict, src_dir: Path) -> List[Path]:
+    if not all("SubFramePath" in section for section in mdoc["sections"]):
+        raise ValueError("No SubFramePath in mdoc")
+    subframes: List[Path] = []
+    for section in mdoc["sections"]:
+        subframes.append(
+            mdocfile.find_relative_path(
+                Path(src_dir),
+                Path(section.get("SubFramePath", "").replace("\\", path.sep)),
+            )
+        )
+    return subframes
 
-        subframelist = sorted(glob(
-            path.join(frame_target_dir, (ts.path.stem + "_sec_[0-9][0-9].mrc"))
-        ))
 
-        # Check that mdoc has as many sections as there are tilt images
-        if not len(mdoc['sections']) == len(subframelist):
-            raise FileNotFoundError(
-                "Error: Mismatch between mdoc entries and frames!")
+def _link_or_copy_frames(
+    mdoc: dict, src_dir: Path, target_dir: Path, mode: Literal["link", "copy"]
+) -> List[Path]:
+    # Check, whether all tlts have SubFrameImages
+    subframes = _get_subframes(mdoc, src_dir)
+    written_files: List[Path] = []
+    for file in subframes:
+        target = target_dir / file.name
+        source = file if file.is_absolute() else Path.cwd() / file
+        if mode == "link":
+            os.symlink(os.path.relpath(source, start=target.parent), target)
+        else:
+            shutil.copy(source, target)
+        written_files.append(target)
+    return written_files
 
-        for i in range(0, len(mdoc['sections'])):
-            mdoc['sections'][i]['SubFramePath'] = 'X:\\WarpDir\\' + \
-                Path(subframelist[i]).name
 
-        mdocfile.write(mdoc, path.join(project_dir, "mdoc", ts.path.stem+".mdoc"))
-
-    return
+def _extract_frames(ts: TiltSeries, mdoc: dict, target_dir: Path):
+    try:
+        subprocess.run(
+            [
+                "newstack",
+                "-split",
+                "0",
+                "-append",
+                "mrc",
+                "-in",
+                ts.path,
+                target_dir / (ts.path.stem + "_sec_"),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        click.echo("Command failed:", e.returncode, err=True)
+        click.echo("stdout:", e.stdout, err=True)
+        click.echo("stderr:", e.stderr, err=True)
+        return
+    # Create mdoc with SubFramePath and save it to the mdoc subdirectory
+    written_files = sorted(target_dir.glob(ts.path.stem + "_sec_[0-9][0-9].mrc"))
+    # Check that mdoc has as many sections as there are tilt images
+    return written_files
 
 
 def batch_parser(input_files: List, batch: bool):
@@ -235,13 +282,15 @@ def ctfplotter_aretomo_export(ts: TiltSeries):
     ctffile = parse_ctfplotter(run_ctfplotter(ts, False))
 
     # ctfplotter is 1-indexed, excludeviews are 0-indexed
-    ctffile_cleaned = ctffile[~ctffile.view_start.isin(
-        [str(ele+1) for ele in exclude])]
+    ctffile_cleaned = ctffile[
+        ~ctffile.view_start.isin([str(ele + 1) for ele in exclude])
+    ]
 
     # Write to AreTomo export folder
-    ctf_out = write_ctfplotter(ctffile_cleaned,
-                               ts.path.parent / f'{ts.path.stem}_ali_Imod' /
-                               f'{ts.path.stem}_ali.defocus')
+    ctf_out = write_ctfplotter(
+        ctffile_cleaned,
+        ts.path.parent / f"{ts.path.stem}_ali_Imod" / f"{ts.path.stem}_ali.defocus",
+    )
 
     return ctf_out
 
@@ -266,27 +315,28 @@ def tomotwin_prep(tomotwin_dir, ts_list, thickness, uid, bin_up=True):
 
         ts_ali = align_with_imod(ts, True, False, binning=binning)
 
-        rec = tomogram.Tomogram.from_tiltseries(ts_ali, bin=1, sirt=0,
-                                                thickness=round(thickness/binning),
-                                                convert_to_byte=False)
+        rec = tomogram.Tomogram.from_tiltseries(
+            ts_ali,
+            bin=1,
+            sirt=0,
+            thickness=round(thickness / binning),
+            convert_to_byte=False,
+        )
 
-        unique_name = f'{uid}_{ts.path.parent.absolute().name}.mrc'
+        unique_name = f"{uid}_{ts.path.parent.absolute().name}.mrc"
 
         os.symlink(rec.path.absolute(), tomo_dir / unique_name)
 
+
 def invert_tlt_files(ts_dir: Path):
     """Invert tilt angles in tlt file for WarpTools."""
-    for tlt in ts_dir.glob('*.tlt'):
-
-        print(f'Inverting tilt angles in {tlt.name}')
-
+    for tlt in ts_dir.glob("*.tlt"):
         tlt_inverted = []
 
         with open(tlt) as file:
             data = file.readlines()
 
         for line in data:
-
             # Remove whitespace, produced by imod
             line = line.strip()
 
@@ -297,10 +347,10 @@ def invert_tlt_files(ts_dir: Path):
                 tlt_inverted.append(line[1:])
 
             else:
-                tlt_inverted.append("-"+line)
+                tlt_inverted.append("-" + line)
 
-        with open(tlt, 'w+') as file:
+        with open(tlt, "w+") as file:
             for line in tlt_inverted:
-                file.write(f'{line}\n')
+                file.write(f"{line}\n")
 
     return
