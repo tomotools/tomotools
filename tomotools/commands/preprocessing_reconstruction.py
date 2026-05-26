@@ -336,7 +336,7 @@ def preprocess(
 
             # Else, add the .mrc (Tomo5-style) to the output file
             else:
-                output_file = output_dir / input_file.mdoc.with_suffix(".mrc")
+                output_file = output_dir / f'{input_file.mdoc.stem}.mrc'
 
             tilt_series = TiltSeries.from_micrographs(
                 micrographs,
