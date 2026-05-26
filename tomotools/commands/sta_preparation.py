@@ -46,7 +46,7 @@ def fit_ctf(input_files):
 @click.argument('project_dir', type=click.Path(file_okay=False, writable=True, path_type=Path), nargs=1)
 def imod2warp(batch_input: bool,
               v2: bool,
-                aretomo: bool,
+              aretomo: bool,
               link_frames: Optional[Path],
               copy_frames: Optional[Path],
               extract_frames: bool,
@@ -73,9 +73,6 @@ def imod2warp(batch_input: bool,
     if sum([bool(link_frames), bool(copy_frames), extract_frames]) > 1:
         click.echo("Cannot both link frames, copy frames and extract frames. Please choose one option.")
         return
-    if project_dir.exists():
-        if not click.confirm('Project dir exists. Do you want to continue?'):
-            return
     project_dir.mkdir(exist_ok=True)
     (project_dir / "imod").mkdir(exist_ok=True)
     (project_dir / "mdoc").mkdir(exist_ok=True)
@@ -85,14 +82,23 @@ def imod2warp(batch_input: bool,
     # Parse input files
     ts_list = sta_util.batch_parser(input_files, batch_input)
 
-    print(f'Found {len(ts_list)} TiltSeries to work on. \n')
-    with click.progressbar(ts_list) as progress:
+    if copy_frames:
+        frames_strategy = ("copy", copy_frames)
+    elif link_frames:
+        frames_strategy = ("link", link_frames)
+    elif extract_frames:
+        frames_strategy = ("extract", None)
+    else:
+        frames_strategy = ("skip", None)
+    with click.progressbar(
+        ts_list,
+        label=f"Working on {len(ts_list)} TiltSeries",
+        item_show_func=lambda x: f'Processing {x.path.name}' if x else None
+    ) as progress:
         for ts in progress:
-            progress.label = f'Processing {ts.path.name}'
             sta_util.make_warp_dir(ts,
                                 project_dir,
-                                frames_mode = "extract" if extract_frames else ("copy" if copy_frames else "link"),
-                                frames_dir=link_frames or copy_frames,
+                                frames_strategy=frames_strategy,
                                 imod=not aretomo,
                                 v2=v2)
 
