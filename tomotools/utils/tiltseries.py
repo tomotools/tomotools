@@ -72,7 +72,9 @@ class TiltSeries:
         elif path.suffix == ".mdoc":
             yield TiltSeries(path.with_suffix(""))
         elif path.suffix == ".edf":
-            yield TiltSeries(path.with_suffix(".mrc"))
+            edf = edffile.read_edf(path)
+            suffix = edf.get("Setup.RawImageStackExt", "mrc")
+            yield TiltSeries(path.with_suffix("." + suffix))
         elif path.suffix == ".ebt":
             ebt = edffile.read_edf(path)
             for dataset in edffile.get_ebt_datasets(ebt):
