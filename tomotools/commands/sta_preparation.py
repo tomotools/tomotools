@@ -55,20 +55,8 @@ def imod2warp(batch_input: bool,
     """Prepares Warp/M project.
 
     Takes as input several tiltseries (folders) or a file listing them (with -b),
-    obtained after processing with tomotools batch-prepare-tiltseries
-    and reconstructed in subdirectories using imod.
-
-    Provide the root folder for the averaging project and a name for this export.
-    This will be the Warp working directory. Both will be created if non-existent.
-
-    Suggested structure is something like this:
-
-    project_dir
-        ./name_1/
-        ./name_2/
-        ./relion/
-        ./m/
-
+    obtained after tilt-series alignment with eTomo or AreTomo
+    and exports them for Warp/M into a specified project directory.
     """
     if sum([bool(link_frames), bool(copy_frames), extract_frames]) > 1:
         click.echo("Cannot both link frames, copy frames and extract frames. Please choose one option.")
