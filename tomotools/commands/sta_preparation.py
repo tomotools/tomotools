@@ -222,13 +222,11 @@ def reconstruct_3dctf(thickness, bin, input_files):
         # Test whether imod alignment found
         if path.isfile(ts_in.path.with_suffix(".xf")):
             ts = ts_in
-            aretomo = False
 
         # Test whether AreTomo alignment found
         elif path.isfile(ts_in.path.with_suffix(".aln")):
             ts = sta_util.aretomo_export(ts_in)
             sta_util.ctfplotter_aretomo_export(ts_in)
-            aretomo = True
 
         else:
             print(f"No previous alignments found for {ts_in.path}.")
@@ -255,13 +253,10 @@ def reconstruct_3dctf(thickness, bin, input_files):
             ts_ali_filt, binning=bin, thickness=thickness,
             z_slices_nm=25, fullimage=[dim_x,dim_y])
 
-        # Link reconstruction back to main dir, in case AreTomo alignments are used
-        if aretomo:
-            os.symlink(rec.path.absolute(),
-                       ts_in.path.parent / f'{ts_in.path.stem}_3dctf_bin{bin}.mrc')
-        else:
-            os.rename(rec.path.absolute(),
-                      ts_in.path.parent / f'{ts_in.path.stem}_3dctf_bin{bin}.mrc')
+        # Move / rename reconstruction
+        os.rename(rec.path.absolute(),
+                  ts_in.path.parent.absolute() /
+                  f'{ts_in.path.stem}_3dctf_bin{bin}.mrc')
 
         print('\n')
 

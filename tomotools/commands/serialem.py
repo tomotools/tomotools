@@ -11,7 +11,7 @@ from tomotools.utils.serialem_navigator import SEMNavigator
 def semnavigator(path):
     """Open a SerialEM navigator (.nav) file in a small graphical browser."""
     nav = SEMNavigator.read(path)
-    fig, ax = plt.subplots()
+    _, ax = plt.subplots()
     all_ptsx, all_ptsy = [], []
     for item in nav.items:
         ptsx_str, ptsy_str = item.get("PtsX"), item.get("PtsY")
@@ -32,3 +32,5 @@ def semnavigator(path):
     ax.set_xlim(min(all_ptsx) * 1.1, max(all_ptsx) * 1.1)
     ax.set_ylim(min(all_ptsy) * 1.1, max(all_ptsy) * 1.1)
     plt.show()
+
+    return

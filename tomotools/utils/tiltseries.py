@@ -1,6 +1,7 @@
 import csv
 import math
 import os
+import re
 import shutil
 import subprocess
 from glob import glob
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import mrcfile
+import numpy as np
 import pandas as pd
 
 from tomotools.utils import mdocfile, util
@@ -25,10 +27,11 @@ class TiltSeries:
 
     def __init__(self, ts_path: Path):
         if ts_path is None:
-            pass
+            self.path = None
         elif not path.isfile(ts_path):
             raise FileNotFoundError(f"File not found: {ts_path}")
-        self.path: Path = ts_path
+        else:
+            self.path: Path = Path(ts_path)
         self.mdoc: Path = Path(f"{ts_path}.mdoc")
         self.is_split: bool = False
         self.evn_path: Optional[Path] = None
@@ -107,9 +110,63 @@ class TiltSeries:
         if hasattr(self, '_axis_angle'):
             return self._axis_angle
         with mrcfile.mmap(self.path) as mrc:
+
+            # Check SerialEM-type header spelling first
             header = str(mrc.header).split('Tilt axis angle = ', 1)
+
+            if len(header) == 1:
+                # Otherwise, try Tomo5 writing
+                header = str(mrc.header).split('TiltAxisAngle = ', 1)
+
+                if len(header) == 1:
+                    raise NotImplementedError("Can't find tilt axis in header.")
+
             self._axis_angle = float(header[1][0:4])
         return self._axis_angle
+
+
+    def _update_axis_angle(self, tilt_axis_angle: float):
+        """Update TiltAxisAngle in header."""
+        with mrcfile.mmap(self.path, mode = 'r+') as mrc:
+
+            labels = mrc.header.label
+
+            # Tomo5 Notation
+            if 'TiltAxisAngle' in str(labels):
+                # Regex breakdown:
+                # (TiltAxisAngle\s*=\s*) ->
+                # Group 1: The key and the equals sign (with any spacing)
+                # [+-]?\d*\.?\d+ ->
+                # The number (handles signs, integers, and decimals)
+                pattern = rb"(TiltAxisAngle\s*=\s*)[+-]?\d*\.?\d+"
+
+            # SerialEM Notation
+            elif 'Tilt axis angle' in str(labels):
+                pattern = rb"(Tilt axis angle\s*=\s*)[+-]?\d*\.?\d+"
+
+            # Otherwise, this item should be added new.
+            else:
+                empty_indices = np.where(labels == b'')[0]
+
+                if len(empty_indices) == 0:
+                    idx = labels[-1]
+
+                else:
+                    idx = empty_indices[0]
+
+                labels[idx] = f"TiltAxisAngle = {tilt_axis_angle}".encode()
+
+            replacement = f"\\1 {tilt_axis_angle}".encode()
+
+            # Apply to every element in the array
+            # NumPy automatically handles the S80 padding for the new, shorter strings
+            mrc.header.label = np.array([re.sub(pattern,
+                                                replacement,
+                                                line) for line in labels], dtype='|S80')
+
+            self._axis_angle = tilt_axis_angle
+
+            return
 
     @staticmethod
     def _update_mrc_header_from_mdoc(path: Path, mdoc: dict):
@@ -140,6 +197,7 @@ class TiltSeries:
         mdoc: Optional[dict] = None,
         reorder=False,
         overwrite_titles: Optional[List[str]] = None,
+        overwrite_angles: Optional[float] = None,
         overwrite_dose: Optional[float] = None
     ) -> "TiltSeries":
         """Create TiltSeries from Micrographs, aka run newstack."""
@@ -243,7 +301,7 @@ def aretomo_executable() -> Optional[str]:
 #TODO: implement binning using -OutBin X
 def align_with_areTomo(
     ts: TiltSeries, local: bool, previous: bool, do_evn_odd: bool, gpu: str,
-        volz: int = 250):
+        volz: int = 250, override_axis: Optional[float] = None):
     """Takes a TiltSeries as input and runs AreTomo on it.
 
     Optional: do local alignment.
@@ -308,6 +366,8 @@ def align_with_areTomo(
                         '-VolZ', '0',
                         '-TiltCor', '0',
                         '-AlignZ', alignZ] +
+                       (['-TiltAxis', override_axis]
+                        if override_axis is not None else []) +
                        (['-Gpu'] + [str(i) for i in gpu_id]) +
                        (['-Patch', patch_x, patch_y] if local else []),
                        stdout=subprocess.DEVNULL)
@@ -323,7 +383,7 @@ def align_with_areTomo(
         os.rename(f"{ts.path}.aln", aln_file)
 
     # Keep compatibility with AreTomo < 1.3, which output the file
-    if not path.isfile(ali_stack.with_suffix('.tlt')):
+    if not path.isfile(ts.path.with_suffix('.tlt')):
         aln_to_tlt(aln_file)
 
     if do_evn_odd and ts.is_split:
@@ -518,7 +578,9 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool, binning = 
                            stdout=subprocess.DEVNULL)
 
             print(f'Aligned {ts.path} and associated EVN/ODD stacks with imod.')
-            return TiltSeries(ali_stack).with_split_files(ali_stack_evn, ali_stack_odd).with_mdoc(orig_mdoc) #noqa: E501
+            return TiltSeries(ali_stack
+                              ).with_split_files(
+                                  ali_stack_evn,ali_stack_odd).with_mdoc(orig_mdoc)
 
         print(f'Finished aligning {ts.path} with imod.')
         return TiltSeries(ali_stack).with_mdoc(orig_mdoc)
@@ -543,12 +605,12 @@ def aln_to_tlt(aln_file: Path):
             else:
                 row_cleaned = [entry for i,
                                entry in enumerate(row) if entry != '']
-                (sec, rot, gmag, tx, ty, smean, sfit,
-                 scale, base, tilt) = row_cleaned
+                (_sec, _rot, _gmag, _tx, _ty, _smean, _sfit,
+                 _scale, _base, tilt) = row_cleaned
 
                 tilts.append(tilt)
 
-    tlt_out = aln_file.with_name(f"{aln_file.stem}_ali.tlt")
+    tlt_out = aln_file.with_name(f"{aln_file.stem}.tlt")
 
     with open(tlt_out, mode="w+") as f:
         f.write("\n".join(tilts))
@@ -575,10 +637,10 @@ def run_ctfplotter(ts: TiltSeries, overwrite: bool):
 
         if path.isfile(ts.path.with_suffix('.tlt')):
             tlt_file = ts.path.with_suffix('.tlt')
-        elif path.isfile(ts.path.with_name(f'{ts.path.stem}_ali.tlt')):
-            tlt_file = ts.path.with_name(f'{ts.path.stem}_ali.tlt')
-        else:
+        elif path.isfile(ts.path.with_suffix('.rawtlt')):
             tlt_file = ts.path.with_suffix('.rawtlt')
+        else:
+            raise FileNotFoundError(f'Tlt file not found for {ts.path}.')
 
         with open(path.join(ts.path.parent, 'ctfplotter.log'), 'a') as out:
             subprocess.run(['ctfplotter',
@@ -681,7 +743,7 @@ def parse_darkimgs(ts: TiltSeries):
                     break
                 elif row[1].startswith('DarkFrame'):
                     row_cleaned = [entry for i, entry in enumerate(row) if entry != '']
-                    (no, title, equal, view, view2, ang) = row_cleaned
+                    (_no, _title, _equal, view, _view2, _ang) = row_cleaned
                     dark_tilts.append(int(view))
                 else:
                     pass
