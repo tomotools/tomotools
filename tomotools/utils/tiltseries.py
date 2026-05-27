@@ -45,7 +45,8 @@ class TiltSeries:
         """Create TiltSeries from a path, which can be a directory or a file."""
         if path.is_dir():
             yield from TiltSeries._from_dir(path)
-        yield from TiltSeries._from_file(path)
+        elif path.is_file():
+            yield from TiltSeries._from_file(path)
 
     @staticmethod
     def _from_dir(path: Path) -> Iterator["TiltSeries"]:
@@ -83,7 +84,7 @@ class TiltSeries:
             with open(path) as file:
                 for line in file:
                     if line.strip():
-                        yield TiltSeries(Path(line.strip()))
+                        yield from TiltSeries.from_path(Path(line.strip()))
 
 
     def find_split_files(self) -> bool:
