@@ -165,22 +165,23 @@ def make_warp_dir(
     mdoc = mdocfile.read(ts.mdoc)
     mdoc = mdocfile.downgrade_DateTime(mdoc)
 
-    if frames_strategy[0] in ("copy", "link"):
-        frames_mode, frames_dir = frames_strategy
+    frames_mode, frames_dir = frames_strategy
+    if frames_mode in ("copy", "link"):
+        assert frames_dir is not None
         try:
             written_files = _link_or_copy_frames(
                 mdoc, frames_dir, frame_target_dir, frames_mode
             )
         except ValueError as e:
-            click.echo(f"Error processing frames for {ts.name}: {e}", err=True)
+            click.echo(f"Error processing frames for {ts.path.name}: {e}", err=True)
             return
-    elif frames_strategy[0] == "extract":
+    elif frames_mode == "extract":
         written_files = _extract_frames(ts, mdoc, frame_target_dir)
     else:
         written_files = []
     if len(written_files) > 0 and not len(mdoc["sections"]) == len(written_files):
         click.echo(
-            f"Error: mismatch between mdoc entries and frames in {ts.name}", err=True
+            f"Error: mismatch between mdoc entries and frames in {ts.path.name}", err=True
         )
         return
     for subframe_path, section in zip(written_files, mdoc["sections"]):
@@ -219,54 +220,23 @@ def _link_or_copy_frames(
     return written_files
 
 
-def _extract_frames(ts: TiltSeries, mdoc: dict, target_dir: Path):
-    try:
-        subprocess.run(
-            [
-                "newstack",
-                "-split",
-                "0",
-                "-append",
-                "mrc",
-                "-in",
-                ts.path,
-                target_dir / (ts.path.stem + "_sec_"),
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except subprocess.CalledProcessError as e:
-        click.echo("Command failed:", e.returncode, err=True)
-        click.echo("stdout:", e.stdout, err=True)
-        click.echo("stderr:", e.stderr, err=True)
-        return
-    # Create mdoc with SubFramePath and save it to the mdoc subdirectory
-    written_files = sorted(target_dir.glob(ts.path.stem + "_sec_[0-9][0-9].mrc"))
-    # Check that mdoc has as many sections as there are tilt images
-    return written_files
-
-
-def batch_parser(input_files: List[Path]):
-    """Batch-parse tiltseries to work on from textfile."""
-    input_files_parsed = []
-    for file in input_files:
-        if file.is_dir():
-
-
-    # Parse input files
-    if batch:
-        with open(input_files[0], "r+") as f:
-            for line in f:
-                input_files_parsed.append(line.strip("\n"))
-
-    else:
-        input_files_parsed = input_files
-
-    # Convert to list of tiltseries
-    ts_list = convert_input_to_TiltSeries(input_files_parsed)
-
-    return ts_list
+def _extract_frames(ts: TiltSeries, mdoc: dict, target_dir: Path) -> List[Path]:
+    subprocess.run(
+        [
+            "newstack",
+            "-split",
+            "0",
+            "-append",
+            "mrc",
+            "-in",
+            ts.path,
+            target_dir / (ts.path.stem + "_sec_"),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return sorted(target_dir.glob(ts.path.stem + "_sec_[0-9][0-9].mrc"))
 
 
 def ctfplotter_aretomo_export(ts: TiltSeries):

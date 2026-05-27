@@ -30,8 +30,8 @@ def fit_ctf(input_files):
 
 
 @click.command()
-@click.option('-b', '--batch-input', is_flag=True, default=False, show_default=True, deprecated=True,
-              help="Read input files as text, each line is a tiltseries (folder)")
+@click.option('-b', '--batch-input', is_flag=True, hidden=True,
+              help="[Deprecated] Read input files as text, each line is a tiltseries (folder)")
 @click.option('--v2/--v1', is_flag=True, default=True, show_default=True,
                 help="WarpTools (2.x) or Warp (1.x) project. Default is WarpTools.")
 @click.option("--aretomo", is_flag=True, default=False, show_default=True, help="Input files are outputs of AreTomo, not imod.")
@@ -43,7 +43,7 @@ def fit_ctf(input_files):
               help="Copy frames from this directory.")
 @click.option("--extract-frames", is_flag=True, default=False, show_default=True,
               help="Extract frames from raw tilt files. Only use if no separate frames are available.")
-@click.argument('input_files', type=click.Path(file_okay=False, dir_okay=True, path_type=Path), nargs=-1)
+@click.argument('input_files', type=click.Path(file_okay=True, dir_okay=True, path_type=Path), nargs=-1)
 @click.argument('project_dir', type=click.Path(file_okay=False, writable=True, path_type=Path), nargs=1)
 def imod2warp(batch_input: bool,
               v2: bool,
@@ -172,8 +172,8 @@ def reconstruct_3dctf(thickness, bin, input_files):
 
     return
 
-@click.option('-b', '--batch-input', is_flag=True, default=False, show_default=True,
-              help="Read input files as text, each line is a tiltseries (folder)")
+@click.option('-b', '--batch-input', is_flag=True, hidden=True,
+              help="[Deprecated] Read input files as text, each line is a tiltseries (folder)")
 @click.option('-d', '--thickness', default=3000, show_default=True,
               help="Tomogram thickness in unbinned pixels.")
 @click.option('--bin-up/--bin-down', is_flag=True, default=True, show_default=True,
@@ -195,14 +195,16 @@ def imod2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_dir
     Provide the unbinned thickness, and a unique identifier for this session.
     UID will be put in from of name, e.g. 230105_TS_01.mrc.
     """
-    ts_list = sta_util.batch_parser(input_files, batch_input)
+    ts_list: List[TiltSeries] = []
+    for input_file in input_files:
+        ts_list.extend(TiltSeries.from_path(input_file))
 
     sta_util.tomotwin_prep(tomotwin_dir, ts_list, thickness, uid, bin_up=bin_up)
 
 
 @click.command()
-@click.option('-b', '--batch-input', is_flag=True, default=False, show_default=True,
-              help="Read input files as text, each line is a tiltseries (folder)")
+@click.option('-b', '--batch-input', is_flag=True, hidden=True,
+              help="[Deprecated] Read input files as text, each line is a tiltseries (folder)")
 @click.option('-d', '--thickness', default=3000, show_default=True,
               help="Tomogram thickness in unbinned pixels.")
 @click.option('--bin-up/--bin-down', is_flag=True, default=True, show_default=True,
@@ -224,8 +226,10 @@ def aretomo2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_
     Provide the unbinned thickness, and a unique identifier for this session.
     UID will be put in from of name, e.g. 230105_TS_01.mrc.
     """
-    # Get input files
-    ts_list = sta_util.batch_parser(input_files, batch_input)
+    # Parse input files
+    ts_list: List[TiltSeries] = []
+    for input_file in input_files:
+        ts_list.extend(TiltSeries.from_path(input_file))
 
     # Process aretomo -> imod
     print(f'Found {len(ts_list)} TiltSeries to work on. \n')
