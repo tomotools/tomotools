@@ -79,4 +79,4 @@ lint.extend-ignore = [
 
 [tool.ruff.format]
 quote-style = "double"
-indent-style = "tab"
+indent-style = "space"

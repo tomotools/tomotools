@@ -300,7 +300,7 @@ def aretomo_executable() -> Optional[str]:
 
 def bin_tiltseries(ts: TiltSeries,
                    bin: int,
-                   do_even_odd: bool = False) -> "TiltSeries":
+                   do_evn_odd: bool = False) -> "TiltSeries":
     """Bin a TiltSeries object."""
     binned_stack = ts.path.with_name(f'{ts.path.stem}_bin_{bin}.mrc')
 
@@ -314,7 +314,7 @@ def bin_tiltseries(ts: TiltSeries,
 
     print(f"{ts.path}: Binned to {bin}.")
 
-    if do_even_odd and ts.is_split:
+    if do_evn_odd and ts.is_split:
         binned_stack_evn = ts.evn_path.with_name(f'{ts.path.stem}_bin_{bin}_EVN.mrc')
         binned_stack_odd = ts.odd_path.with_name(f'{ts.path.stem}_bin_{bin}_ODD.mrc')
 
@@ -347,7 +347,7 @@ def align_with_areTomo(ts: TiltSeries,
                        previous: bool,
                        do_evn_odd: bool,
                        gpu: str,
-                       override_axis: Optional[float],
+                       override_axis: Optional[float] = None,
                        volz: int = 250,
                        bin: int = 1,
                        ):
