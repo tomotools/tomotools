@@ -150,7 +150,7 @@ def make_warp_dir(
     if tlt_file.is_file():
         shutil.copy(tlt_file, ts_dir)
     elif rawtlt_file.is_file():
-        shutil.copy(rawtlt_file, ts_dir / ts.name.with_suffix(".tlt"))
+        shutil.copy(rawtlt_file, ts_dir / ts.path.with_suffix(".tlt").name)
 
     if v2:
         # invert tilt-angles in tlt file (done during import in Warp 1.X)
@@ -194,12 +194,13 @@ def _get_subframes(mdoc: dict, src_dir: Path) -> List[Path]:
         raise ValueError("No SubFramePath in mdoc")
     subframes: List[Path] = []
     for section in mdoc["sections"]:
-        subframes.append(
-            mdocfile.find_relative_path(
-                Path(src_dir),
-                Path(section.get("SubFramePath", "").replace("\\", path.sep)),
-            )
-        )
+        subframe_path = mdocfile.find_relative_path(
+                        Path(src_dir),
+                        Path(section.get("SubFramePath", "").replace("\\", path.sep)),
+                    )
+        if subframe_path is None:
+            raise ValueError(f"Could not find relative path for SubFramePath: {section.get('SubFramePath')}")
+        subframes.append(subframe_path)
     return subframes
 
 
