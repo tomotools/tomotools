@@ -56,12 +56,9 @@ class TiltSeries:
         if not path.is_dir():
             raise NotADirectoryError(f"{path} is not a directory!")
         for mdoc in path.glob("*.mdoc"):
-            mrc = mdoc.with_suffix('')
-            if not mrc.is_file():
-                continue
             if "allviews" in mdoc.name or "cutviews" in mdoc.name:
                 continue
-            yield TiltSeries(mrc)
+            yield from TiltSeries._from_file(mdoc.with_suffix(''))
 
     @staticmethod
     def _from_file(path: Path) -> Iterator["TiltSeries"]:
@@ -71,15 +68,15 @@ class TiltSeries:
         if path.suffix in [".mrc", ".st"]:
             yield TiltSeries(path)
         elif path.suffix == ".mdoc":
-            yield TiltSeries(path.with_suffix(""))
+            yield from TiltSeries._from_file(path.with_suffix(""))
         elif path.suffix == ".edf":
             edf = edffile.read_edf(path)
             suffix = edf.get("Setup.RawImageStackExt", "mrc")
-            yield TiltSeries(path.with_suffix("." + suffix))
+            yield from TiltSeries._from_file(path.with_suffix("." + suffix))
         elif path.suffix == ".ebt":
             ebt = edffile.read_edf(path)
             for dataset in edffile.get_ebt_datasets(ebt):
-                yield TiltSeries(Path(dataset))
+                yield from TiltSeries._from_file(Path(dataset))
         else:
             with open(path) as file:
                 for line in file:
