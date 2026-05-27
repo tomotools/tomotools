@@ -7,11 +7,10 @@ from glob import glob
 from operator import itemgetter
 from os import path
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Iterator, List, Optional, Tuple
 
 import mrcfile
 import pandas as pd
-from pandas.core.indexes.range import Iterator
 
 from tomotools.utils import edffile, mdocfile, util
 from tomotools.utils.micrograph import Micrograph
