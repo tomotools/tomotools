@@ -98,11 +98,20 @@ class TiltSeries:
             self.path.with_name(self.path.stem + "_odd"),
         )]:
             if even.is_file() and odd.is_file():
-                self.evn_path = even
-                self.odd_path = odd
-                self._is_split = True
+                self.with_split_files(even, odd)
                 return True
         return False
+
+    def with_split_files(self, evn_file: Path, odd_file: Path) -> "TiltSeries":
+        """Create TiltSeries with EVN/ODD by giving their paths."""
+        if not evn_file.is_file():
+            raise FileNotFoundError(f"File not found: {evn_file}")
+        if not odd_file.is_file():
+            raise FileNotFoundError(f"File not found: {odd_file}")
+        self.evn_path = evn_file
+        self.odd_path = odd_file
+        self._is_split = True
+        return self
 
     def with_mdoc(self, file: Path):
         """Explicitely use this mdoc file."""
