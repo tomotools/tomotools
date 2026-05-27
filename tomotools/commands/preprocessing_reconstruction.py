@@ -561,7 +561,7 @@ def reconstruct(
                 tiltseries, previous, do_evn_odd, binning=bin
             )
         else:
-            # AreTomo binning looks terrible
+            # AreTomo binning looks terrible, so do binning in separate step
             tiltseries_at = align_with_areTomo(
                 ts=tiltseries,
                 local=local,
@@ -569,14 +569,14 @@ def reconstruct(
                 do_evn_odd=do_evn_odd,
                 gpu=gpu,
                 volz=ali_d,
-                bin=1,
             )
 
             tiltseries_ali = bin_tiltseries(
-                tiltseries_at, bin=bin, do_evn_odd=do_evn_odd
+                tiltseries_at,
+                bin=bin,
+                do_evn_odd=do_evn_odd,
+                overwrite=True,
             )
-
-            tiltseries_at.delete_files(delete_mdoc=False)
 
         # Do dose filtration.
         tiltseries_dosefiltered = dose_filter(tiltseries_ali, do_evn_odd)
@@ -669,7 +669,7 @@ def reconstruct(
 
         Tomogram.from_tiltseries(
             tiltseries_dosefiltered,
-            bin=bin,
+            binned=8,
             thickness=thickness,
             x_axis_tilt=x_axis_tilt,
             z_shift=z_shift,

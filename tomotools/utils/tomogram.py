@@ -36,7 +36,7 @@ class Tomogram:
     def with_split_dir(self, dir: Path) -> "Tomogram":
         """Create tomogram with EVN/ODD by passing directory containing them."""
         if not dir.is_dir():
-            raise NotADirectoryError(f'{dir} is not a directory!')
+            raise NotADirectoryError(f"{dir} is not a directory!")
         return find_Tomogram_halves(self, dir)
 
     @property
@@ -55,14 +55,14 @@ class Tomogram:
     @staticmethod
     def from_tiltseries(
         tiltseries: TiltSeries,
-        bin: int = 1,
+        binned: int = 8,
         sirt: int = 5,
         thickness: Optional[int] = None,
         x_axis_tilt: float = 0,
         z_shift: float = 0,
         do_EVN_ODD: bool = False,
         trim: bool = True,
-        convert_to_byte: bool = True
+        convert_to_byte: bool = True,
     ) -> "Tomogram":
         """Create Tomogram from TiltSeries, aka reconstruct."""
         # TODO: Reduce complexity C901
@@ -77,106 +77,191 @@ class Tomogram:
         if thickness is None:
             # Define default thickness as function of pixel size
             # always reconstruct 600 nm if no better number is given
-            thickness = str(round(6000 / pix_xy))
+            thickness = str(round(6000 / pix_xy / binned))
 
         # Get dimensions of aligned stack - assumption is that tilt is around the y axis
-        [full_reconstruction_y,full_reconstruction_x] = tiltseries.dimZYX[1:3]
+        [full_reconstruction_y, full_reconstruction_x] = (
+            tiltseries.dimZYX[1] * binned,
+            tiltseries.dimZYX[2] * binned,
+        )
 
         # Perform imod WBP
-        full_rec = tiltseries.path.with_name(f'{tiltseries.path.stem}_full_rec.mrc')
+        full_rec = tiltseries.path.with_name(f"{tiltseries.path.stem}_full_rec.mrc")
 
-        subprocess.run(['tilt']
-                       + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
-                       ['-InputProjections', ali_stack,
-                        '-OutputFile', full_rec,
-                        '-IMAGEBINNED', str(bin),
-                        '-XAXISTILT', str(x_axis_tilt),
-                        '-TILTFILE', f'{list(tiltseries.path.parent.glob("*.tlt"))[0]}',
-                        '-THICKNESS', str(thickness),
-                        '-RADIAL', '0.35,0.035',
-                        '-FalloffIsTrueSigma', '1',
-                        '-SCALE', '0.0,0.05',
-                        '-PERPENDICULAR',
-                        '-MODE', '2',
-                        '-FULLIMAGE', f'{full_reconstruction_x} {full_reconstruction_y}', #noqa: E501
-                        '-SUBSETSTART', '0,0',
-                        '-AdjustOrigin',
-                        '-ActionIfGPUFails', '1,2',
-                        '-OFFSET', '0.0',
-                        '-SHIFT', f'0.0,{z_shift}',
-                        '-UseGPU', '0'],
-                        stdout=subprocess.DEVNULL)
+        subprocess.run(
+            ["tilt"]
+            + (["-FakeSIRTiterations", str(sirt)] if sirt > 0 else [])
+            + [
+                "-InputProjections",
+                ali_stack,
+                "-OutputFile",
+                full_rec,
+                "-IMAGEBINNED",
+                str(binned),
+                "-XAXISTILT",
+                str(x_axis_tilt),
+                "-TILTFILE",
+                f"{list(tiltseries.path.parent.glob('*.tlt'))[0]}",
+                "-THICKNESS",
+                str(thickness),
+                "-RADIAL",
+                "0.35,0.035",
+                "-FalloffIsTrueSigma",
+                "1",
+                "-SCALE",
+                "0.0,0.05",
+                "-PERPENDICULAR",
+                "-MODE",
+                "2",
+                "-FULLIMAGE",
+                f"{full_reconstruction_x} {full_reconstruction_y}",
+                "-SUBSETSTART",
+                "0,0",
+                "-AdjustOrigin",
+                "-ActionIfGPUFails",
+                "1,2",
+                "-OFFSET",
+                "0.0",
+                "-SHIFT",
+                f"0.0,{z_shift}",
+                "-UseGPU",
+                "0",
+            ],
+            stdout=subprocess.DEVNULL,
+        )
 
-        print(f'{tiltseries.path}: Finished reconstruction.')
+        print(f"{tiltseries.path}: Finished reconstruction.")
 
         if do_EVN_ODD and tiltseries.is_split:
-            full_rec_evn = tiltseries.path.with_name(f'{tiltseries.path.stem}_full_rec_EVN.mrc') #noqa: E501
-            full_rec_odd = tiltseries.path.with_name(f'{tiltseries.path.stem}_full_rec_ODD.mrc') #noqa: E501
+            full_rec_evn = tiltseries.path.with_name(
+                f"{tiltseries.path.stem}_full_rec_EVN.mrc"
+            )
+            full_rec_odd = tiltseries.path.with_name(
+                f"{tiltseries.path.stem}_full_rec_ODD.mrc"
+            )
 
-            subprocess.run(['tilt']
-                           + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
-                           ['-InputProjections', ali_stack_evn,
-                            '-OutputFile', full_rec_evn,
-                            '-IMAGEBINNED', str(bin),
-                            '-XAXISTILT', str(x_axis_tilt),
-                            '-TILTFILE', f'{list(tiltseries.path.parent.glob("*.tlt"))[0]}', #noqa: E501
-                            '-THICKNESS', str(thickness),
-                            '-RADIAL', '0.35,0.035',
-                            '-FalloffIsTrueSigma', '1',
-                            '-SCALE', '0.0,0.05',
-                            '-PERPENDICULAR',
-                            '-MODE', '2',
-                            '-FULLIMAGE', f'{full_reconstruction_x} {full_reconstruction_y}', #noqa: E501
-                            '-SUBSETSTART', '0,0',
-                            '-AdjustOrigin',
-                            '-ActionIfGPUFails', '1,2',
-                            '-OFFSET', '0.0',
-                            '-SHIFT', f'0.0,{z_shift}',
-                            '-UseGPU', '0'],
-                            stdout=subprocess.DEVNULL)
+            subprocess.run(
+                ["tilt"]
+                + (["-FakeSIRTiterations", str(sirt)] if sirt > 0 else [])
+                + [
+                    "-InputProjections",
+                    ali_stack_evn,
+                    "-OutputFile",
+                    full_rec_evn,
+                    "-IMAGEBINNED",
+                    str(binned),
+                    "-XAXISTILT",
+                    str(x_axis_tilt),
+                    "-TILTFILE",
+                    f"{list(tiltseries.path.parent.glob('*.tlt'))[0]}",
+                    "-THICKNESS",
+                    str(thickness),
+                    "-RADIAL",
+                    "0.35,0.035",
+                    "-FalloffIsTrueSigma",
+                    "1",
+                    "-SCALE",
+                    "0.0,0.05",
+                    "-PERPENDICULAR",
+                    "-MODE",
+                    "2",
+                    "-FULLIMAGE",
+                    f"{full_reconstruction_x} {full_reconstruction_y}",
+                    "-SUBSETSTART",
+                    "0,0",
+                    "-AdjustOrigin",
+                    "-ActionIfGPUFails",
+                    "1,2",
+                    "-OFFSET",
+                    "0.0",
+                    "-SHIFT",
+                    f"0.0,{z_shift}",
+                    "-UseGPU",
+                    "0",
+                ],
+                stdout=subprocess.DEVNULL,
+            )
 
-            subprocess.run(['tilt']
-                           + (['-FakeSIRTiterations', str(sirt)] if sirt > 0 else []) +
-                           ['-InputProjections', ali_stack_odd,
-                            '-OutputFile', full_rec_odd,
-                            '-IMAGEBINNED', str(bin),
-                            '-XAXISTILT', str(x_axis_tilt),
-                            '-TILTFILE', f'{list(tiltseries.path.parent.glob("*.tlt"))[0]}', #noqa: E501
-                            '-THICKNESS', str(thickness),
-                            '-RADIAL', '0.35,0.035',
-                            '-FalloffIsTrueSigma', '1',
-                            '-SCALE', '0.0,0.05',
-                            '-PERPENDICULAR',
-                            '-MODE', '2',
-                            '-FULLIMAGE', f'{full_reconstruction_x} {full_reconstruction_y}', #noqa: E501
-                            '-SUBSETSTART', '0,0',
-                            '-AdjustOrigin',
-                            '-ActionIfGPUFails', '1,2',
-                            '-OFFSET', '0.0',
-                            '-SHIFT', f'0.0,{z_shift}',
-                            '-UseGPU', '0'],
-                            stdout=subprocess.DEVNULL)
+            subprocess.run(
+                ["tilt"]
+                + (["-FakeSIRTiterations", str(sirt)] if sirt > 0 else [])
+                + [
+                    "-InputProjections",
+                    ali_stack_odd,
+                    "-OutputFile",
+                    full_rec_odd,
+                    "-IMAGEBINNED",
+                    str(binned),
+                    "-XAXISTILT",
+                    str(x_axis_tilt),
+                    "-TILTFILE",
+                    f"{list(tiltseries.path.parent.glob('*.tlt'))[0]}",
+                    "-THICKNESS",
+                    str(thickness),
+                    "-RADIAL",
+                    "0.35,0.035",
+                    "-FalloffIsTrueSigma",
+                    "1",
+                    "-SCALE",
+                    "0.0,0.05",
+                    "-PERPENDICULAR",
+                    "-MODE",
+                    "2",
+                    "-FULLIMAGE",
+                    f"{full_reconstruction_x} {full_reconstruction_y}",
+                    "-SUBSETSTART",
+                    "0,0",
+                    "-AdjustOrigin",
+                    "-ActionIfGPUFails",
+                    "1,2",
+                    "-OFFSET",
+                    "0.0",
+                    "-SHIFT",
+                    f"0.0,{z_shift}",
+                    "-UseGPU",
+                    "0",
+                ],
+                stdout=subprocess.DEVNULL,
+            )
 
-            print(f'{tiltseries.path}: Finished reconstruction of EVN/ODD stacks.')
+            print(f"{tiltseries.path}: Finished reconstruction of EVN/ODD stacks.")
 
         if trim:
             # Trim: Read in dimensions of full_rec (as YZX)
-            with mrcfile.mmap(full_rec, mode = 'r') as mrc:
+            with mrcfile.mmap(full_rec, mode="r") as mrc:
                 full_rec_dim = mrc.data.shape
 
-            final_rec = tiltseries.path.with_name(f'{tiltseries.path.stem}_rec_bin_{bin}.mrc') #noqa: E501
+            final_rec = tiltseries.path.with_name(
+                f"{tiltseries.path.stem}_rec_bin_{binned}.mrc"
+            )
 
-            tr =subprocess.run(['trimvol',
-                                '-x', f'1,{full_rec_dim[2]}',
-                                '-y', f'1,{full_rec_dim[0]}',
-                                '-z', f'1,{full_rec_dim[1]}',
-                                '-f', '-rx'] +
-                               (['-sx', f'1,{full_rec_dim[2]}',
-                                 '-sy', f'1,{full_rec_dim[0]}',
-                                 '-sz', f'{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}'] #noqa: E501
-                                if convert_to_byte else []) +
-                               [full_rec, final_rec],
-                               stdout=subprocess.DEVNULL)
+            tr = subprocess.run(
+                [
+                    "trimvol",
+                    "-x",
+                    f"1,{full_rec_dim[2]}",
+                    "-y",
+                    f"1,{full_rec_dim[0]}",
+                    "-z",
+                    f"1,{full_rec_dim[1]}",
+                    "-f",
+                    "-rx",
+                ]
+                + (
+                    [
+                        "-sx",
+                        f"1,{full_rec_dim[2]}",
+                        "-sy",
+                        f"1,{full_rec_dim[0]}",
+                        "-sz",
+                        f"{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}",  # noqa: E501
+                    ]
+                    if convert_to_byte
+                    else []
+                )
+                + [full_rec, final_rec],
+                stdout=subprocess.DEVNULL,
+            )
 
             if tr.returncode != 0:
                 print(f"{tiltseries.path}: Trimming failed, keeping full_rec file.")
@@ -188,34 +273,70 @@ class Tomogram:
                     return Tomogram(full_rec)
 
             if do_EVN_ODD and tiltseries.is_split:
-                final_rec_evn = tiltseries.path.with_name(f'{tiltseries.path.stem}_rec_bin_{bin}_EVN.mrc') #noqa: E501
-                final_rec_odd = tiltseries.path.with_name(f'{tiltseries.path.stem}_rec_bin_{bin}_ODD.mrc') #noqa: E501
+                final_rec_evn = tiltseries.path.with_name(
+                    f"{tiltseries.path.stem}_rec_bin_{binned}_EVN.mrc"
+                )
+                final_rec_odd = tiltseries.path.with_name(
+                    f"{tiltseries.path.stem}_rec_bin_{binned}_ODD.mrc"
+                )
 
-                subprocess.run(['trimvol',
-                                '-x', f'1,{full_rec_dim[2]}',
-                                '-y', f'1,{full_rec_dim[0]}',
-                                '-z', f'1,{full_rec_dim[1]}',
-                                '-f', '-rx'] +
-                               (['-sx', f'1,{full_rec_dim[2]}',
-                                 '-sy', f'1,{full_rec_dim[0]}',
-                                 '-sz', f'{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}'] #noqa: E501
-                                if convert_to_byte else []) +
-                               [full_rec_evn, final_rec_evn],
-                                stdout=subprocess.DEVNULL)
+                subprocess.run(
+                    [
+                        "trimvol",
+                        "-x",
+                        f"1,{full_rec_dim[2]}",
+                        "-y",
+                        f"1,{full_rec_dim[0]}",
+                        "-z",
+                        f"1,{full_rec_dim[1]}",
+                        "-f",
+                        "-rx",
+                    ]
+                    + (
+                        [
+                            "-sx",
+                            f"1,{full_rec_dim[2]}",
+                            "-sy",
+                            f"1,{full_rec_dim[0]}",
+                            "-sz",
+                            f"{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}",  # noqa: E501
+                        ]
+                        if convert_to_byte
+                        else []
+                    )
+                    + [full_rec_evn, final_rec_evn],
+                    stdout=subprocess.DEVNULL,
+                )
 
-                subprocess.run(['trimvol',
-                                '-x', f'1,{full_rec_dim[2]}',
-                                '-y', f'1,{full_rec_dim[0]}',
-                                '-z', f'1,{full_rec_dim[1]}',
-                                '-f', '-rx'] +
-                               (['-sx', f'1,{full_rec_dim[2]}',
-                                 '-sy', f'1,{full_rec_dim[0]}',
-                                 '-sz', f'{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}'] #noqa: E501
-                                if convert_to_byte else []) +
-                               [full_rec_odd, final_rec_odd],
-                                stdout=subprocess.DEVNULL)
+                subprocess.run(
+                    [
+                        "trimvol",
+                        "-x",
+                        f"1,{full_rec_dim[2]}",
+                        "-y",
+                        f"1,{full_rec_dim[0]}",
+                        "-z",
+                        f"1,{full_rec_dim[1]}",
+                        "-f",
+                        "-rx",
+                    ]
+                    + (
+                        [
+                            "-sx",
+                            f"1,{full_rec_dim[2]}",
+                            "-sy",
+                            f"1,{full_rec_dim[0]}",
+                            "-sz",
+                            f"{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}",  # noqa: E501
+                        ]
+                        if convert_to_byte
+                        else []
+                    )
+                    + [full_rec_odd, final_rec_odd],
+                    stdout=subprocess.DEVNULL,
+                )
 
-                print(f'{tiltseries.path}: Finished trimming.')
+                print(f"{tiltseries.path}: Finished trimming.")
 
                 os.remove(full_rec)
                 os.remove(full_rec_evn)
@@ -231,9 +352,13 @@ class Tomogram:
         return Tomogram(full_rec)
 
     @staticmethod
-    def from_tiltseries_3dctf(tiltseries: TiltSeries, binning=1,
-                              thickness=3000, z_slices_nm=25,
-                              fullimage: Optional[List] = None) -> 'Tomogram':
+    def from_tiltseries_3dctf(
+        tiltseries: TiltSeries,
+        binning=1,
+        thickness=3000,
+        z_slices_nm=25,
+        fullimage: Optional[List] = None,
+    ) -> "Tomogram":
         """
         Calculate Tomogram with imod ctf3d.
 
@@ -260,39 +385,46 @@ class Tomogram:
         # Fix tilt.com
         comfile.fix_tiltcom(tiltseries, thickness, 0, binning, fullimage)
 
-        print(f'Fixed tilt.com file for {tiltseries.path.parent.name}.')
+        print(f"Fixed tilt.com file for {tiltseries.path.parent.name}.")
 
         # Set up files
-        subprocess.run(['ctf3dsetup',
-                        '-th', str(z_slices_nm),
-                        '-pa','tilt'], cwd = tiltseries.path.parent)
+        subprocess.run(
+            ["ctf3dsetup", "-th", str(z_slices_nm), "-pa", "tilt"],
+            cwd=tiltseries.path.parent,
+        )
 
-        print(f'Reconstructing {tiltseries.path.parent.name} with ctf3d.')
+        print(f"Reconstructing {tiltseries.path.parent.name} with ctf3d.")
 
         # Perform actual reconstruction
-        subprocess.run(['processchunks',
-                        'localhost',
-                        'ctf3d'], cwd = tiltseries.path.parent,
-                       stdout = subprocess.DEVNULL)
+        subprocess.run(
+            ["processchunks", "localhost", "ctf3d"],
+            cwd=tiltseries.path.parent,
+            stdout=subprocess.DEVNULL,
+        )
 
-        print(f'Reconstruction of {tiltseries.path.parent.name} done.')
+        print(f"Reconstruction of {tiltseries.path.parent.name} done.")
 
         # Clean up
         tiltseries.delete_files(False)
 
         # Rotate tomogram to default
-        subprocess.run(['clip','rotx',
-                        tiltseries.path.parent /
-                        f'{tiltseries.path.stem}_3dctf_rec.mrc',
-                        tiltseries.path.parent /
-                        f'{tiltseries.mdoc.with_suffix("").stem}_3dctf_rec_rot.mrc'])
-        print(f'Rotation of {tiltseries.path.parent.name} done.')
+        subprocess.run(
+            [
+                "clip",
+                "rotx",
+                tiltseries.path.parent / f"{tiltseries.path.stem}_3dctf_rec.mrc",
+                tiltseries.path.parent
+                / f"{tiltseries.mdoc.with_suffix('').stem}_3dctf_rec_rot.mrc",
+            ]
+        )
+        print(f"Rotation of {tiltseries.path.parent.name} done.")
 
-        os.remove(tiltseries.path.parent /
-                  f'{tiltseries.path.stem}_3dctf_rec.mrc')
+        os.remove(tiltseries.path.parent / f"{tiltseries.path.stem}_3dctf_rec.mrc")
 
-        return Tomogram(tiltseries.path.parent /
-                        f'{tiltseries.mdoc.with_suffix("").stem}_3dctf_rec_rot.mrc')
+        return Tomogram(
+            tiltseries.path.parent
+            / f"{tiltseries.mdoc.with_suffix('').stem}_3dctf_rec_rot.mrc"
+        )
 
 
 def find_Tomogram_halves(tomo: Tomogram, split_dir: Optional[Path] = None):
@@ -307,11 +439,11 @@ def find_Tomogram_halves(tomo: Tomogram, split_dir: Optional[Path] = None):
         parent_dir = split_dir
 
     # Generate plausible filenames either after MotionCor2 or imod notation:
-    EVN_file = parent_dir / f'{tomo.path.stem}_EVN.mrc'
-    ODD_file = parent_dir / f'{tomo.path.stem}_ODD.mrc'
+    EVN_file = parent_dir / f"{tomo.path.stem}_EVN.mrc"
+    ODD_file = parent_dir / f"{tomo.path.stem}_ODD.mrc"
 
-    even_file = parent_dir / f'{tomo.path.stem[:-3]}even_rec.mrc'
-    odd_file = parent_dir / f'{tomo.path.stem[:-3]}odd_rec.mrc'
+    even_file = parent_dir / f"{tomo.path.stem[:-3]}even_rec.mrc"
+    odd_file = parent_dir / f"{tomo.path.stem[:-3]}odd_rec.mrc"
 
     if path.isfile(EVN_file) and path.isfile(ODD_file):
         return tomo.with_split_files(EVN_file, ODD_file)
@@ -319,6 +451,7 @@ def find_Tomogram_halves(tomo: Tomogram, split_dir: Optional[Path] = None):
         return tomo.with_split_files(even_file, odd_file)
     else:
         return tomo
+
 
 def convert_input_to_Tomogram(input_files: List[Path]):
     """Takes list of input files or folders from Click.
@@ -332,21 +465,27 @@ def convert_input_to_Tomogram(input_files: List[Path]):
         if input_file.is_file():
             input_tomo.append(Tomogram(Path(input_file)))
         elif input_file.is_dir():
-            input_tomo += ([Tomogram(Path(file)) for file in glob(path.join(input_file,
-                                                                            '*_rec_bin_[0-9].mrc'))])
+            input_tomo += [
+                Tomogram(Path(file))
+                for file in glob(path.join(input_file, "*_rec_bin_[0-9].mrc"))
+            ]
             # Do not include full_rec, even_rec and odd_rec
-            input_tomo += ([Tomogram(Path(Path(file))) for file in list(set(glob(path.join(input_file, '*_rec.mrc'))) #noqa: E501
-                                                                        -set(glob(path.join(input_file,'*even_rec.mrc')))
-                                                                        -set(glob(path.join(input_file,'*_odd_rec.mrc')))
-                                                                        -set(glob(path.join(input_file,'*_full_rec.mrc')))
-                                                                        )])
+            input_tomo += [
+                Tomogram(Path(Path(file)))
+                for file in list(
+                    set(glob(path.join(input_file, "*_rec.mrc")))
+                    - set(glob(path.join(input_file, "*even_rec.mrc")))
+                    - set(glob(path.join(input_file, "*_odd_rec.mrc")))
+                    - set(glob(path.join(input_file, "*_full_rec.mrc")))
+                )
+            ]
 
     for tomo in input_tomo:
         tomo = find_Tomogram_halves(tomo)
         if tomo.is_split:
-            print(f'Found reconstruction {tomo.path} with EVN and ODD stacks.')
+            print(f"Found reconstruction {tomo.path} with EVN and ODD stacks.")
         else:
             tomo = tomo
-            print(f'Found reconstruction {tomo.path}.')
+            print(f"Found reconstruction {tomo.path}.")
 
     return input_tomo
