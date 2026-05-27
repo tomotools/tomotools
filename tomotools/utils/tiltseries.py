@@ -347,9 +347,10 @@ def align_with_areTomo(ts: TiltSeries,
                        previous: bool,
                        do_evn_odd: bool,
                        gpu: str,
+                       override_axis: Optional[float],
                        volz: int = 250,
-                       override_axis: float = None,
-                       bin: int = 1):
+                       bin: int = 1,
+                       ):
     """Takes a TiltSeries as input and runs AreTomo on it.
 
     Optional: do local alignment.
@@ -447,15 +448,7 @@ def align_with_areTomo(ts: TiltSeries,
                 "-AngFile", tlt_file,
                 "-AlnFile", aln_file,
                 "-VolZ", "0",
-<<<<<<< HEAD
-<<<<<<< HEAD
                 '-OutBin', str(bin),
-=======
-                '-OutBin', bin,
->>>>>>> bc524ca (implemented initial version of reconstruct workflow with binning during alignment)
-=======
-                '-OutBin', str(bin),
->>>>>>> 59cc49c (added error with int in subprocess.run)
             ],
             stdout=subprocess.DEVNULL,
         )
@@ -468,15 +461,7 @@ def align_with_areTomo(ts: TiltSeries,
                 "-AngFile", tlt_file,
                 "-AlnFile", aln_file,
                 "-VolZ", "0",
-<<<<<<< HEAD
-<<<<<<< HEAD
                 '-OutBin', str(bin),
-=======
-                '-OutBin', bin,
->>>>>>> bc524ca (implemented initial version of reconstruct workflow with binning during alignment)
-=======
-                '-OutBin', str(bin),
->>>>>>> 59cc49c (added error with int in subprocess.run)
             ],
             stdout=subprocess.DEVNULL,
         )
