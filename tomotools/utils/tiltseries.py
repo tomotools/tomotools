@@ -245,7 +245,10 @@ class TiltSeries:
 
         # Now, create the TiltSeries files
         micrograph_paths = [str(micrograph.path) for micrograph in micrographs]
-        subprocess.run(["newstack"] + micrograph_paths + [ts_path, "-quiet"])
+        subprocess.run(
+            ["newstack"] + micrograph_paths + [ts_path, "-quiet"],
+            stdout=subprocess.DEVNULL,
+        )
 
         # Sync MRC header and MDOC
         TiltSeries._update_mrc_header_from_mdoc(ts_path, stack_mdoc)
@@ -263,8 +266,14 @@ class TiltSeries:
             ts_evn = ts_path.with_name(ts_path.stem + "_even.mrc")
             ts_odd = ts_path.with_name(ts_path.stem + "_odd.mrc")
 
-            subprocess.run(["newstack"] + micrograph_evn_paths + [ts_evn, "-quiet"])
-            subprocess.run(["newstack"] + micrograph_odd_paths + [ts_odd, "-quiet"])
+            subprocess.run(
+                ["newstack"] + micrograph_evn_paths + [ts_evn, "-quiet"],
+                stdout=subprocess.DEVNULL,
+            )
+            subprocess.run(
+                ["newstack"] + micrograph_odd_paths + [ts_odd, "-quiet"],
+                stdout=subprocess.DEVNULL,
+            )
 
             TiltSeries._update_mrc_header_from_mdoc(ts_evn, stack_mdoc)
             TiltSeries._update_mrc_header_from_mdoc(ts_odd, stack_mdoc)
