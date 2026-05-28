@@ -14,7 +14,7 @@ from tomotools.utils.tiltseries import (
 
 
 @click.command()
-@click.argument('input_files', nargs=-1)
+@click.argument("input_files", nargs=-1)
 def fit_ctf(input_files):
     """Performs interactive CTF-Fitting.
 
@@ -30,29 +30,64 @@ def fit_ctf(input_files):
 
 
 @click.command()
-@click.option('-b', '--batch-input', is_flag=True, hidden=True,
-              help="[Deprecated] Read input files as text, each line is a tiltseries (folder)")
-@click.option('--v2/--v1', is_flag=True, default=True, show_default=True,
-                help="WarpTools (2.x) or Warp (1.x) project. Default is WarpTools.")
-@click.option("--aretomo", is_flag=True, default=False, show_default=True, help="Input files are outputs of AreTomo, not imod.")
-@click.option('--link-frames',
-              type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
-              help="Link frames from this directory.")
-@click.option("--copy-frames",
-              type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
-              help="Copy frames from this directory.")
-@click.option("--extract-frames", is_flag=True, default=False, show_default=True,
-              help="Extract frames from raw tilt files. Only use if no separate frames are available.")
-@click.argument('input_files', type=click.Path(file_okay=True, dir_okay=True, path_type=Path), nargs=-1)
-@click.argument('project_dir', type=click.Path(file_okay=False, writable=True, path_type=Path), nargs=1)
-def imod2warp(batch_input: bool,
-              v2: bool,
-              aretomo: bool,
-              link_frames: Optional[Path],
-              copy_frames: Optional[Path],
-              extract_frames: bool,
-              input_files: Tuple[Path],
-              project_dir: Path):
+@click.option(
+    "-b",
+    "--batch-input",
+    is_flag=True,
+    hidden=True,
+    help="[Deprecated] Read input files as text, each line is a tiltseries (folder)",
+)
+@click.option(
+    "--v2/--v1",
+    is_flag=True,
+    default=True,
+    show_default=True,
+    help="WarpTools (2.x) or Warp (1.x) project. Default is WarpTools.",
+)
+@click.option(
+    "--aretomo",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Input files are outputs of AreTomo, not imod.",
+)
+@click.option(
+    "--link-frames",
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+    help="Link frames from this directory.",
+)
+@click.option(
+    "--copy-frames",
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+    help="Copy frames from this directory.",
+)
+@click.option(
+    "--extract-frames",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Extract frames from raw tilt files. Only use if no separate frames are available.",
+)
+@click.argument(
+    "input_files",
+    type=click.Path(file_okay=True, dir_okay=True, path_type=Path),
+    nargs=-1,
+)
+@click.argument(
+    "project_dir",
+    type=click.Path(file_okay=False, writable=True, path_type=Path),
+    nargs=1,
+)
+def imod2warp(
+    batch_input: bool,
+    v2: bool,
+    aretomo: bool,
+    link_frames: Optional[Path],
+    copy_frames: Optional[Path],
+    extract_frames: bool,
+    input_files: Tuple[Path],
+    project_dir: Path,
+):
     """Prepares Warp/M project.
 
     Takes as input several tiltseries (folders) or a file listing them (with -b),
@@ -60,7 +95,9 @@ def imod2warp(batch_input: bool,
     and exports them for Warp/M into a specified project directory.
     """
     if sum([bool(link_frames), bool(copy_frames), extract_frames]) > 1:
-        click.echo("Cannot both link frames, copy frames and extract frames. Please choose one option.")
+        click.echo(
+            "Cannot both link frames, copy frames and extract frames. Please choose one option."
+        )
         return
     project_dir.mkdir(exist_ok=True)
     (project_dir / "imod").mkdir(exist_ok=True)
@@ -84,21 +121,31 @@ def imod2warp(batch_input: bool,
     with click.progressbar(
         ts_list,
         label=f"Working on {len(ts_list)} TiltSeries",
-        item_show_func=lambda x: f'Processing {x.path.name}' if x else None
+        item_show_func=lambda x: f"Processing {x.path.name}" if x else None,
     ) as progress:
         for ts in progress:
-            sta_util.make_warp_dir(ts,
-                                project_dir,
-                                frames_strategy=frames_strategy,
-                                imod=not aretomo,
-                                v2=v2)
+            if aretomo:
+                ts_out_imod = sta_util.aretomo_export(ts)
+            else:
+                ts_out_imod = ts
+
+            sta_util.make_warp_dir(
+                ts_out_imod,
+                project_dir,
+                frames_strategy=frames_strategy,
+                imod=not aretomo,
+                v2=v2,
+            )
 
 
 @click.command()
-@click.option('--thickness', default = 3000, show_default = True,
-              help="Total thickness in unbinned pixels.")
-@click.option('--bin', default = 1, show_default = True,
-              help="Desired binning level.")
+@click.option(
+    "--thickness",
+    default=3000,
+    show_default=True,
+    help="Total thickness in unbinned pixels.",
+)
+@click.option("--bin", default=1, show_default=True, help="Desired binning level.")
 @click.argument("input_files", nargs=-1, type=click.Path(exists=True))
 def reconstruct_3dctf(thickness, bin, input_files):
     """Reconstruct tomograms using imod's ctf3d command.
@@ -109,7 +156,7 @@ def reconstruct_3dctf(thickness, bin, input_files):
     """
     input_ts = convert_input_to_TiltSeries(input_files)
 
-    print(f'Found {len(input_ts)} TiltSeries to work on. \n')
+    print(f"Found {len(input_ts)} TiltSeries to work on. \n")
 
     # First, check whether all defocus files are there
     for ts_in in input_ts:
@@ -117,11 +164,10 @@ def reconstruct_3dctf(thickness, bin, input_files):
         if not path.isfile(ts_in.path.with_suffix(".defocus")):
             run_ctfplotter(ts_in, True)
 
-    print('All defocus files found or created.')
+    print("All defocus files found or created.")
 
     for ts_in in input_ts:
-
-        print(f'Now working on {ts_in.path}.')
+        print(f"Now working on {ts_in.path}.")
 
         # Test whether imod alignment found
         if path.isfile(ts_in.path.with_suffix(".xf")):
@@ -139,7 +185,7 @@ def reconstruct_3dctf(thickness, bin, input_files):
             continue
 
         # Align
-        ts_ali = tiltseries.align_with_imod(ts, True, False, binning = bin)
+        ts_ali = tiltseries.align_with_imod(ts, True, False, binning=bin)
 
         # Perform dose filtration
         ts_ali_filt = tiltseries.dose_filter(ts_ali, False)
@@ -148,7 +194,7 @@ def reconstruct_3dctf(thickness, bin, input_files):
         # Check that defocus file is there + create ctf com-file
         # Otherwise, open ctfplotter
         if ts.defocus_file() is None:
-            print(f'Defocus file not found for {ts.path.name}. Running ctfplotter now.')
+            print(f"Defocus file not found for {ts.path.name}. Running ctfplotter now.")
             run_ctfplotter(ts, True)
 
         comfile.fake_ctfcom(ts_ali_filt, 1)
@@ -156,32 +202,59 @@ def reconstruct_3dctf(thickness, bin, input_files):
         dim_x, dim_y = tiltseries.binned_size(ts, 1)
 
         rec = tomogram.Tomogram.from_tiltseries_3dctf(
-            ts_ali_filt, binning=bin, thickness=thickness,
-            z_slices_nm=25, fullimage=[dim_x,dim_y])
+            ts_ali_filt,
+            binning=bin,
+            thickness=thickness,
+            z_slices_nm=25,
+            fullimage=[dim_x, dim_y],
+        )
 
         # Link reconstruction back to main dir, in case AreTomo alignments are used
         if aretomo:
-            os.symlink(rec.path.absolute(),
-                       ts_in.path.parent / f'{ts_in.path.stem}_3dctf_bin{bin}.mrc')
+            os.symlink(
+                rec.path.absolute(),
+                ts_in.path.parent / f"{ts_in.path.stem}_3dctf_bin{bin}.mrc",
+            )
         else:
-            os.rename(rec.path.absolute(),
-                      ts_in.path.parent / f'{ts_in.path.stem}_3dctf_bin{bin}.mrc')
+            os.rename(
+                rec.path.absolute(),
+                ts_in.path.parent / f"{ts_in.path.stem}_3dctf_bin{bin}.mrc",
+            )
 
-        print('\n')
-
+        print("\n")
 
     return
 
-@click.option('-b', '--batch-input', is_flag=True, hidden=True,
-              help="[Deprecated] Read input files as text, each line is a tiltseries (folder)")
-@click.option('-d', '--thickness', default=3000, show_default=True,
-              help="Tomogram thickness in unbinned pixels.")
-@click.option('--bin-up/--bin-down', is_flag=True, default=True, show_default=True,
-              help="Default calculates binning closest to 10A and rounds up.")
-@click.option('--uid', default='imod', show_default=True,
-              help="Unique identifier to tell apart tomograms from several sessions.")
-@click.argument('input_files', nargs=-1)
-@click.argument('tomotwin_dir', nargs=1)
+
+@click.option(
+    "-b",
+    "--batch-input",
+    is_flag=True,
+    hidden=True,
+    help="[Deprecated] Read input files as text, each line is a tiltseries (folder)",
+)
+@click.option(
+    "-d",
+    "--thickness",
+    default=3000,
+    show_default=True,
+    help="Tomogram thickness in unbinned pixels.",
+)
+@click.option(
+    "--bin-up/--bin-down",
+    is_flag=True,
+    default=True,
+    show_default=True,
+    help="Default calculates binning closest to 10A and rounds up.",
+)
+@click.option(
+    "--uid",
+    default="imod",
+    show_default=True,
+    help="Unique identifier to tell apart tomograms from several sessions.",
+)
+@click.argument("input_files", nargs=-1)
+@click.argument("tomotwin_dir", nargs=1)
 def imod2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_dir):
     """Prepare for TomoTwin picking.
 
@@ -203,16 +276,35 @@ def imod2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_dir
 
 
 @click.command()
-@click.option('-b', '--batch-input', is_flag=True, hidden=True,
-              help="[Deprecated] Read input files as text, each line is a tiltseries (folder)")
-@click.option('-d', '--thickness', default=3000, show_default=True,
-              help="Tomogram thickness in unbinned pixels.")
-@click.option('--bin-up/--bin-down', is_flag=True, default=True, show_default=True,
-              help="Default calculates binning closest to 10A and rounds up.")
-@click.option('--uid', default='aretomo', show_default=True,
-              help="Unique identifier to tell apart tomograms from several sessions.")
-@click.argument('input_files', nargs=-1)
-@click.argument('tomotwin_dir', nargs=1)
+@click.option(
+    "-b",
+    "--batch-input",
+    is_flag=True,
+    hidden=True,
+    help="[Deprecated] Read input files as text, each line is a tiltseries (folder)",
+)
+@click.option(
+    "-d",
+    "--thickness",
+    default=3000,
+    show_default=True,
+    help="Tomogram thickness in unbinned pixels.",
+)
+@click.option(
+    "--bin-up/--bin-down",
+    is_flag=True,
+    default=True,
+    show_default=True,
+    help="Default calculates binning closest to 10A and rounds up.",
+)
+@click.option(
+    "--uid",
+    default="aretomo",
+    show_default=True,
+    help="Unique identifier to tell apart tomograms from several sessions.",
+)
+@click.argument("input_files", nargs=-1)
+@click.argument("tomotwin_dir", nargs=1)
 def aretomo2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_dir):
     """Prepare for TomoTwin picking.
 
@@ -232,7 +324,7 @@ def aretomo2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_
         ts_list.extend(TiltSeries.from_path(input_file))
 
     # Process aretomo -> imod
-    print(f'Found {len(ts_list)} TiltSeries to work on. \n')
+    print(f"Found {len(ts_list)} TiltSeries to work on. \n")
 
     ts_imodlike = []
 

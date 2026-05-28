@@ -2,21 +2,19 @@ import math
 import os
 import shutil
 import subprocess
-from glob import glob
 from os import path
 from pathlib import Path
 from typing import List, Tuple, Union
-import click
-from typing_extensions import Literal
 
+import click
 import mrcfile
+from typing_extensions import Literal
 
 from tomotools.utils import mdocfile, tomogram
 from tomotools.utils.tiltseries import (
     TiltSeries,
     align_with_imod,
     aretomo_executable,
-    convert_input_to_TiltSeries,
     parse_ctfplotter,
     parse_darkimgs,
     run_ctfplotter,
