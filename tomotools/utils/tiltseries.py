@@ -26,6 +26,7 @@ class TiltSeries:
     """
 
     def __init__(self, ts_path: Path):
+        # TODO: find a better, type-checkeable way to init from just an mdoc
         if ts_path is None:
             self.path = None
         elif not path.isfile(ts_path):
