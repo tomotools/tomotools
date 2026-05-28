@@ -16,6 +16,7 @@ from tomotools.utils.tiltseries import (
     TiltSeries,
     align_with_areTomo,
     align_with_imod,
+    bin_tiltseries,
     convert_input_to_TiltSeries,
     dose_filter,
 )
@@ -176,8 +177,7 @@ def preprocess(
     The last argument is the output dir. It will be created if it doesn't exist.
     """
     # Convert all directories into a list of TiltSeries objects
-    input_files = convert_input_to_TiltSeries(input_files,
-                                              mdoc_ok=True)
+    input_files = convert_input_to_TiltSeries(input_files, mdoc_ok=True)
 
     output_dir = Path(output_dir)
     if not output_dir.is_dir():
@@ -187,10 +187,10 @@ def preprocess(
         try:
             mdoc = mdocfile.read(input_file.mdoc)
         except FileNotFoundError:
-             print(f'No MDOC file found for {input_file.path}. \n')
-             continue
-        if mdoc.get('Montage', 0) == 1:
-            print(f'Skipping {input_file.mdoc.name} because it is a montage. \n')
+            print(f"No MDOC file found for {input_file.path}. \n")
+            continue
+        if mdoc.get("Montage", 0) == 1:
+            print(f"Skipping {input_file.mdoc.name} because it is a montage. \n")
             continue
         # Identify batch / anchoring files, using two criteria:
         # 1. Fewer than three sections
@@ -199,9 +199,7 @@ def preprocess(
             print(f"{input_file.mdoc.name} has fewer than three sections. Skipping.")
             continue
         elif all(abs(section["TiltAngle"]) < 1 for section in mdoc["sections"]):
-            print(
-                f"All angles in {input_file.mdoc.name} are near 0. Skipping."
-            )
+            print(f"All angles in {input_file.mdoc.name} are near 0. Skipping.")
             continue
 
         # File is a tilt-series.
@@ -213,9 +211,7 @@ def preprocess(
                 section["ExposureDose"] = exposuredose
 
         if any(section["ExposureDose"] == 0 for section in mdoc["sections"]):
-            print(
-                f"{input_file.mdoc.name} has no ExposureDose in mdoc."
-            )
+            print(f"{input_file.mdoc.name} has no ExposureDose in mdoc.")
 
         # Are any SubFrames present?
         if any("SubFramePath" in section for section in mdoc["sections"]):
@@ -241,31 +237,34 @@ def preprocess(
 
         else:
             if reorder:
-                print(f'Running newstack -reorder on {input_file.mdoc.name}. \n')
-                subprocess.run(['newstack',
-                                '-reorder', str(1),
-                                '-mdoc',
-                                '-in', input_file.path,
-                                '-ou', str(output_dir.joinpath(input_file.path.name)),
-                                '-quiet'])
+                print(f"Running newstack -reorder on {input_file.mdoc.name}. \n")
+                subprocess.run(
+                    [
+                        "newstack",
+                        "-reorder",
+                        str(1),
+                        "-mdoc",
+                        "-in",
+                        input_file.path,
+                        "-ou",
+                        str(output_dir.joinpath(input_file.path.name)),
+                        "-quiet",
+                    ]
+                )
                 if exposuredose is not None:
                     os.unlink(output_dir / f"{input_file.path.name}.mdoc")
                     mdocfile.write(mdoc, output_dir / f"{input_file.path.name}.mdoc")
 
             else:
-                print(f'Just copying {input_file.path} to {output_dir}. \n')
-                subprocess.run(['cp',
-                                input_file.path,
-                                output_dir])
+                print(f"Just copying {input_file.path} to {output_dir}. \n")
+                subprocess.run(["cp", input_file.path, output_dir])
                 if exposuredose is not None:
                     mdocfile.write(mdoc, output_dir / f"{input_file.path.name}.mdoc")
                 else:
-                    subprocess.run(['cp',
-                                f'{input_file.path.name}.mdoc',
-                                output_dir])
+                    subprocess.run(["cp", f"{input_file.path.name}.mdoc", output_dir])
             continue
 
-        print(f'Frames were found for {input_file.mdoc.name}, will run MotionCor.')
+        print(f"Frames were found for {input_file.mdoc.name}, will run MotionCor.")
 
         # Get rotation and flip of Gain reference from mdoc file property
         mcrot, mcflip = None, None
@@ -274,8 +273,6 @@ def preprocess(
         elif "RotationAndFlip" in mdoc["sections"][0]:
             mdoc_rotflip = mdoc["sections"][0]["RotationAndFlip"]
             mcrot, mcflip = sem2mc2(mdoc_rotflip)
-
-
 
         # Grab frame size to estimate appropriate patch numbers
         # Will only be used if --patch is specified
@@ -306,61 +303,58 @@ def preprocess(
 
         # Update pixel size and dimensions in mdoc, if mcbin != 1
         if mcbin != 1:
-
             # check the size of the MC2 output
-            with mrcfile.open(micrographs[0].path, 'r') as mrc:
+            with mrcfile.open(micrographs[0].path, "r") as mrc:
                 real_y, real_x = mrc.data.shape
 
             # Calculate expected binned size
-            expected_x = int(mdoc['ImageSize'][0] / mcbin)
-            expected_y = int(mdoc['ImageSize'][1] / mcbin)
+            expected_x = int(mdoc["ImageSize"][0] / mcbin)
+            expected_y = int(mdoc["ImageSize"][1] / mcbin)
 
-            if expected_x%2 != 0:
-                expected_x = expected_x -1
-            if expected_y%2 != 0:
-                expected_y = expected_y -1
+            if expected_x % 2 != 0:
+                expected_x = expected_x - 1
+            if expected_y % 2 != 0:
+                expected_y = expected_y - 1
 
             # If the expected size and the real size match, update mdoc
             if expected_x == real_x and expected_y == real_y:
-                mdoc['ImageSize'] = [expected_x, expected_y]
-                mdoc['PixelSpacing'] = mdoc['PixelSpacing'] * mcbin
+                mdoc["ImageSize"] = [expected_x, expected_y]
+                mdoc["PixelSpacing"] = mdoc["PixelSpacing"] * mcbin
 
-                for section in mdoc['sections']:
-                    section['PixelSpacing'] = section['PixelSpacing'] * mcbin
+                for section in mdoc["sections"]:
+                    section["PixelSpacing"] = section["PixelSpacing"] * mcbin
 
         if stack:
-
             # If the mdoc is .mrc.mdoc (SerialEM-style), use .mrc
             if input_file.mdoc.stem.endswith(".mrc"):
                 output_file = output_dir / input_file.mdoc.stem
 
             # Else, add the .mrc (Tomo5-style) to the output file
             else:
-                output_file = output_dir / f'{input_file.mdoc.stem}.mrc'
+                output_file = output_dir / f"{input_file.mdoc.stem}.mrc"
 
             tilt_series = TiltSeries.from_micrographs(
                 micrographs,
                 output_file,
                 mdoc=mdoc,
                 reorder=True,
-                overwrite_dose=exposuredose
+                overwrite_dose=exposuredose,
             )
             shutil.rmtree(frames_corrected_dir)
 
             if axisangle is not None:
                 tilt_series._update_axis_angle(axisangle)
 
-            print(f'Successfully created {tilt_series.path}. \n')
+            print(f"Successfully created {tilt_series.path}. \n")
 
         else:
             for micrograph in micrographs:
-                with mrcfile.mmap(micrograph.path, mode='r+') as mrc:
-                    mrc.voxel_size = mdoc['PixelSpacing']
+                with mrcfile.mmap(micrograph.path, mode="r+") as mrc:
+                    mrc.voxel_size = mdoc["PixelSpacing"]
                 micrograph.path.rename(output_dir.joinpath(micrograph.path.name))
 
-
             shutil.rmtree(frames_corrected_dir)
-            print(f'Successfully created micrograph images in {output_dir}. \n')
+            print(f"Successfully created micrograph images in {output_dir}. \n")
 
 
 @click.command()
@@ -372,8 +366,13 @@ def preprocess(
     show_default=True,
     help="Local or global alignments (local takes significantly longer)",
 )
-@click.option('-d','--thickness', default=None, show_default=True,
-              help="Total thickness in unbinned pixels")
+@click.option(
+    "-d",
+    "--thickness",
+    default=None,
+    show_default=True,
+    help="Total thickness in unbinned pixels",
+)
 @click.option(
     "--extra-thickness",
     default=0,
@@ -382,28 +381,28 @@ def preprocess(
 )
 @click.option(
     "--ali-d",
-    default = 250,
-    show_default = True,
-    help="Sample thickness passed to AreTomo for optimal alignment, in nm.")
+    default=250,
+    show_default=True,
+    help="Sample thickness passed to AreTomo for optimal alignment, in nm.",
+)
 @click.option(
     "-b", "--bin", default=1, show_default=True, help="Final reconstruction binning"
 )
 @click.option(
-    "--sirt",
-    default=5,
-    show_default=True,
-    help="SIRT-like filter iterations"
+    "--sirt", default=5, show_default=True, help="SIRT-like filter iterations"
 )
-@click.option('--imod/--aretomo',
-              is_flag=True,
-              default=False,
-              show_default=True,
-              help="Use imod instead of AreTomo for alignment.")
+@click.option(
+    "--imod/--aretomo",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Use imod instead of AreTomo for alignment.",
+)
 @click.option(
     "--previous",
     is_flag=True,
     default=False,
-    help="Use previous alignment found in the folder."
+    help="Use previous alignment found in the folder.",
 )
 @click.option(
     "--gpu",
@@ -411,16 +410,18 @@ def preprocess(
     default=None,
     help="Specify which GPUs to use for AreTomo. [default: all]",
 )
-@click.option('--do-positioning/--skip-positioning',
-              is_flag=True,
-              default=False,
-              show_default=True,
-              help='Skip tomogram positioning. Useful for STA.')
+@click.option(
+    "--do-positioning/--skip-positioning",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Skip tomogram positioning. Useful for STA.",
+)
 @click.option(
     "--do-evn-odd",
     is_flag=True,
     default=False,
-    show_default = True,
+    show_default=True,
     help="Reconstruct ENV/ODD stacks also.",
 )
 @click.option(
@@ -469,7 +470,12 @@ def reconstruct(
     """
     # Exclusion and previous clash with each other!
     if previous and batch_file is not None:
-        raise ValueError(f"You passed the flag --previous, but also want to exclude the tilts specified in {batch_file}. \n This will mess up alignment files. \n Either the tilts were already excluded in the initial run, then you can skip the --batch-file, or you want to add exclusions, then you have to skip the --previous flag. \n") #noqa: E501
+        raise ValueError(
+            "You passed the flag --previous, but also want to exclude the tilts. \n"
+            "This will mess up alignment files. \n Either the tilts were already"
+            "excluded in the initial run, then you can skip the --batch-file, or you"
+            "want to add exclusions, then you have to skip the --previous flag. \n"
+        )
 
     # Read in batch tilt exclude file
     ts_info = {}
@@ -488,23 +494,26 @@ def reconstruct(
     input_ts = convert_input_to_TiltSeries(input_files)
 
     for tiltseries in input_ts:
-
         print(f"\nNow working on {tiltseries.path.name}.")
 
         if move:
-            tsdir = tiltseries.path.with_suffix('')
+            tsdir = tiltseries.path.with_suffix("")
             tsdir.mkdir()
-            print(f'Moving files to subdir {tsdir}.')
+            print(f"Moving files to subdir {tsdir}.")
             tiltseries.path = tiltseries.path.rename(tsdir / tiltseries.path.name)
             tiltseries.mdoc = tiltseries.mdoc.rename(tsdir / tiltseries.mdoc.name)
             if tiltseries.is_split:
-                tiltseries.evn_path = tiltseries.evn_path.rename(tsdir / tiltseries.evn_path.name) #noqa: E501
-                tiltseries.odd_path = tiltseries.odd_path.rename(tsdir / tiltseries.odd_path.name) #noqa: E501
+                tiltseries.evn_path = tiltseries.evn_path.rename(
+                    tsdir / tiltseries.evn_path.name
+                )
+                tiltseries.odd_path = tiltseries.odd_path.rename(
+                    tsdir / tiltseries.odd_path.name
+                )
 
         # If imod alignment is wanted and no previous tag is passed, stop here
         # imod batch alignment can handle the rest!
         if imod and not previous:
-            print(f'Moved {tiltseries.path.name} into subfolder. Continue in etomo. \n')
+            print(f"Moved {tiltseries.path.name} into subfolder. Continue in etomo. \n")
             continue
 
         if batch_file is not None:
@@ -512,41 +521,61 @@ def reconstruct(
             excludetilts = None
             if tiltseries.path.name in ts_info:
                 excludetilts = ts_info[str(tiltseries.path.name)]
-                print(f'Will exclude tilts {excludetilts}.')
+                print(f"Will exclude tilts {excludetilts}.")
 
             if excludetilts is not None:
-                exclude_cmd = ['excludeviews', '-views', excludetilts, '-delete']
-                subprocess.run(exclude_cmd + [str(tiltseries.path)],
-                               stdout=subprocess.DEVNULL)
-                print(f'Excluded specified tilts from {tiltseries.path}.')
+                exclude_cmd = ["excludeviews", "-views", excludetilts, "-delete"]
+                subprocess.run(
+                    exclude_cmd + [str(tiltseries.path)], stdout=subprocess.DEVNULL
+                )
+                print(f"Excluded specified tilts from {tiltseries.path}.")
 
                 if tiltseries.is_split:
-                    subprocess.run(exclude_cmd + [str(tiltseries.evn_path)], stdout=subprocess.DEVNULL) #noqa: E501
-                    subprocess.run(exclude_cmd + [str(tiltseries.odd_path)], stdout=subprocess.DEVNULL) #noqa: E501
-                    print('Excluded specified tilts from EVN and ODD stacks.')
+                    subprocess.run(
+                        exclude_cmd + [str(tiltseries.evn_path)],
+                        stdout=subprocess.DEVNULL,
+                    )
+                    subprocess.run(
+                        exclude_cmd + [str(tiltseries.odd_path)],
+                        stdout=subprocess.DEVNULL,
+                    )
+                    print("Excluded specified tilts from EVN and ODD stacks.")
 
                 # Move the excluded views to a separate subdirectory
-                excludedir = join(tiltseries.path.parent, 'excluded_views')
+                excludedir = join(tiltseries.path.parent, "excluded_views")
                 if not path.isdir(excludedir):
                     os.mkdir(excludedir)
 
-                for file in glob(join(tiltseries.path.parent,'*_cutviews0.*')):
-                    os.rename(file, join(excludedir,Path(file).name))
+                for file in glob(join(tiltseries.path.parent, "*_cutviews0.*")):
+                    os.rename(file, join(excludedir, Path(file).name))
 
-                with open(join(excludedir,'README'), mode = 'w+') as file:
-                    file.write('Restore full stack by moving these files back and running command excludeviews -restore') #noqa: E501
-
+                with open(join(excludedir, "README"), mode="w+") as file:
+                    file.write("Restore by running excludeviews -restore")
 
         # Align Stack
         # If previous is passed, respect --imod flag.
         # Otherwise, use AreTomo.
 
-        #TODO: bin during alignment
         if previous and imod:
-            tiltseries_ali = align_with_imod(tiltseries, previous, do_evn_odd)
+            tiltseries_ali = align_with_imod(
+                tiltseries, previous, do_evn_odd, binning=bin
+            )
         else:
-            tiltseries_ali = align_with_areTomo(
-                tiltseries, local, previous, do_evn_odd, gpu, volz=ali_d
+            # AreTomo binning looks terrible, so do binning in separate step
+            tiltseries_at = align_with_areTomo(
+                ts=tiltseries,
+                local=local,
+                previous=previous,
+                do_evn_odd=do_evn_odd,
+                gpu=gpu,
+                volz=ali_d,
+            )
+
+            tiltseries_ali = bin_tiltseries(
+                tiltseries_at,
+                bin=bin,
+                do_evn_odd=do_evn_odd,
+                overwrite=True,
             )
 
         # Do dose filtration.
@@ -563,70 +592,97 @@ def reconstruct(
 
         if do_positioning:
             print(f"Trying to run automatic positioning on {tiltseries.path.name}.")
+
             # Perform reconstruction at bin 8 to find pitch / thickness
-            tomo_pitch = Tomogram.from_tiltseries(tiltseries_dosefiltered,
-                                                  bin=8,
-                                                  do_EVN_ODD=False,
-                                                  trim=False,
-                                                  thickness=round(10000 / pix_xy))
+            if bin < 8:
+                binned_ts = bin_tiltseries(tiltseries_dosefiltered, int(8 / bin))
+            else:
+                binned_ts = tiltseries_dosefiltered
+
+            tomo_pitch = Tomogram.from_tiltseries(
+                binned_ts,
+                bin=8,
+                do_EVN_ODD=False,
+                trim=False,
+                thickness=round(10000 / pix_xy),
+            )
 
             # Try to automatically find edges of tomogram
-            pitch_mod = tomo_pitch.path.with_name(f'{tiltseries.path.stem}_pitch.mod')
+            pitch_mod = tomo_pitch.path.with_name(f"{tiltseries.path.stem}_pitch.mod")
 
             # The parameters for findsection are taken from the etomo source code
-            fs = subprocess.run(['findsection',
-                                 '-tomo', tomo_pitch.path,
-                                 '-pitch', pitch_mod,
-                                 '-scales', '2',
-                                 '-size', '16,1,16',
-                                 '-samples', '5',
-                                 '-block', '48'],
-                                stdout=subprocess.DEVNULL)
+            fs = subprocess.run(
+                [
+                    "findsection",
+                    "-tomo",
+                    tomo_pitch.path,
+                    "-pitch",
+                    pitch_mod,
+                    "-scales",
+                    "2",
+                    "-size",
+                    "16,1,16",
+                    "-samples",
+                    "5",
+                    "-block",
+                    "48",
+                ],
+                stdout=subprocess.DEVNULL,
+            )
 
             # If it fails, just use default values
             if fs.returncode != 0:
-                print(
-                    f'{tiltseries.path}: findsection failed, using default values.')
+                print(f"{tiltseries.path}: findsection failed, using default values.")
             else:
                 # Else, get tomopitch
-                tomopitch = subprocess.run([
-                    'tomopitch',
-                    '-mod', pitch_mod,
-                    '-extra', str(extra_thickness),
-                    '-scale', str(8)],
+                tomopitch = subprocess.run(
+                    [
+                        "tomopitch",
+                        "-mod",
+                        pitch_mod,
+                        "-extra",
+                        str(extra_thickness),
+                        "-scale",
+                        str(8),
+                    ],
                     capture_output=True,
-                    text=True).stdout.splitlines()
+                    text=True,
+                ).stdout.splitlines()
 
                 # Check for failed process again.
-                if any(line.startswith('ERROR') for line in tomopitch):
-                    print(
-                        f'{tiltseries.path}: tomopitch failed, using default values.')
+                if any(line.startswith("ERROR") for line in tomopitch):
+                    print(f"{tiltseries.path}: tomopitch failed, using default values.")
                 else:
                     x_axis_tilt = float(tomopitch[-3].split()[-1])
-                    z_shift_line, thickness_line = tomopitch[-1].split(';')
+                    z_shift_line, thickness_line = tomopitch[-1].split(";")
                     z_shift = z_shift_line.split()[-1]
                     thickness = int(thickness_line.split()[-1]) + extra_thickness
                     print(
-                        f'{tiltseries.path}: Succesfully estimated tomopitch: thickness {thickness}, z_shift {z_shift}, x_axis_tilt {x_axis_tilt}') #noqa: E501
+                        f"{tiltseries.path}: Succesfully estimated tomopitch:"
+                        f"thickness {thickness}, z_shift {z_shift},"
+                        f"x_axis_tilt {x_axis_tilt}"
+                    )
             pitch_mod.unlink(missing_ok=True)
             tomo_pitch.path.unlink(missing_ok=True)
 
         # Perform final reconstruction
 
-        # TODO: don't bin here anymore!
-        Tomogram.from_tiltseries(tiltseries_dosefiltered,
-                                 bin=bin,
-                                 thickness=thickness,
-                                 x_axis_tilt=x_axis_tilt,
-                                 z_shift=z_shift,
-                                 sirt=sirt,
-                                 do_EVN_ODD=do_evn_odd,
-                                 convert_to_byte=bytes)
+        Tomogram.from_tiltseries(
+            tiltseries_dosefiltered,
+            binned=8,
+            thickness=thickness,
+            x_axis_tilt=x_axis_tilt,
+            z_shift=z_shift,
+            sirt=sirt,
+            do_EVN_ODD=do_evn_odd,
+            convert_to_byte=bytes,
+        )
 
         tiltseries_ali.delete_files(delete_mdoc=False)
 
         tiltseries_dosefiltered.delete_files(delete_mdoc=False)
         print("\n")
+
 
 @click.command()
 @click.option(
@@ -647,7 +703,6 @@ def fix_header_angle(
     input_ts = convert_input_to_TiltSeries(input_files)
 
     for tiltseries in input_ts:
-
         tiltseries._update_axis_angle(override_angle)
 
         print(f"\nSet angle in {tiltseries.path.name} to {override_angle}.")

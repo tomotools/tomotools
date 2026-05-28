@@ -321,10 +321,3 @@ def defects_tif(gainref, tempdir, template):
     subprocess.run(["clip", "defect", "-D", defects_txt, template, defects_tif])
     print(f"Found and converted defects file {defects_tif}")
     return defects_tif
-
-def make_mrc_gainref(gainref):
-    """Convert DM4 or TIF(F) GainRef to MRC.
-
-    Checks for existence of converted GainRef.
-    """
-    pass

@@ -17,8 +17,8 @@ authors:
       Heidelberg University
   - given-names: Benedikt H
     family-names: Wimmer
-    email: b.wimmer@bioc.uzh.ch
-    affiliation: 'Department of Biochemistry, University of Zurich'
+    email: wimmer@stanford.edu
+    affiliation: 'Department of Biology, Stanford University'
     orcid: 'https://orcid.org/0000-0002-6916-9360'
 abstract: ' Scripts to make cryo-electron tomography a bit easier '
 keywords:
