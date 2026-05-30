@@ -66,7 +66,7 @@ def fit_ctf(input_files):
     is_flag=True,
     default=False,
     show_default=True,
-    help="Extract frames from raw tilt files. Only use if no separate frames are available.",
+    help="Extract images from tilt stack. Only use if no raw frames are available.",
 )
 @click.argument(
     "input_files",
@@ -96,7 +96,8 @@ def imod2warp(
     """
     if sum([bool(link_frames), bool(copy_frames), extract_frames]) > 1:
         click.echo(
-            "Cannot both link frames, copy frames and extract frames. Please choose one option."
+            "Cannot both link frames, copy frames and extract frames."
+            "Please choose one option."
         )
         return
     project_dir.mkdir(exist_ok=True)
@@ -241,6 +242,13 @@ def reconstruct_3dctf(thickness, bin, input_files):
     help="Tomogram thickness in unbinned pixels.",
 )
 @click.option(
+    "--aretomo",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Input files are outputs of AreTomo, not imod.",
+)
+@click.option(
     "--bin-up/--bin-down",
     is_flag=True,
     default=True,
@@ -255,7 +263,9 @@ def reconstruct_3dctf(thickness, bin, input_files):
 )
 @click.argument("input_files", nargs=-1)
 @click.argument("tomotwin_dir", nargs=1)
-def imod2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_dir):
+def imod2tomotwin(
+    batch_input, thickness, aretomo, bin_up, uid, input_files, tomotwin_dir
+):
     """Prepare for TomoTwin picking.
 
     Takes as input several tiltseries (folders) or a file listing them (with -b),
@@ -269,68 +279,16 @@ def imod2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_dir
     UID will be put in from of name, e.g. 230105_TS_01.mrc.
     """
     ts_list: List[TiltSeries] = []
+
     for input_file in input_files:
         ts_list.extend(TiltSeries.from_path(input_file))
+
+    if aretomo:
+        ts_list_temp = []
+
+        for ts in ts_list:
+            ts_list_temp.append(sta_util.aretomo_export(ts))
+
+        ts_list = ts_list_temp
 
     sta_util.tomotwin_prep(tomotwin_dir, ts_list, thickness, uid, bin_up=bin_up)
-
-
-@click.command()
-@click.option(
-    "-b",
-    "--batch-input",
-    is_flag=True,
-    hidden=True,
-    help="[Deprecated] Read input files as text, each line is a tiltseries (folder)",
-)
-@click.option(
-    "-d",
-    "--thickness",
-    default=3000,
-    show_default=True,
-    help="Tomogram thickness in unbinned pixels.",
-)
-@click.option(
-    "--bin-up/--bin-down",
-    is_flag=True,
-    default=True,
-    show_default=True,
-    help="Default calculates binning closest to 10A and rounds up.",
-)
-@click.option(
-    "--uid",
-    default="aretomo",
-    show_default=True,
-    help="Unique identifier to tell apart tomograms from several sessions.",
-)
-@click.argument("input_files", nargs=-1)
-@click.argument("tomotwin_dir", nargs=1)
-def aretomo2tomotwin(batch_input, thickness, bin_up, uid, input_files, tomotwin_dir):
-    """Prepare for TomoTwin picking.
-
-    Takes as input several tiltseries (folders) or a file listing them (with -b),
-    obtained after processing with tomotools batch-prepare-tiltseries
-    and reconstructed in subdirectories using AreTomo.
-
-    Will output tomograms as desired by TomoTwin in the specified project folder,
-    subfolder "tomo".
-
-    Provide the unbinned thickness, and a unique identifier for this session.
-    UID will be put in from of name, e.g. 230105_TS_01.mrc.
-    """
-    # Parse input files
-    ts_list: List[TiltSeries] = []
-    for input_file in input_files:
-        ts_list.extend(TiltSeries.from_path(input_file))
-
-    # Process aretomo -> imod
-    print(f"Found {len(ts_list)} TiltSeries to work on. \n")
-
-    ts_imodlike = []
-
-    for ts in ts_list:
-        print(f"Now working on {ts.path.name}")
-        ts_imodlike.append(sta_util.aretomo_export(ts))
-
-    # Process as normal imod-aligned TS
-    sta_util.tomotwin_prep(tomotwin_dir, ts_imodlike, thickness, uid, bin_up=bin_up)

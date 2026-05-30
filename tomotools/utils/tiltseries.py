@@ -57,7 +57,7 @@ class TiltSeries:
         for mdoc in path.glob("*.mdoc"):
             if "allviews" in mdoc.name or "cutviews" in mdoc.name:
                 continue
-            yield from TiltSeries._from_file(mdoc.with_suffix(''))
+            yield from TiltSeries._from_file(mdoc.with_suffix(""))
 
     @staticmethod
     def _from_file(path: Path) -> Iterator["TiltSeries"]:
@@ -82,7 +82,6 @@ class TiltSeries:
                     if line.strip():
                         yield from TiltSeries.from_path(Path(line.strip()))
 
-
     def find_split_files(self) -> bool:
         """Automatically try to find even/odd split files.
 
@@ -90,13 +89,16 @@ class TiltSeries:
         1. The same directory as the mrc file, suffixed with _EVN/_ODD
         2. The same directory as the mrc file, suffixed with _even/_odd
         """
-        for even, odd in [(
-            self.path.with_name(self.path.stem + "_EVN"),
-            self.path.with_name(self.path.stem + "_ODD"),
-        ), (
-            self.path.with_name(self.path.stem + "_even"),
-            self.path.with_name(self.path.stem + "_odd"),
-        )]:
+        for even, odd in [
+            (
+                self.path.with_name(self.path.stem + "_EVN"),
+                self.path.with_name(self.path.stem + "_ODD"),
+            ),
+            (
+                self.path.with_name(self.path.stem + "_even"),
+                self.path.with_name(self.path.stem + "_odd"),
+            ),
+        ]:
             if even.is_file() and odd.is_file():
                 self.with_split_files(even, odd)
                 return True
@@ -134,17 +136,17 @@ class TiltSeries:
 
     def defocus_file(self):
         """Return path of defocus file from ctfplotter."""
-        if path.exists(self.path.with_name(f'{self.path.stem}_ctfplotter.txt')):
-            return self.path.with_name(f'{self.path.stem}_ctfplotter.txt')
-        elif path.exists(self.path.with_name(f'{self.path.stem}.defocus')):
-            return self.path.with_name(f'{self.path.stem}.defocus')
+        if path.exists(self.path.with_name(f"{self.path.stem}_ctfplotter.txt")):
+            return self.path.with_name(f"{self.path.stem}_ctfplotter.txt")
+        elif path.exists(self.path.with_name(f"{self.path.stem}.defocus")):
+            return self.path.with_name(f"{self.path.stem}.defocus")
         else:
             return None
 
     @property
     def angpix(self) -> float:
         """Return angpix from header."""
-        if hasattr(self, '_angpix'):
+        if hasattr(self, "_angpix"):
             return self._angpix
         with mrcfile.mmap(self.path) as mrc:
             self._angpix = float(mrc.voxel_size.x)
@@ -153,7 +155,7 @@ class TiltSeries:
     @property
     def dimZYX(self) -> Tuple[float, float, float]:
         """Return ZYX dimensions."""
-        if hasattr(self, '_dimZYX'):
+        if hasattr(self, "_dimZYX"):
             return self._dimZYX
         with mrcfile.mmap(self.path) as mrc:
             self._dimZYX = mrc.data.shape
@@ -162,10 +164,10 @@ class TiltSeries:
     @property
     def axis_angle(self) -> float:
         """Return tilt axis angle from header."""
-        if hasattr(self, '_axis_angle'):
+        if hasattr(self, "_axis_angle"):
             return self._axis_angle
         with mrcfile.mmap(self.path) as mrc:
-            header = str(mrc.header).split('Tilt axis angle = ', 1)
+            header = str(mrc.header).split("Tilt axis angle = ", 1)
             self._axis_angle = float(header[1][0:4])
         return self._axis_angle
 
@@ -176,11 +178,10 @@ class TiltSeries:
             mrc.update_header_from_data()
             mrc.update_header_stats()
             for i in range(10):
-                title = mdoc['titles'][i].encode() if i < len(
-                    mdoc['titles']) else b''
-                mrc.header['label'][i] = title
-            mrc.header['nlabl'] = len(mdoc['titles'])
-            mrc.voxel_size = mdoc['sections'][0]['PixelSpacing']
+                title = mdoc["titles"][i].encode() if i < len(mdoc["titles"]) else b""
+                mrc.header["label"][i] = title
+            mrc.header["nlabl"] = len(mdoc["titles"])
+            mrc.voxel_size = mdoc["sections"][0]["PixelSpacing"]
 
     @staticmethod
     def _update_mdoc_from_mrc_header(path: Path, mdoc: dict):
@@ -198,7 +199,7 @@ class TiltSeries:
         mdoc: Optional[dict] = None,
         reorder=False,
         overwrite_titles: Optional[List[str]] = None,
-        overwrite_dose: Optional[float] = None
+        overwrite_dose: Optional[float] = None,
     ) -> "TiltSeries":
         """Create TiltSeries from Micrographs, aka run newstack."""
         # TODO: Possibly remove overwrite_titles
@@ -207,13 +208,13 @@ class TiltSeries:
             raise FileExistsError(f"File at {ts_path} already exists!")
         if reorder:
             micrographs = sorted(
-                micrographs, key=lambda micrograph: micrograph.tilt_angle)
+                micrographs, key=lambda micrograph: micrograph.tilt_angle
+            )
 
         # First, take care of the MDOC files
         if all(micrograph.mdoc for micrograph in micrographs):
             # If all movies have their own associated mdoc, merge the mdoc files
-            stack_mdoc = {'titles': [], 'sections': [],
-                          'framesets': []}
+            stack_mdoc = {"titles": [], "sections": [], "framesets": []}
 
             for micrograph in micrographs:
                 mdoc = micrograph.mdoc
@@ -235,14 +236,16 @@ class TiltSeries:
         elif mdoc is not None:
             stack_mdoc = mdoc
             if reorder:
-                stack_mdoc['sections'] = sorted(
-                    stack_mdoc['sections'], key=itemgetter('TiltAngle'))
+                stack_mdoc["sections"] = sorted(
+                    stack_mdoc["sections"], key=itemgetter("TiltAngle")
+                )
             if overwrite_dose is not None:
                 for section in stack_mdoc["sections"]:
                     section["ExposureDose"] = overwrite_dose
         else:
             raise FileNotFoundError(
-                'No original MDOC was provided and the movies don\'t have MDOCs.')
+                "No original MDOC was provided and the movies don't have MDOCs."
+            )
 
         # Now, create the TiltSeries files
         micrograph_paths = [str(micrograph.path) for micrograph in micrographs]
@@ -252,20 +255,20 @@ class TiltSeries:
         TiltSeries._update_mrc_header_from_mdoc(ts_path, stack_mdoc)
         TiltSeries._update_mdoc_from_mrc_header(ts_path, stack_mdoc)
 
-        mdocfile.write(stack_mdoc, str(ts_path) + '.mdoc')
+        mdocfile.write(stack_mdoc, str(ts_path) + ".mdoc")
 
         if all(micrograph.is_split for micrograph in micrographs):
-            micrograph_evn_paths = [str(micrograph.evn_path)
-                                    for micrograph in micrographs]
-            micrograph_odd_paths = [str(micrograph.odd_path)
-                                    for micrograph in micrographs]
-            ts_evn = ts_path.with_name(ts_path.stem + '_even.mrc')
-            ts_odd = ts_path.with_name(ts_path.stem + '_odd.mrc')
+            micrograph_evn_paths = [
+                str(micrograph.evn_path) for micrograph in micrographs
+            ]
+            micrograph_odd_paths = [
+                str(micrograph.odd_path) for micrograph in micrographs
+            ]
+            ts_evn = ts_path.with_name(ts_path.stem + "_even.mrc")
+            ts_odd = ts_path.with_name(ts_path.stem + "_odd.mrc")
 
-            subprocess.run(
-                ['newstack'] + micrograph_evn_paths + [ts_evn, '-quiet'])
-            subprocess.run(
-                ['newstack'] + micrograph_odd_paths + [ts_odd, '-quiet'])
+            subprocess.run(["newstack"] + micrograph_evn_paths + [ts_evn, "-quiet"])
+            subprocess.run(["newstack"] + micrograph_odd_paths + [ts_odd, "-quiet"])
 
             TiltSeries._update_mrc_header_from_mdoc(ts_evn, stack_mdoc)
             TiltSeries._update_mrc_header_from_mdoc(ts_odd, stack_mdoc)
@@ -298,10 +301,15 @@ def aretomo_executable() -> Optional[str]:
         raise FileNotFoundError("AreTomo not found. Check README.md for setup info.")
 
 
-#TODO: implement binning using -OutBin X
+# TODO: implement binning using -OutBin X
 def align_with_areTomo(
-    ts: TiltSeries, local: bool, previous: bool, do_evn_odd: bool, gpu: str,
-        volz: int = 250):
+    ts: TiltSeries,
+    local: bool,
+    previous: bool,
+    do_evn_odd: bool,
+    gpu: str,
+    volz: int = 250,
+):
     """Takes a TiltSeries as input and runs AreTomo on it.
 
     Optional: do local alignment.
@@ -330,58 +338,78 @@ def align_with_areTomo(
     with mrcfile.mmap(ts.path) as mrc:
         angpix = float(mrc.voxel_size.x)
 
-    tlt_file = ts.path.with_suffix('.rawtlt')
+    tlt_file = ts.path.with_suffix(".rawtlt")
 
     if not path.isfile(tlt_file):
-        subprocess.run(['extracttilts', ts.path, tlt_file],
-                       stdout=subprocess.DEVNULL)
+        subprocess.run(["extracttilts", ts.path, tlt_file], stdout=subprocess.DEVNULL)
 
     if previous:
         if not path.isfile(aln_file):
             raise FileNotFoundError(
-                f'{ts.path}: --previous was passed, but no alignment at {aln_file}.')
+                f"{ts.path}: --previous was passed, but no alignment at {aln_file}."
+            )
 
-        subprocess.run([aretomo_executable(),
-                        '-InMrc', ts.path,
-                        '-OutMrc', ali_stack,
-                        '-AngFile', tlt_file,
-                        '-AlnFile', aln_file,
-                        '-VolZ', '0'],
-                       stdout=subprocess.DEVNULL)
+        subprocess.run(
+            [
+                aretomo_executable(),
+                "-InMrc",
+                ts.path,
+                "-OutMrc",
+                ali_stack,
+                "-AngFile",
+                tlt_file,
+                "-AlnFile",
+                aln_file,
+                "-VolZ",
+                "0",
+            ],
+            stdout=subprocess.DEVNULL,
+        )
 
     if not previous:
         mdoc = mdocfile.read(ts.mdoc)
-        full_dimensions = mdoc['ImageSize']
+        full_dimensions = mdoc["ImageSize"]
 
         patch_x, patch_y = [
             str(round(full_dimensions[0] / 1000)),
-            str(round(full_dimensions[1] / 1000))]
+            str(round(full_dimensions[1] / 1000)),
+        ]
 
         alignZ = str(round(volz * 10 / angpix))
 
-        subprocess.run([aretomo_executable(),
-                        '-InMrc', ts.path,
-                        '-OutMrc', ali_stack,
-                        '-AngFile', tlt_file,
-                        '-VolZ', '0',
-                        '-TiltCor', '0',
-                        '-AlignZ', alignZ] +
-                       (['-Gpu'] + [str(i) for i in gpu_id]) +
-                       (['-Patch', patch_x, patch_y] if local else []),
-                       stdout=subprocess.DEVNULL)
+        subprocess.run(
+            [
+                aretomo_executable(),
+                "-InMrc",
+                ts.path,
+                "-OutMrc",
+                ali_stack,
+                "-AngFile",
+                tlt_file,
+                "-VolZ",
+                "0",
+                "-TiltCor",
+                "0",
+                "-AlignZ",
+                alignZ,
+            ]
+            + (["-Gpu"] + [str(i) for i in gpu_id])
+            + (["-Patch", patch_x, patch_y] if local else []),
+            stdout=subprocess.DEVNULL,
+        )
 
     with mrcfile.mmap(ali_stack, mode="r+") as mrc:
         mrc.voxel_size = str(angpix)
         mrc.update_header_stats()
 
-    print(f'Done aligning {ts.path.stem} with AreTomo.')
+    print(f"Done aligning {ts.path.stem} with AreTomo.")
 
     # AreTomo somehow is inconsistent in naming .aln files
-    if ts.path.suffix == '.st' and path.isfile(f"{ts.path}.aln"):
+    if ts.path.suffix == ".st" and path.isfile(f"{ts.path}.aln"):
         os.rename(f"{ts.path}.aln", aln_file)
 
     # Keep compatibility with AreTomo < 1.3, which output the file
-    if not path.isfile(ali_stack.with_suffix('.tlt')):
+    if not path.isfile(ali_stack.with_suffix(".tlt")):
         aln_to_tlt(aln_file)
 
     if do_evn_odd and ts.is_split:
@@ -503,7 +531,7 @@ def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
         return TiltSeries(filtered_stack).with_mdoc(orig_mdoc)
 
 
-def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool, binning = 1):
+def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool, binning=1):
     """Aligns given TiltSeries with imod.
 
     If previous is passed, use .xf and .tlt file from previous alignment
@@ -515,70 +543,112 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool, binning = 
 
     if previous:
         # Generate new stack with alignment files
-        if not path.isfile(ts.path.with_suffix('.xf')):
+        if not path.isfile(ts.path.with_suffix(".xf")):
             raise FileNotFoundError(
-                f'--previous passed, but file {ts.path.with_suffix(".xf")} not found! ')
+                f"--previous passed, but file {ts.path.with_suffix('.xf')} not found! "
+            )
 
-        ali_stack = ts.path.with_name(f'{ts.path.stem}_ali.mrc')
-
+        ali_stack = ts.path.with_name(f"{ts.path.stem}_ali.mrc")
 
         # Copy the imod-generated tlt-file to _ali.tlt
-        shutil.copyfile(ts.path.with_suffix('.tlt'), ali_stack.with_suffix('.tlt'))
+        shutil.copyfile(ts.path.with_suffix(".tlt"), ali_stack.with_suffix(".tlt"))
 
         out_x, out_y = binned_size(ts, binning)
 
-        subprocess.run(['newstack',
-                        '-InputFile', ts.path,
-                        '-OutputFile', ali_stack,
-                        '-TransformFile', ts.path.with_suffix('.xf'),
-                        '-TaperAtFill', '1,1',
-                        '-AdjustOrigin',
-                        '-OffsetsInXandY', '0,0',
-                        '-ImagesAreBinned', '1',
-                        '-SizeToOutputInXandY', f'{out_x},{out_y}',
-                        '-quiet'] +
-                       (['-bin', str(binning),
-                         '-AntialiasFilter', '-1'] if binning != 1 else []),
-                       stdout=subprocess.DEVNULL)
+        subprocess.run(
+            [
+                "newstack",
+                "-InputFile",
+                ts.path,
+                "-OutputFile",
+                ali_stack,
+                "-TransformFile",
+                ts.path.with_suffix(".xf"),
+                "-TaperAtFill",
+                "1,1",
+                "-AdjustOrigin",
+                "-OffsetsInXandY",
+                "0,0",
+                "-ImagesAreBinned",
+                "1",
+                "-SizeToOutputInXandY",
+                f"{out_x},{out_y}",
+                "-quiet",
+            ]
+            + (
+                ["-bin", str(binning), "-AntialiasFilter", "-1"] if binning != 1 else []
+            ),
+            stdout=subprocess.DEVNULL,
+        )
 
         if do_evn_odd:
-            ali_stack_evn = ts.evn_path.with_name(
-                f'{ts.path.stem}_ali_even.mrc')
-            ali_stack_odd = ts.odd_path.with_name(
-                f'{ts.path.stem}_ali_odd.mrc')
+            ali_stack_evn = ts.evn_path.with_name(f"{ts.path.stem}_ali_even.mrc")
+            ali_stack_odd = ts.odd_path.with_name(f"{ts.path.stem}_ali_odd.mrc")
 
-            subprocess.run(['newstack',
-                            '-InputFile', ts.evn_path,
-                            '-OutputFile', ali_stack_evn,
-                            '-TransformFile', ts.path.with_suffix('.xf'),
-                            '-TaperAtFill', '1,1',
-                            '-AdjustOrigin',
-                            '-OffsetsInXandY', '0,0',
-                            '-ImagesAreBinned', '1',
-                            '-SizeToOutputInXandY', f'{out_x},{out_y}',
-                            '-quiet'] +
-                           (['-bin', str(binning),
-                             '-AntialiasFilter', '-1'] if binning != 1 else []),
-                           stdout=subprocess.DEVNULL)
+            subprocess.run(
+                [
+                    "newstack",
+                    "-InputFile",
+                    ts.evn_path,
+                    "-OutputFile",
+                    ali_stack_evn,
+                    "-TransformFile",
+                    ts.path.with_suffix(".xf"),
+                    "-TaperAtFill",
+                    "1,1",
+                    "-AdjustOrigin",
+                    "-OffsetsInXandY",
+                    "0,0",
+                    "-ImagesAreBinned",
+                    "1",
+                    "-SizeToOutputInXandY",
+                    f"{out_x},{out_y}",
+                    "-quiet",
+                ]
+                + (
+                    ["-bin", str(binning), "-AntialiasFilter", "-1"]
+                    if binning != 1
+                    else []
+                ),
+                stdout=subprocess.DEVNULL,
+            )
 
-            subprocess.run(['newstack',
-                            '-InputFile', ts.odd_path,
-                            '-OutputFile', ali_stack_odd,
-                            '-TransformFile', ts.path.with_suffix('.xf'),
-                            '-TaperAtFill', '1,1',
-                            '-AdjustOrigin',
-                            '-OffsetsInXandY', '0,0',
-                            '-ImagesAreBinned', '1',
-                            '-SizeToOutputInXandY', f'{out_x},{out_y}',
-                            '-quiet'] +
-                           (['-bin', str(binning),
-                             '-AntialiasFilter', '-1'] if binning != 1 else []),
-                           stdout=subprocess.DEVNULL)
+            subprocess.run(
+                [
+                    "newstack",
+                    "-InputFile",
+                    ts.odd_path,
+                    "-OutputFile",
+                    ali_stack_odd,
+                    "-TransformFile",
+                    ts.path.with_suffix(".xf"),
+                    "-TaperAtFill",
+                    "1,1",
+                    "-AdjustOrigin",
+                    "-OffsetsInXandY",
+                    "0,0",
+                    "-ImagesAreBinned",
+                    "1",
+                    "-SizeToOutputInXandY",
+                    f"{out_x},{out_y}",
+                    "-quiet",
+                ]
+                + (
+                    ["-bin", str(binning), "-AntialiasFilter", "-1"]
+                    if binning != 1
+                    else []
+                ),
+                stdout=subprocess.DEVNULL,
+            )
 
-            print(f'Aligned {ts.path} and associated EVN/ODD stacks with imod.')
-            return TiltSeries(ali_stack).with_split_files(ali_stack_evn, ali_stack_odd).with_mdoc(orig_mdoc) #noqa: E501
+            print(f"Aligned {ts.path} and associated EVN/ODD stacks with imod.")
+            return (
+                TiltSeries(ali_stack)
+                .with_split_files(ali_stack_evn, ali_stack_odd)
+                .with_mdoc(orig_mdoc)
+            )
 
-        print(f'Finished aligning {ts.path} with imod.')
+        print(f"Finished aligning {ts.path} with imod.")
         return TiltSeries(ali_stack).with_mdoc(orig_mdoc)
 
     elif not previous:
@@ -593,16 +663,15 @@ def aln_to_tlt(aln_file: Path):
     with open(aln_file) as f:
         reader = csv.reader(f, delimiter=" ")
         for row in reader:
-
-            if row[1].startswith('Local'):
+            if row[1].startswith("Local"):
                 break
-            elif row[0].startswith('#'):
+            elif row[0].startswith("#"):
                 pass
             else:
-                row_cleaned = [entry for i,
-                               entry in enumerate(row) if entry != '']
-                (sec, rot, gmag, tx, ty, smean, sfit,
-                 scale, base, tilt) = row_cleaned
+                row_cleaned = [entry for i, entry in enumerate(row) if entry != ""]
+                _sec, _rot, _gmag, _tx, _ty, _smean, _sfit, _scale, _base, tilt = (
+                    row_cleaned
+                )
 
                 tilts.append(tilt)
 
@@ -620,70 +689,92 @@ def run_ctfplotter(ts: TiltSeries, overwrite: bool):
     Returns path to defocus file.
     """
     if ts.defocus_file() is None or overwrite:
-
         nmpix = ts.angpix / 10
         axis_angle = ts.axis_angle
 
         mdoc = mdocfile.read(ts.mdoc)
-        expected_defocus = str(
-            abs(mdoc['sections'][0]['TargetDefocus']) * 1000)
+        expected_defocus = str(abs(mdoc["sections"][0]["TargetDefocus"]) * 1000)
 
         kV = 300
         cs = 2.7
 
-        if path.isfile(ts.path.with_suffix('.tlt')):
-            tlt_file = ts.path.with_suffix('.tlt')
-        elif path.isfile(ts.path.with_name(f'{ts.path.stem}_ali.tlt')):
-            tlt_file = ts.path.with_name(f'{ts.path.stem}_ali.tlt')
+        if path.isfile(ts.path.with_suffix(".tlt")):
+            tlt_file = ts.path.with_suffix(".tlt")
+        elif path.isfile(ts.path.with_name(f"{ts.path.stem}_ali.tlt")):
+            tlt_file = ts.path.with_name(f"{ts.path.stem}_ali.tlt")
         else:
-            tlt_file = ts.path.with_suffix('.rawtlt')
+            tlt_file = ts.path.with_suffix(".rawtlt")
 
-        with open(path.join(ts.path.parent, 'ctfplotter.log'), 'a') as out:
-            subprocess.run(['ctfplotter',
-                            '-InputStack', ts.path,
-                            '-angleFn', tlt_file,
-                            '-defFn', ts.path.with_name(
-                                f'{ts.path.stem}.defocus'),
-                            '-pixelSize', str(nmpix),
-                            '-crop', '0.3',
-                            '-volt', str(kV),
-                            '-cs', str(cs),
-                            '-am', str(0.07),
-                            '-degPhase', str(0),
-                            '-AxisAngle', str(axis_angle),
-                            '-expDef', expected_defocus,
-                            '-autoFit', '3,1'],
-                           stdout=out)
+        with open(path.join(ts.path.parent, "ctfplotter.log"), "a") as out:
+            subprocess.run(
+                [
+                    "ctfplotter",
+                    "-InputStack",
+                    ts.path,
+                    "-angleFn",
+                    tlt_file,
+                    "-defFn",
+                    ts.path.with_name(f"{ts.path.stem}.defocus"),
+                    "-pixelSize",
+                    str(nmpix),
+                    "-crop",
+                    "0.3",
+                    "-volt",
+                    str(kV),
+                    "-cs",
+                    str(cs),
+                    "-am",
+                    str(0.07),
+                    "-degPhase",
+                    str(0),
+                    "-AxisAngle",
+                    str(axis_angle),
+                    "-expDef",
+                    expected_defocus,
+                    "-autoFit",
+                    "3,1",
+                ],
+                stdout=out,
+            )
 
-    return ts.path.with_name(f'{ts.path.stem}.defocus')
+    return ts.path.with_name(f"{ts.path.stem}.defocus")
 
 
 def parse_ctfplotter(file: Path):
     """Takes path to ctfplotter output. Returns pandas dataframe."""
-    df_file = pd.DataFrame({'view_start': [],
-                            'view_end': [],
-                            'tilt_start': [],
-                            'tilt_end': [],
-                            'df_1_nm': [],
-                            'df_2_nm': [],
-                            'astig_ang': []}, dtype = int)
+    df_file = pd.DataFrame(
+        {
+            "view_start": [],
+            "view_end": [],
+            "tilt_start": [],
+            "tilt_end": [],
+            "df_1_nm": [],
+            "df_2_nm": [],
+            "astig_ang": [],
+        },
+        dtype=int,
+    )
 
     with open(file) as f:
-        reader = csv.reader(f, delimiter = '\t')
+        reader = csv.reader(f, delimiter="\t")
         for row in reader:
             if row == []:
                 pass
-            elif row[1] == '0':
+            elif row[1] == "0":
                 pass
             else:
-                df_temp = pd.DataFrame({'view_start': [row[0]],
-                                        'view_end': [row[1]],
-                                        'tilt_start': [row[2]],
-                                        'tilt_end': [row[3]],
-                                        'df_1_nm': [row[4]],
-                                        'df_2_nm': [row[5]],
-                                        'astig_ang': [row[6]]})
-                df_file = pd.concat([df_file,df_temp])
+                df_temp = pd.DataFrame(
+                    {
+                        "view_start": [row[0]],
+                        "view_end": [row[1]],
+                        "tilt_start": [row[2]],
+                        "tilt_end": [row[3]],
+                        "df_1_nm": [row[4]],
+                        "df_2_nm": [row[5]],
+                        "astig_ang": [row[6]],
+                    }
+                )
+                df_file = pd.concat([df_file, df_temp])
 
     return df_file
 
@@ -691,19 +782,19 @@ def parse_ctfplotter(file: Path):
 def write_ctfplotter(df: pd.DataFrame, file: Path):
     """Writes Pandas dataframe as ctfplotter .defocus file."""
     # Somehow this header is present in ctfplotter files, so also add here.
-    header = pd.DataFrame(['1', '0', '0.0', '0.0', '0.0', '3']).T
+    header = pd.DataFrame(["1", "0", "0.0", "0.0", "0.0", "3"]).T
 
     # Make sure that view_start is starting at 1
     # This can happen if views are excluded by script
     if df.iloc[0].view_start != 1:
         shift = int(df.iloc[0].view_start) - 1
-        df['view_start'] = df['view_start'].astype(int) - shift
-        df['view_end'] = df['view_end'].astype(int) - shift
+        df["view_start"] = df["view_start"].astype(int) - shift
+        df["view_end"] = df["view_end"].astype(int) - shift
 
     temp_header = header.to_csv(sep="\t", header=False, index=False)
     temp = df.to_csv(sep="\t", header=False, index=False)
 
-    with open(file, 'w+') as f:
+    with open(file, "w+") as f:
         f.write(temp_header + temp + "\n")
 
     return file
@@ -718,13 +809,13 @@ def parse_darkimgs(ts: TiltSeries):
     """
     dark_tilts = []
 
-    dark_txt = ts.path.with_name(f'{ts.path.stem}_DarkImgs.txt')
-    aln_file = ts.path.with_suffix('.aln')
+    dark_txt = ts.path.with_name(f"{ts.path.stem}_DarkImgs.txt")
+    aln_file = ts.path.with_suffix(".aln")
 
     if path.isfile(dark_txt):
         with open(dark_txt) as txt:
             for line in txt:
-                if line.startswith('#'):
+                if line.startswith("#"):
                     pass
                 else:
                     line = line.strip()
@@ -732,14 +823,13 @@ def parse_darkimgs(ts: TiltSeries):
 
     else:
         with open(aln_file) as f:
-            reader = csv.reader(f, delimiter=' ')
+            reader = csv.reader(f, delimiter=" ")
             for row in reader:
-
-                if row[1].startswith('Local'):
+                if row[1].startswith("Local"):
                     break
-                elif row[1].startswith('DarkFrame'):
-                    row_cleaned = [entry for i, entry in enumerate(row) if entry != '']
-                    (no, title, equal, view, view2, ang) = row_cleaned
+                elif row[1].startswith("DarkFrame"):
+                    row_cleaned = [entry for i, entry in enumerate(row) if entry != ""]
+                    _no, _title, _equal, view, _view2, _ang = row_cleaned
                     dark_tilts.append(int(view))
                 else:
                     pass
@@ -747,7 +837,7 @@ def parse_darkimgs(ts: TiltSeries):
     return dark_tilts
 
 
-def convert_input_to_TiltSeries(input_files:[], mdoc_ok = False):
+def convert_input_to_TiltSeries(input_files: [], mdoc_ok=False):
     """Takes list of input files or folders from Click.
 
     Returns list of TiltSeries objects with or without split frames.
@@ -764,50 +854,62 @@ def convert_input_to_TiltSeries(input_files:[], mdoc_ok = False):
     for input_file in input_files:
         input_file = Path(input_file)
         if input_file.is_file():
-            if not (input_file.name.endswith('.st') or
-                     input_file.name.endswith('.mrc')):
-
+            if not (
+                input_file.name.endswith(".st") or input_file.name.endswith(".mrc")
+            ):
                 if input_file.name.endswith(".mdoc") and mdoc_ok:
                     return_list.append(TiltSeries(None).with_mdoc(input_file))
 
                 continue
 
-            if (input_file.name.endswith('_EVN.mrc') or
-                input_file.name.endswith('_ODD.mrc') or
-                input_file.name.endswith('_even.mrc') or
-                input_file.name.endswith('_odd.mrc')):
+            if (
+                input_file.name.endswith("_EVN.mrc")
+                or input_file.name.endswith("_ODD.mrc")
+                or input_file.name.endswith("_even.mrc")
+                or input_file.name.endswith("_odd.mrc")
+            ):
                 continue
 
             return_list.append(TiltSeries(Path(input_file)))
 
         elif input_file.is_dir():
-            return_list += ([TiltSeries(Path(Path(file).with_suffix('')))
-                             for file in list(set(glob(path.join(input_file, '*.mdoc')))- #noqa: E501
-                                              set(glob(path.join(input_file,'*allviews*.mdoc')))-
-                                              set(glob(path.join(input_file,'*cutviews*.mdoc')))
-                                              )])
+            return_list += [
+                TiltSeries(Path(Path(file).with_suffix("")))
+                for file in list(
+                    set(glob(path.join(input_file, "*.mdoc")))
+                    - set(glob(path.join(input_file, "*allviews*.mdoc")))
+                    - set(glob(path.join(input_file, "*cutviews*.mdoc")))
+                )
+            ]
 
     for file in return_list:
         if file.path is None and mdoc_ok:
-            print(f'Found mdoc for {file.mdoc}.')
+            print(f"Found mdoc for {file.mdoc}.")
 
         else:
-            if (path.isfile(file.path.with_name(f'{file.path.stem}_EVN.mrc')) and
-                path.isfile(file.path.with_name(f'{file.path.stem}_ODD.mrc'))):
-                file = file.with_split_files(file.path.with_name(f'{file.path.stem}_EVN.mrc'), #noqa: E501
-                                            file.path.with_name(f'{file.path.stem}_ODD.mrc'))
+            if path.isfile(
+                file.path.with_name(f"{file.path.stem}_EVN.mrc")
+            ) and path.isfile(file.path.with_name(f"{file.path.stem}_ODD.mrc")):
+                file = file.with_split_files(
+                    file.path.with_name(f"{file.path.stem}_EVN.mrc"),
+                    file.path.with_name(f"{file.path.stem}_ODD.mrc"),
+                )
 
-            elif (path.isfile(file.path.with_name(f'{file.path.stem}_even.mrc')) and
-                path.isfile(file.path.with_name(f'{file.path.stem}_odd.mrc'))):
-                file = file.with_split_files(file.path.with_name(f'{file.path.stem}_even.mrc'), #noqa: E501
-                                            file.path.with_name(f'{file.path.stem}_odd.mrc'))
+            elif path.isfile(
+                file.path.with_name(f"{file.path.stem}_even.mrc")
+            ) and path.isfile(file.path.with_name(f"{file.path.stem}_odd.mrc")):
+                file = file.with_split_files(
+                    file.path.with_name(f"{file.path.stem}_even.mrc"),
+                    file.path.with_name(f"{file.path.stem}_odd.mrc"),
+                )
 
             if file.is_split:
-                print(f'Found TiltSeries {file.path} with EVN and ODD stacks.')
+                print(f"Found TiltSeries {file.path} with EVN and ODD stacks.")
             else:
-                print(f'Found TiltSeries {file.path}.')
+                print(f"Found TiltSeries {file.path}.")
 
     return return_list
+
 
 def binned_size(ts: TiltSeries, binning):
     """Return the x and y dimensions of tiltseries after alignment and binning."""
@@ -823,4 +925,4 @@ def binned_size(ts: TiltSeries, binning):
         out_x = in_y
         out_y = in_x
 
-    return math.ceil(out_x/binning),math.ceil(out_y/binning)
+    return math.ceil(out_x / binning), math.ceil(out_y / binning)

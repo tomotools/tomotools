@@ -179,7 +179,8 @@ def make_warp_dir(
         written_files = []
     if len(written_files) > 0 and not len(mdoc["sections"]) == len(written_files):
         click.echo(
-            f"Error: mismatch between mdoc entries and frames in {ts.path.name}", err=True
+            f"Error: mismatch between mdoc entries and frames in {ts.path.name}",
+            err=True,
         )
         return
     for subframe_path, section in zip(written_files, mdoc["sections"]):
@@ -193,11 +194,14 @@ def _get_subframes(mdoc: dict, src_dir: Path) -> List[Path]:
     subframes: List[Path] = []
     for section in mdoc["sections"]:
         subframe_path = mdocfile.find_relative_path(
-                        Path(src_dir),
-                        Path(section.get("SubFramePath", "").replace("\\", path.sep)),
-                    )
+            Path(src_dir),
+            Path(section.get("SubFramePath", "").replace("\\", path.sep)),
+        )
         if subframe_path is None:
-            raise ValueError(f"Could not find relative path for SubFramePath: {section.get('SubFramePath')}")
+            raise ValueError(
+                f"Could not find relative path for SubFramePath:"
+                f"{section.get('SubFramePath')}"
+            )
         subframes.append(subframe_path)
     return subframes
 
