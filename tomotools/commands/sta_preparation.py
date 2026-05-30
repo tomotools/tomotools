@@ -227,6 +227,7 @@ def reconstruct_3dctf(thickness, bin, input_files):
     return
 
 
+@click.command()
 @click.option(
     "-b",
     "--batch-input",
@@ -257,7 +258,7 @@ def reconstruct_3dctf(thickness, bin, input_files):
 )
 @click.option(
     "--uid",
-    default="imod",
+    default="",
     show_default=True,
     help="Unique identifier to tell apart tomograms from several sessions.",
 )
@@ -269,8 +270,7 @@ def imod2tomotwin(
     """Prepare for TomoTwin picking.
 
     Takes as input several tiltseries (folders) or a file listing them (with -b),
-    obtained after processing with tomotools batch-prepare-tiltseries
-    and reconstructed in subdirectories using imod.
+    obtained after processing with tomotools.
 
     Will output tomograms as desired by TomoTwin in the specified project folder,
     subfolder "tomo".
