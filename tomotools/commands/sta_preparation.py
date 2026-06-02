@@ -80,6 +80,7 @@ def fit_ctf(input_files):
 )
 def imod2warp(
     batch_input: bool,
+    v2: bool,
     aretomo: bool,
     link_frames: Optional[Path],
     copy_frames: Optional[Path],
@@ -87,10 +88,10 @@ def imod2warp(
     input_files: Tuple[Path],
     project_dir: Path,
 ):
-    """Prepares Warp/M project.
+    """Export aligned tilt-series into a Warp/M project.
 
-    Takes as input several tiltseries (folders) or a file listing them (with -b),
-    obtained after tilt-series alignment with eTomo or AreTomo
+    Takes as input ETomo- or AreTomo-aligned tilt-series (in the form of folders,
+    mdoc files, etomo batch (.ebt), etomo project (.edf) or text files listing them)
     and exports them for Warp/M into a specified project directory.
     """
     if sum([bool(link_frames), bool(copy_frames), extract_frames]) > 1:
