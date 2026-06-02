@@ -41,8 +41,8 @@ def fit_ctf(input_files):
     "--v2/--v1",
     is_flag=True,
     default=True,
-    show_default=True,
-    help="WarpTools (2.x) or Warp (1.x) project. Default is WarpTools.",
+    hidden=True,
+    help="[Deprecated] WarpTools (2.x) or Warp (1.x) project. Default is WarpTools.",
 )
 @click.option(
     "--aretomo",
@@ -80,7 +80,6 @@ def fit_ctf(input_files):
 )
 def imod2warp(
     batch_input: bool,
-    v2: bool,
     aretomo: bool,
     link_frames: Optional[Path],
     copy_frames: Optional[Path],
@@ -103,8 +102,7 @@ def imod2warp(
     project_dir.mkdir(exist_ok=True)
     (project_dir / "imod").mkdir(exist_ok=True)
     (project_dir / "mdoc").mkdir(exist_ok=True)
-    if v2:
-        (project_dir / "frames").mkdir(exist_ok=True)
+    (project_dir / "frames").mkdir(exist_ok=True)
 
     # Parse input files
     ts_list: List[TiltSeries] = []
@@ -135,7 +133,6 @@ def imod2warp(
                 project_dir,
                 frames_strategy=frames_strategy,
                 imod=not aretomo,
-                v2=v2,
             )
 
 
@@ -209,11 +206,12 @@ def reconstruct_3dctf(thickness, bin, input_files):
         )
 
         # Move / rename reconstruction
-        os.rename(rec.path.absolute(),
-                  ts_in.path.parent.absolute() /
-                  f'{ts_in.path.stem}_3dctf_bin{bin}.mrc')
+        os.rename(
+            rec.path.absolute(),
+            ts_in.path.parent.absolute() / f"{ts_in.path.stem}_3dctf_bin{bin}.mrc",
+        )
 
-        print('\n')
+        print("\n")
 
         print("\n")
 

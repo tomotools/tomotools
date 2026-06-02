@@ -114,7 +114,6 @@ def make_warp_dir(
         Tuple[Literal["link"], Path],
     ],
     imod: bool = False,
-    v2: bool = False,
 ):
     """Export tiltseries to Warp."""
     ts_path = ts.path
@@ -150,14 +149,10 @@ def make_warp_dir(
     elif rawtlt_file.is_file():
         shutil.copy(rawtlt_file, ts_dir / ts.path.with_suffix(".tlt").name)
 
-    if v2:
-        # invert tilt-angles in tlt file (done during import in Warp 1.X)
-        invert_tlt_files(ts_dir)
-        # copy frames to frames subfolder instead of main folder
-        frame_target_dir = project_dir / "frames"
-    else:
-        # tilt images go to warp root directory
-        frame_target_dir = project_dir
+    # invert tilt-angles in tlt file (done during import in Warp 1.X)
+    invert_tlt_files(ts_dir)
+    # copy frames to frames subfolder instead of main folder
+    frame_target_dir = project_dir / "frames"
 
     # Read mdoc, fix date bug
     mdoc = mdocfile.read(ts.mdoc)
