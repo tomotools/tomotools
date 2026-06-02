@@ -32,3 +32,5 @@ def semnavigator(path):
     ax.set_xlim(min(all_ptsx) * 1.1, max(all_ptsx) * 1.1)
     ax.set_ylim(min(all_ptsy) * 1.1, max(all_ptsy) * 1.1)
     plt.show()
+
+    return

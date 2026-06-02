@@ -1,3 +1,4 @@
+
 import os
 import shutil
 import subprocess
@@ -62,68 +63,46 @@ class Micrograph:
         gpu: Optional[str] = None,
     ) -> "List[Micrograph]":
         """Create micrograph from a list of movies using MotionCor."""
-        # TODO: Reduce complexity C901
-
         tempdir = output_dir.joinpath("motioncor2_temp")
         tempdir.mkdir(parents=True)
-        gain_ref_dm4 = None
-        gain_ref_mrc = None
 
-        # If override_gainref is given, check if it is already mrc
-        # Otherwise, convert.
+        # Find gain reference
+        # 1. Use override_gainref if given
+        # 2. Otherwise, check mdoc for gain reference
         if override_gainref is not None:
             override_gainref = Path(override_gainref)
-            if override_gainref.suffix == ".dm4":
-                gain_ref_dm4 = override_gainref
-            elif override_gainref.suffix == ".mrc":
-                gain_ref_mrc = override_gainref
-            else:
-                raise AttributeError(
-                    "Gain reference can only be in .dm4 or .mrc format!"
-                )
-        elif movies[0].mdoc is not None:
+        elif override_gainref is None and movies[0].mdoc is not None:
             # Check if there is a subframe mdoc and if it contains a gain reference path
             gain_refs = {movie.mdoc["framesets"][0].get("GainReference", None)
-                         for movie in movies}
-
-            if len(gain_refs) != 1:
-                raise Exception(
-                    f'Only 0 or 1 gainref supported, {len(gain_refs)} found in mdoc.'
-                )
-            gain_ref_dm4 = gain_refs.pop()
-            if gain_ref_dm4 is not None:
+                         for movie in movies if movie.mdoc is not None}
+            gain_refs.discard(None)
+            if len(gain_refs) > 1:
+                raise Exception('Found multiple gain references, only one is supported')
+            elif len(gain_refs) == 1:
                 # The gain ref should be in the same folder as the input file(s)
                 # Check if it's there.
-                gain_ref_dm4 = movies[0].path.parent / gain_ref_dm4
-                if not gain_ref_dm4.is_file():
+                override_gainref = gain_refs.pop()
+                override_gainref = movies[0].path.parent / override_gainref  # pyright: ignore[reportOperatorIssue]
+                if not override_gainref.is_file():  # pyright: ignore[reportOptionalMemberAccess]
                     raise FileNotFoundError(
-                        f"Expected gain reference at {gain_ref_dm4}, aborting"
+                        f"Couldn't find gain reference at {override_gainref}, aborting"
                     )
 
-        if gain_ref_dm4 is not None and gain_ref_mrc is None:
-            # The gain ref is saved in dm4 format, convert to MRC for MotionCor2
-            # Write to a separate directory to keep it away from MC2.
-            temp_gain = output_dir.joinpath("motioncor2_gain")
-            temp_gain.mkdir()
-            gain_ref_mrc = temp_gain.joinpath(gain_ref_dm4.stem + ".mrc")
+        # Convert gain reference to mrc if needed
+        if override_gainref is None:
+            gain_ref_mrc = None
             print(
-                f"Found gain reference {gain_ref_dm4}, converting to {gain_ref_mrc}"
+                "No gainref is given or found, continuing without gain correction."
             )
-            subprocess.run(["dm2mrc", gain_ref_dm4, gain_ref_mrc],
-                           stdout=subprocess.DEVNULL)
-
-        if gain_ref_mrc is not None:
+        else:
+            gain_ref_mrc = _ensure_gainref_mrc(override_gainref, output_dir)
             if not gain_ref_mrc.is_file():
                 raise FileNotFoundError(
                     f"The GainRef file {gain_ref_mrc} doesn't exist!"
                 )
             print(f"Using gainref file {gain_ref_mrc}")
-        else:
-            print(
-                "No gainref is given or found, continuing without gain correction."
-            )
 
-        # Generate MotionCor command
+        # Build and run MotionCor command
         command = [
             motioncor_executable(),
             "-FtBin",
@@ -148,10 +127,11 @@ class Micrograph:
         if mcrot is not None and mcflip is not None:
             command += ["-RotGain", str(mcrot), "-FlipGain", str(mcflip)]
 
-        if gain_ref_dm4 is not None and check_defects(gain_ref_dm4) is not None:
+        if (override_gainref is not None and override_gainref.suffix == '.dm4' and
+            check_defects(override_gainref) is not None):
             command += [
                 "-DefectMap",
-                defects_tif(gain_ref_dm4, tempdir, movies[0].path).absolute(),
+                defects_tif(override_gainref, tempdir, movies[0].path).absolute(),
             ]
 
         # Patch alignment takes two groupings, for global and local alignments.
@@ -219,8 +199,8 @@ class Micrograph:
                         "Gain reference was specified, but not applied by MotionCor."
                     )
 
-        if gain_ref_dm4 is not None:
-            shutil.rmtree(temp_gain)
+        if  os.path.isdir(output_dir.joinpath("motioncor2_gain")):
+            shutil.rmtree(output_dir.joinpath("motioncor2_gain"))
 
         output_micrographs = [
             Micrograph(
@@ -263,6 +243,26 @@ def motioncor_executable() -> Optional[str]:
                 'MotionCor not found. Check README.md for setup info.'
             )
 
+def _ensure_gainref_mrc(gain_ref: Path, output_dir: Path) -> Path:
+    temp_gain = output_dir / "motioncor2_gain"
+    temp_gain.mkdir()
+    gain_out = temp_gain / (gain_ref.with_suffix(".mrc").name)
+    print(
+        f"Found gain reference {gain_ref}, converting to {gain_out}"
+    )
+    if gain_ref.suffix == ".mrc":
+        gain_out = gain_ref
+    elif gain_ref.suffix == ".dm4":
+        subprocess.run(["dm2mrc", gain_ref, gain_out],
+                        stdout=subprocess.DEVNULL)
+    elif gain_ref.suffix in [".tif", ".tiff", ".gain"]:
+        subprocess.run(["tif2mrc", gain_ref, gain_out],
+                        stdout=subprocess.DEVNULL)
+    else:
+        raise AttributeError(
+            "Gain reference can only be in .tif(f) or .dm4 format!"
+        )
+    return gain_out
 
 def sem2mc2(RotationAndFlip: int = 0):
     """Read RotationAndFlip for MotionCor2.
