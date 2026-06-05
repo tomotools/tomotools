@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,7 +9,8 @@ readme = "README.md"
 version = "0.4.7"
 
 requires-python = ">=3.12"
-license = {text = "None so far"}
+license = "GPL-2.0-only"
+license-files = ["LICENSE"]
 authors = [
   {email = "moritz.wachsmuth@bioquant.uni-heidelberg.de", name = "Moritz Wachsmuth-Melm"},
   {email = "wimmer@stanford.edu", name = "Benedikt Wimmer"},
@@ -21,9 +22,6 @@ dependencies = [
     "mrcfile",
     "matplotlib",
 ]
-
-[tool.setuptools]
-packages = ["tomotools", "tomotools.commands", "tomotools.utils"]
 
 [project.optional-dependencies]
 dev = [
