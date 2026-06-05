@@ -38,10 +38,11 @@ tomotools [subcommand] --help
 
 ### Other
 
-- **semnavigator**: Display SerialEM navigator files to find back you tomogram positions
+- **semnavigator**: Display SerialEM navigator files to find back you tomogram positions.
 - **create-movie**: Create a movie from a series of image files.
-- **update**: Automatically pulls the most recent version from GitHub and runs `pip install --upgrade` on it.
+- **fix-header-angle**: Fix TiltAxisAngle in mrc header, can be useful after acquiring in Tomo5.
 - **restore-frames**: Restore SubFramePath to mdoc of tiltseries preprocessed with tomotools < 0.4.
+- **update**: Automatically pulls the most recent version from GitHub and runs `pip install --upgrade` on it.
 
 ## Dependencies
 
