@@ -23,10 +23,12 @@ dependencies = [
     "matplotlib",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest",
     "ruff",
+    "pre-commit",
+    "identify>=2.6.18",  # required for pre-commit linting of pyproject.toml
 ]
 
 [project.scripts]
