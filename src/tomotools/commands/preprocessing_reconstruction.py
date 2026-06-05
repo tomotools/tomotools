@@ -273,8 +273,8 @@ def preprocess(
         # Grab frame size to estimate appropriate patch numbers
         # Will only be used if --patch is specified
         patch_x, patch_y = [
-            str(round(mdoc["ImageSize"][0] / 800)),
-            str(round(mdoc["ImageSize"][1] / 800)),
+            round(mdoc["ImageSize"][0] / 800),
+            round(mdoc["ImageSize"][1] / 800),
         ]
 
         frames_corrected_dir = output_dir.joinpath("frames_corrected")
@@ -429,27 +429,31 @@ def preprocess(
 )
 @click.option(
     "--batch-file",
-    type=click.Path(exists=True, dir_okay=False),
+    type=click.Path(file_okay=True, dir_okay=False, path_type=Path),
     help="Pass a tab-separated file with tilt series names and views to exclude.",
 )
-@click.argument("input_files", nargs=-1, type=click.Path(exists=True))
+@click.argument(
+    "input_files",
+    nargs=-1,
+    type=click.Path(file_okay=True, dir_okay=False, path_type=Path),
+)
 # TODO: Fix complexity error C901
 def reconstruct(
-    move,
-    thickness,
-    local,
-    imod,
-    extra_thickness,
-    bin,
-    ali_d,
-    sirt,
-    do_positioning,
-    previous,
-    gpu,
-    do_evn_odd,
-    bytes,
-    batch_file,
-    input_files,
+    move: bool,
+    thickness: int | None,
+    local: bool,
+    imod: bool,
+    extra_thickness: int,
+    bin: int,
+    ali_d: int,
+    sirt: int,
+    do_positioning: bool,
+    previous: bool,
+    gpu: str | None,
+    do_evn_odd: bool,
+    bytes: bool,
+    batch_file: Path | None,
+    input_files: tuple[Path],
 ):
     """Align and reconstruct the given tiltseries.
 
@@ -487,7 +491,7 @@ def reconstruct(
                     ts_info.update(temp)
 
     # Iterate over the tiltseries objects and align and reconstruct
-    input_ts = convert_input_to_TiltSeries(input_files)
+    input_ts = convert_input_to_TiltSeries(list(input_files))
 
     for tiltseries in input_ts:
         print(f"\nNow working on {tiltseries.path.name}.")
@@ -584,7 +588,7 @@ def reconstruct(
         x_axis_tilt: float = 0
         z_shift: float = 0
         if thickness is None:
-            thickness: int = round(6000 / pix_xy) + extra_thickness
+            thickness = round(6000 / pix_xy) + extra_thickness
 
         if do_positioning:
             print(f"Trying to run automatic positioning on {tiltseries.path.name}.")
@@ -651,7 +655,7 @@ def reconstruct(
                 else:
                     x_axis_tilt = float(tomopitch[-3].split()[-1])
                     z_shift_line, thickness_line = tomopitch[-1].split(";")
-                    z_shift = z_shift_line.split()[-1]
+                    z_shift = float(z_shift_line.split()[-1])
                     thickness = int(thickness_line.split()[-1]) + extra_thickness
                     print(
                         f"{tiltseries.path}: Succesfully estimated tomopitch:"

@@ -58,9 +58,12 @@ def aretomo_export(ts: TiltSeries):
         )
 
     else:
+        aretomo_exe = aretomo_executable()
+        if aretomo_exe is None:
+            raise FileNotFoundError("AreTomo executable not found.")
         subprocess.run(
             [
-                aretomo_executable(),
+                aretomo_exe,
                 "-InMrc",
                 ts.path,
                 "-OutMrc",
@@ -252,7 +255,7 @@ def ctfplotter_aretomo_export(ts: TiltSeries):
 
     # Write to AreTomo export folder
     ctf_out = write_ctfplotter(
-        ctffile_cleaned,
+        ctffile_cleaned,  # pyright: ignore[reportArgumentType]
         ts.path.parent / f"{ts.path.stem}_ali_Imod" / f"{ts.path.stem}_ali.defocus",
     )
 

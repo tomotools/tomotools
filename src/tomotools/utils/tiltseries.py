@@ -164,6 +164,8 @@ class TiltSeries:
         if hasattr(self, "_dimZYX"):
             return self._dimZYX
         with mrcfile.mmap(self.path) as mrc:
+            if mrc.data is None:
+                raise ValueError("No data in MRC file.")
             self._dimZYX = mrc.data.shape
         return self._dimZYX
 
@@ -189,6 +191,8 @@ class TiltSeries:
     def _update_axis_angle(self, tilt_axis_angle: float):
         """Update TiltAxisAngle in header."""
         with mrcfile.mmap(self.path, mode="r+") as mrc:
+            if mrc.header is None:
+                raise ValueError("No header in MRC file.")
             labels = mrc.header.label
 
             # Tomo5 Notation
@@ -234,6 +238,8 @@ class TiltSeries:
             # Copy the first 10 titles into the newly created mrc
             mrc.update_header_from_data()
             mrc.update_header_stats()
+            if mrc.header is None:
+                raise ValueError("No header in MRC file.")
             for i in range(10):
                 title = mdoc["titles"][i].encode() if i < len(mdoc["titles"]) else b""
                 mrc.header["label"][i] = title
@@ -243,6 +249,8 @@ class TiltSeries:
     @staticmethod
     def _update_mdoc_from_mrc_header(path: Path, mdoc: dict):
         with mrcfile.mmap(path, "r+") as mrc:
+            if mrc.header is None:
+                raise ValueError("No header in MRC file.")
             # Copy over some global information from the first section into the mdoc
             mdoc["PixelSpacing"] = mdoc["sections"][0]["PixelSpacing"]
             mdoc["ImageFile"] = path.name
@@ -396,6 +404,7 @@ def bin_tiltseries(
     print(f"{ts.path}: Binned to {bin}.")
 
     if do_evn_odd and ts.is_split:
+        assert ts.evn_path is not None and ts.odd_path is not None
         if overwrite:
             binned_stack_evn = ts.evn_path
             binned_stack_odd = ts.odd_path
@@ -455,7 +464,7 @@ def align_with_areTomo(
     local: bool,
     previous: bool,
     do_evn_odd: bool,
-    gpu: str,
+    gpu: str | None,
     override_axis: float | None = None,
     volz: int = 250,
 ):
@@ -471,6 +480,9 @@ def align_with_areTomo(
 
     Will apply the pixel size from the input stack to the output stack.
     """
+    aretomo_exe = aretomo_executable()
+    if aretomo_exe is None:
+        raise FileNotFoundError("AreTomo not found.")
     ali_stack = ts.path.with_name(f"{ts.path.stem}_ali.mrc")
     aln_file = ts.path.with_suffix(".aln")
     orig_mdoc = ts.mdoc
@@ -500,7 +512,7 @@ def align_with_areTomo(
 
         subprocess.run(
             [
-                aretomo_executable(),
+                aretomo_exe,
                 "-InMrc",
                 ts.path,
                 "-OutMrc",
@@ -528,7 +540,7 @@ def align_with_areTomo(
 
         subprocess.run(
             [
-                aretomo_executable(),
+                aretomo_exe,
                 "-InMrc",
                 ts.path,
                 "-OutMrc",
@@ -563,11 +575,12 @@ def align_with_areTomo(
         aln_to_tlt(aln_file)
 
     if do_evn_odd and ts.is_split:
+        assert ts.evn_path is not None and ts.odd_path is not None
         ali_stack_evn = ts.evn_path.with_name(f"{ts.path.stem}_ali_EVN.mrc")
         ali_stack_odd = ts.odd_path.with_name(f"{ts.path.stem}_ali_ODD.mrc")
         subprocess.run(
             [
-                aretomo_executable(),
+                aretomo_exe,
                 "-InMrc",
                 ts.evn_path,
                 "-OutMrc",
@@ -584,7 +597,7 @@ def align_with_areTomo(
 
         subprocess.run(
             [
-                aretomo_executable(),
+                aretomo_exe,
                 "-InMrc",
                 ts.odd_path,
                 "-OutMrc",
@@ -650,6 +663,7 @@ def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
         )
 
         if ts.is_split and do_evn_odd:
+            assert ts.evn_path is not None and ts.odd_path is not None
             filtered_evn = ts.path.with_name(f"{ts.path.stem}_filtered_EVN.mrc")
             filtered_odd = ts.path.with_name(f"{ts.path.stem}_filtered_ODD.mrc")
 
@@ -739,7 +753,8 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool, binning=1)
             stdout=subprocess.DEVNULL,
         )
 
-        if do_evn_odd:
+        if do_evn_odd and ts.is_split:
+            assert ts.evn_path is not None and ts.odd_path is not None
             ali_stack_evn = ts.evn_path.with_name(f"{ts.path.stem}_ali_even.mrc")
             ali_stack_odd = ts.odd_path.with_name(f"{ts.path.stem}_ali_odd.mrc")
 

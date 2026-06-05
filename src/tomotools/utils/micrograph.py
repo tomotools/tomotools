@@ -1,7 +1,7 @@
 import os
 import shutil
 import subprocess
-from os.path import basename, isfile, join
+from os.path import isfile, join
 from pathlib import Path
 
 
@@ -81,7 +81,7 @@ class Micrograph:
             elif len(gain_refs) == 1:
                 # The gain ref should be in the same folder as the input file(s)
                 # Check if it's there.
-                override_gainref = gain_refs.pop()
+                override_gainref = Path(gain_refs.pop())
                 override_gainref = movies[0].path.parent / override_gainref  # pyright: ignore[reportOperatorIssue]
                 if not override_gainref.is_file():  # pyright: ignore[reportOptionalMemberAccess]
                     raise FileNotFoundError(
@@ -130,9 +130,12 @@ class Micrograph:
             and override_gainref.suffix == ".dm4"
             and check_defects(override_gainref) is not None
         ):
+            defects_tif_path = defects_tif(override_gainref, tempdir, movies[0].path)
+            if defects_tif_path is None:
+                raise FileNotFoundError("Defects file could not be created.")
             command += [
                 "-DefectMap",
-                defects_tif(override_gainref, tempdir, movies[0].path).absolute(),
+                defects_tif_path.absolute(),
             ]
 
         # Patch alignment takes two groupings, for global and local alignments.
@@ -150,23 +153,15 @@ class Micrograph:
 
         # Now, correct every movie separately, since -Serial 1 causes issues
         for movie in movies:
-            if movie.is_mrc:
-                command_temp = command + ["-InMrc", movie.path.absolute()]
-            elif movie.is_tiff:
-                command_temp = command + ["-InTiff", movie.path.absolute()]
-
-            command_temp += [
-                "-OutMrc",
-                str(output_dir.absolute())
-                + os.path.sep
-                + movie.path.with_suffix(".mrc").name,
-            ]
+            in_flag = "-InMrc" if movie.is_mrc else "-InTiff"
+            out_path = output_dir / movie.path.with_suffix(".mrc").name
+            command += [in_flag, movie.path.absolute(), "-OutMrc", out_path]
 
             with (
-                open(join(output_dir, "motioncor2.log"), "a") as out,
-                open(join(output_dir, "motioncor2.err"), "a") as err,
+                open(output_dir / "motioncor2.log", "a") as out,
+                open(output_dir / "motioncor2.err", "a") as err,
             ):
-                subprocess.run(command_temp, cwd=tempdir, stdout=out, stderr=err)
+                subprocess.run(command, cwd=tempdir, stdout=out, stderr=err)
 
         # If present, copy the mdoc files to the output dir
         # Rename from .tif.mdoc to .mrc.mdoc
@@ -292,11 +287,11 @@ def sem2mc2(RotationAndFlip: int = 0):
     return conv[RotationAndFlip]
 
 
-def check_defects(gainref: os.PathLike):
+def check_defects(gainref: Path) -> Path | None:
     """Checks for a SerialEM-created defects file and -if found- returns file name."""
     defects_temp = []
 
-    defects_temp.extend(Path(gainref).parent.glob("defects*.txt"))
+    defects_temp.extend(gainref.parent.glob("defects*.txt"))
 
     if len(defects_temp) == 1:
         return defects_temp[0]
@@ -309,7 +304,7 @@ def check_defects(gainref: os.PathLike):
         return None
 
 
-def defects_tif(gainref, tempdir, template):
+def defects_tif(gainref: Path, tempdir: Path, template: Path) -> Path | None:
     """Create Defect Map for MC2 from defects.txt.
 
     Input SerialEM gain reference, example frame and temporary directory.
@@ -317,8 +312,10 @@ def defects_tif(gainref, tempdir, template):
 
     Returns path of the defects.tif
     """
-    defects_txt = check_defects(gainref)
-    defects_tif = Path(tempdir) / f"{basename(defects_txt)}.tif"
+    defects_txt: Path | None = check_defects(gainref)
+    if defects_txt is None:
+        return None
+    defects_tif = Path(tempdir) / defects_txt.with_suffix(".tif")
 
     subprocess.run(["clip", "defect", "-D", defects_txt, template, defects_tif])
     print(f"Found and converted defects file {defects_tif}")

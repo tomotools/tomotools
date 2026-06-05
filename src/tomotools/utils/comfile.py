@@ -107,9 +107,7 @@ def fix_tiltcom(
     if get_value(ts.path.with_name("tilt.com"), "FakeSIRTiterations") is not None:
         modify_value(ts.path.with_name("tilt.com"), "FakeSIRTiterations", str(fsirt))
 
-    if get_value(ts.path.with_name("tilt.com"), "LOCALFILE") is not None and get_value(
-        ts.path.with_name("tilt.com"), "LOCALFILE"
-    ).endswith(".xf"):
-        remove_value(ts.path.with_name("tilt.com"), "LOCALFILE")
-
+    match get_value(ts.path.with_name("tilt.com"), "LOCALFILE"):
+        case str(localfile) if localfile.endswith(".xf"):
+            remove_value(ts.path.with_name("tilt.com"), "LOCALFILE")
     return

@@ -1,5 +1,5 @@
+from pathlib import Path
 import subprocess
-from os import path, remove
 
 import click
 
@@ -9,14 +9,17 @@ import click
 @click.option("-q", "--quality", type=int, default=20)
 @click.option("-g", "--glob", default="*.png", show_default=True)
 @click.option("-p", "--palindromic", is_flag=True)
-@click.argument("output_file")
-def create_movie(framerate, quality, glob, palindromic, output_file):
+@click.argument(
+    "output_file",
+    type=click.Path(file_okay=True, dir_okay=False, writable=True, path_type=Path),
+)
+def create_movie(
+    framerate: int, quality: int, glob: str, palindromic: bool, output_file: Path
+):
     """Create a movie from a series of image files."""
-    directory = path.dirname(output_file)
-    basename, ext = path.splitext(path.basename(output_file))
-    output_file_tmp = path.join(directory, f"{basename}_tmp{ext}")
-    output_file_rev = path.join(directory, f"{basename}_rev{ext}")
-    videofiles_tmp = path.join(directory, f"{basename}.txt")
+    output_file_tmp = output_file.with_stem(f"{output_file.stem}_tmp")
+    output_file_rev = output_file.with_stem(f"{output_file.stem}_rev")
+    videofiles_tmp = output_file.with_suffix(".txt")
 
     cmd = [
         "ffmpeg",
@@ -59,6 +62,6 @@ def create_movie(framerate, quality, glob, palindromic, output_file):
                 output_file,
             ]
         )
-        remove(output_file_tmp)
-        remove(output_file_rev)
-        remove(videofiles_tmp)
+        output_file_tmp.unlink()
+        output_file_rev.unlink()
+        videofiles_tmp.unlink()

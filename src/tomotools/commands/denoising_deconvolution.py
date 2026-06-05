@@ -1,4 +1,5 @@
 from os import path
+from pathlib import Path
 
 import click
 import mrcfile
@@ -11,6 +12,7 @@ from tomotools.utils import mathutil
 @click.option(
     "--defocus",
     help="(Central) defocus in um. Positive values denote underfocus.",
+    required=True,
 )
 @click.option(
     "--snrfalloff",
@@ -34,15 +36,20 @@ from tomotools.utils import mathutil
     "--phaseshift", default=0, show_default=True, help="Phase shift in degrees"
 )
 @click.option("--phaseflipped", is_flag=True, help="Data has been phase-flipped")
-@click.argument("input_files", nargs=-1, required=True)
+@click.argument(
+    "input_files",
+    nargs=-1,
+    type=click.Path(file_okay=True, dir_okay=False, path_type=Path),
+    required=True,
+)
 def deconv(
-    defocus,
-    snrfalloff,
-    deconvstrength,
-    hpnyquist,
-    phaseshift,
-    phaseflipped,
-    input_files,
+    defocus: float,
+    snrfalloff: float,
+    deconvstrength: float,
+    hpnyquist: float,
+    phaseshift: int,
+    phaseflipped: bool,
+    input_files: tuple[Path],
 ):
     """Deconvolve your tomogram or list of tomograms.
 
@@ -56,15 +63,12 @@ def deconv(
     Original Script at https://github.com/dtegunov/tom_deconv/.
     """
     # TODO: automatically read defocus out of ctfplotter file?
-    if defocus is None:
-        raise NotImplementedError(
-            "Automated defocus determination not yet implemented."
-        )
-
     for input_file in input_files:
         with mrcfile.open(input_file) as mrc:
             angpix = float(mrc.voxel_size.x)
             volume_in = mrc.data
+        if volume_in is None:
+            raise ValueError(f"Input file {input_file} is empty.")
 
         wiener = mathutil.wiener(
             angpix,

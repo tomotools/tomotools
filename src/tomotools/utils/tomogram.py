@@ -67,10 +67,6 @@ class Tomogram:
         # TODO: Reduce complexity C901
         ali_stack = tiltseries.path
 
-        if do_EVN_ODD and tiltseries.is_split:
-            ali_stack_evn = tiltseries.evn_path
-            ali_stack_odd = tiltseries.odd_path
-
         pix_xy = tiltseries.angpix
 
         if thickness is None:
@@ -132,6 +128,7 @@ class Tomogram:
         print(f"{tiltseries.path}: Finished reconstruction.")
 
         if do_EVN_ODD and tiltseries.is_split:
+            assert tiltseries.evn_path is not None and tiltseries.odd_path is not None
             full_rec_evn = tiltseries.path.with_name(
                 f"{tiltseries.path.stem}_full_rec_EVN.mrc"
             )
@@ -144,7 +141,7 @@ class Tomogram:
                 + (["-FakeSIRTiterations", str(sirt)] if sirt > 0 else [])
                 + [
                     "-InputProjections",
-                    ali_stack_evn,
+                    tiltseries.evn_path,
                     "-OutputFile",
                     full_rec_evn,
                     "-IMAGEBINNED",
@@ -186,7 +183,7 @@ class Tomogram:
                 + (["-FakeSIRTiterations", str(sirt)] if sirt > 0 else [])
                 + [
                     "-InputProjections",
-                    ali_stack_odd,
+                    tiltseries.odd_path,
                     "-OutputFile",
                     full_rec_odd,
                     "-IMAGEBINNED",
