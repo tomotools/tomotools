@@ -3,7 +3,7 @@ import subprocess
 from glob import glob
 from os import path
 from pathlib import Path
-from typing import List, Optional
+
 
 import mrcfile
 
@@ -19,8 +19,8 @@ class Tomogram:
             raise FileNotFoundError(f"File not found: {path}")
         self.path: Path = path
         self.is_split: bool = False
-        self.evn_path: Optional[Path] = None
-        self.odd_path: Optional[Path] = None
+        self.evn_path: Path | None = None
+        self.odd_path: Path | None = None
 
     def with_split_files(self, evn_file: Path, odd_file: Path) -> "Tomogram":
         """Create tomogram with EVN/ODD by passing their paths."""
@@ -57,7 +57,7 @@ class Tomogram:
         tiltseries: TiltSeries,
         binned: int = 8,
         sirt: int = 5,
-        thickness: Optional[int] = None,
+        thickness: int | None = None,
         x_axis_tilt: float = 0,
         z_shift: float = 0,
         do_EVN_ODD: bool = False,
@@ -357,7 +357,7 @@ class Tomogram:
         binning=1,
         thickness=3000,
         z_slices_nm=25,
-        fullimage: Optional[List] = None,
+        fullimage: list | None = None,
     ) -> "Tomogram":
         """
         Calculate Tomogram with imod ctf3d.
@@ -427,7 +427,7 @@ class Tomogram:
         )
 
 
-def find_Tomogram_halves(tomo: Tomogram, split_dir: Optional[Path] = None):
+def find_Tomogram_halves(tomo: Tomogram, split_dir: Path | None = None):
     """Check whether tomogram has EVN/ODD halves.
 
     Optionally, you can pass a directory where the split reconstructions are.
@@ -453,7 +453,7 @@ def find_Tomogram_halves(tomo: Tomogram, split_dir: Optional[Path] = None):
         return tomo
 
 
-def convert_input_to_Tomogram(input_files: List[Path]):
+def convert_input_to_Tomogram(input_files: list[Path]):
     """Takes list of input files or folders from Click.
 
     Returns list of Tomogram objects with or without split reconstructions.

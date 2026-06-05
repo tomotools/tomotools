@@ -5,7 +5,7 @@ from glob import glob
 from os import path
 from os.path import basename, isfile, join
 from pathlib import Path
-from typing import List, Optional
+
 
 from tomotools.utils import mdocfile, util
 from tomotools.utils.movie import Movie
@@ -22,8 +22,8 @@ class Micrograph:
         self.mdoc = mdocfile.read(self.mdoc_path) if self.mdoc_path.is_file() else None
         self.tilt_angle: float = tilt_angle
         self.is_split: bool = False
-        self.evn_path: Optional[Path] = None
-        self.odd_path: Optional[Path] = None
+        self.evn_path: Path | None = None
+        self.odd_path: Path | None = None
 
     def with_split_files(self, evn_file: Path, odd_file: Path) -> "Micrograph":
         """Create Micrograph with associated EVN ODD stacks, giving their paths."""
@@ -48,7 +48,7 @@ class Micrograph:
 
     @staticmethod
     def from_movies(
-        movies: List[Movie],
+        movies: list[Movie],
         output_dir: Path,
         splitsum: bool = False,
         binning: int = 1,
@@ -56,11 +56,11 @@ class Micrograph:
         patch: bool = False,
         patch_x: int = 5,
         patch_y: int = 7,
-        mcrot: Optional[int] = None,
-        mcflip: Optional[int] = None,
-        override_gainref: Optional[Path] = None,
-        gpu: Optional[str] = None,
-    ) -> "List[Micrograph]":
+        mcrot: int | None = None,
+        mcflip: int | None = None,
+        override_gainref: Path | None = None,
+        gpu: str | None = None,
+    ) -> "list[Micrograph]":
         """Create micrograph from a list of movies using MotionCor."""
         tempdir = output_dir.joinpath("motioncor2_temp")
         tempdir.mkdir(parents=True)
@@ -221,7 +221,7 @@ class Micrograph:
         return output_micrographs
 
 
-def motioncor_executable() -> Optional[str]:
+def motioncor_executable() -> str | None:
     """Return MotionCor2/3 executable.
 
     Path can be set with one of the following ways (in order of priority):

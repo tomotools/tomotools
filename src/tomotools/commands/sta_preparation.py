@@ -1,7 +1,7 @@
 import os
 from os import path
 from pathlib import Path
-from typing import List, Optional, Tuple
+
 
 import click
 
@@ -82,10 +82,10 @@ def imod2warp(
     batch_input: bool,
     v2: bool,
     aretomo: bool,
-    link_frames: Optional[Path],
-    copy_frames: Optional[Path],
+    link_frames: Path | None,
+    copy_frames: Path | None,
     extract_frames: bool,
-    input_files: Tuple[Path],
+    input_files: tuple[Path],
     project_dir: Path,
 ):
     """Export aligned tilt-series into a Warp/M project.
@@ -106,7 +106,7 @@ def imod2warp(
     (project_dir / "frames").mkdir(exist_ok=True)
 
     # Parse input files
-    ts_list: List[TiltSeries] = []
+    ts_list: list[TiltSeries] = []
     for input_file in input_files:
         ts_list.extend(TiltSeries.from_path(input_file))
 
@@ -270,7 +270,7 @@ def imod2tomotwin(
     Provide the unbinned thickness, and a unique identifier for this session.
     UID will be put in from of name, e.g. 230105_TS_01.mrc.
     """
-    ts_list: List[TiltSeries] = []
+    ts_list: list[TiltSeries] = []
 
     for input_file in input_files:
         ts_list.extend(TiltSeries.from_path(input_file))

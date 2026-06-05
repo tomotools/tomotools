@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 import csv
 import math
 import os
@@ -8,7 +9,6 @@ from glob import glob
 from operator import itemgetter
 from os import path
 from pathlib import Path
-from typing import Iterator, List, Optional, Tuple
 
 import mrcfile
 import numpy as np
@@ -34,9 +34,9 @@ class TiltSeries:
         else:
             self.path: Path = Path(ts_path)
         self.mdoc: Path = Path(f"{ts_path}.mdoc")
-        self._is_split: Optional[bool] = None
-        self.evn_path: Optional[Path] = None
-        self.odd_path: Optional[Path] = None
+        self._is_split: bool | None = None
+        self.evn_path: Path | None = None
+        self.odd_path: Path | None = None
 
     @property
     def is_split(self) -> bool:
@@ -159,7 +159,7 @@ class TiltSeries:
         return self._angpix
 
     @property
-    def dimZYX(self) -> Tuple[float, float, float]:
+    def dimZYX(self) -> tuple[float, float, float]:
         """Return ZYX dimensions."""
         if hasattr(self, "_dimZYX"):
             return self._dimZYX
@@ -251,13 +251,13 @@ class TiltSeries:
 
     @staticmethod
     def from_micrographs(
-        micrographs: List[Micrograph],
+        micrographs: list[Micrograph],
         ts_path: Path,
-        mdoc: Optional[dict] = None,
+        mdoc: dict | None = None,
         reorder=False,
-        overwrite_titles: Optional[List[str]] = None,
-        overwrite_angles: Optional[float] = None,
-        overwrite_dose: Optional[float] = None,
+        overwrite_titles: list[str | None] = None,
+        overwrite_angles: float | None = None,
+        overwrite_dose: float | None = None,
     ) -> "TiltSeries":
         """Create TiltSeries from Micrographs, aka run newstack."""
         # TODO: Possibly remove overwrite_titles
@@ -344,7 +344,7 @@ class TiltSeries:
             return TiltSeries(ts_path)
 
 
-def aretomo_executable() -> Optional[str]:
+def aretomo_executable() -> str | None:
     """Return AreTomo1/2 executable.
 
     Path can be set with one of the following ways (in order of priority):
@@ -456,7 +456,7 @@ def align_with_areTomo(
     previous: bool,
     do_evn_odd: bool,
     gpu: str,
-    override_axis: Optional[float] = None,
+    override_axis: float | None = None,
     volz: int = 250,
 ):
     """Takes a TiltSeries as input and runs AreTomo on it.
@@ -995,7 +995,7 @@ def parse_darkimgs(ts: TiltSeries):
     return dark_tilts
 
 
-def convert_input_to_TiltSeries(input_files: List[Path], mdoc_ok=False):
+def convert_input_to_TiltSeries(input_files: list[Path], mdoc_ok=False):
     """Takes list of input files or folders from Click.
 
     Returns list of TiltSeries objects with or without split frames.

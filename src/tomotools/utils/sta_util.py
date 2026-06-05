@@ -4,7 +4,7 @@ import shutil
 import subprocess
 from os import path
 from pathlib import Path
-from typing import List, Literal, Tuple
+from typing import Literal
 
 import click
 import mrcfile
@@ -106,10 +106,12 @@ def aretomo_export(ts: TiltSeries):
 def make_warp_dir(
     ts: TiltSeries,
     project_dir: Path,
-    frames_strategy: Tuple[Literal["skip"], None]
-    | Tuple[Literal["extract"], None]
-    | Tuple[Literal["copy"], Path]
-    | Tuple[Literal["link"], Path],
+    frames_strategy: (
+        tuple[Literal["skip"], None]
+        | tuple[Literal["extract"], None]
+        | tuple[Literal["copy"], Path]
+        | tuple[Literal["link"], Path]
+    ),
     imod: bool = False,
 ):
     """Export tiltseries to Warp."""
@@ -180,10 +182,10 @@ def make_warp_dir(
     mdocfile.write(mdoc, project_dir / "mdoc" / f"{ts.path.stem}.mdoc")
 
 
-def _get_subframes(mdoc: dict, src_dir: Path) -> List[Path]:
+def _get_subframes(mdoc: dict, src_dir: Path) -> list[Path]:
     if not all("SubFramePath" in section for section in mdoc["sections"]):
         raise ValueError("No SubFramePath in mdoc")
-    subframes: List[Path] = []
+    subframes: list[Path] = []
     for section in mdoc["sections"]:
         subframe_path = mdocfile.find_relative_path(
             Path(src_dir),
@@ -200,10 +202,10 @@ def _get_subframes(mdoc: dict, src_dir: Path) -> List[Path]:
 
 def _link_or_copy_frames(
     mdoc: dict, src_dir: Path, target_dir: Path, mode: Literal["link", "copy"]
-) -> List[Path]:
+) -> list[Path]:
     # Check, whether all tlts have SubFrameImages
     subframes = _get_subframes(mdoc, src_dir)
-    written_files: List[Path] = []
+    written_files: list[Path] = []
     for file in subframes:
         target = target_dir / file.name
         source = file if file.is_absolute() else Path.cwd() / file
@@ -215,7 +217,7 @@ def _link_or_copy_frames(
     return written_files
 
 
-def _extract_frames(ts: TiltSeries, mdoc: dict, target_dir: Path) -> List[Path]:
+def _extract_frames(ts: TiltSeries, mdoc: dict, target_dir: Path) -> list[Path]:
     subprocess.run(
         [
             "newstack",
