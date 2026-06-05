@@ -50,6 +50,7 @@ MotionCor2/3 and AreTomo2/3 can either be in PATH as `MotionCor2` / `MotionCor3`
 
 ## Installation
 
+Tomotools requires Python >= 3.12.
 We suggest installing tomotools into its own conda / mamba environment.
 If you can only access your userspace, consider using [micromamba](https://mamba.readthedocs.io/en/latest/user_guide/micromamba.html).
 
@@ -64,26 +65,6 @@ With tomotools installed into a conda environment, you can then start tomotools 
 ```
 conda activate tomotools
 tomotools --help
-```
-
-### Notes on sbgrid:
-
-If you're using an sbgrid environment, make sure to set the following in your `.sbgrid.conf` file:
-
-```
-PYTHON_X=3.8.8 (anything > 3.8 works)
-```
-
-Additionally, try `pip --version` to make sure it's correctly working. This is required for `tomotools update`. Else, you can add the following line to your `.bashrc`:
-
-```
-alias pip='python -m pip'
-```
-
-Likely, you will also need to add your local Python path to `.bashrc`:
-
-```
-export PATH="/YOURHOMEFOLDER/.local/bin:$PATH"
 ```
 
 ### Feedback, Bug Reports and Contributions are always welcome!
