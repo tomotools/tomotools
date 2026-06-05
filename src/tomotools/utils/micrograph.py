@@ -1,8 +1,6 @@
 import os
 import shutil
 import subprocess
-from glob import glob
-from os import path
 from os.path import basename, isfile, join
 from pathlib import Path
 
@@ -298,7 +296,7 @@ def check_defects(gainref: os.PathLike):
     """Checks for a SerialEM-created defects file and -if found- returns file name."""
     defects_temp = []
 
-    defects_temp.extend(glob(path.join(path.dirname(gainref), "defects*.txt")))
+    defects_temp.extend(Path(gainref).parent.glob("defects*.txt"))
 
     if len(defects_temp) == 1:
         return defects_temp[0]

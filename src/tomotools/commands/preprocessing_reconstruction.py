@@ -1,9 +1,8 @@
 import os
 import shutil
 import subprocess
-from glob import glob
-from os import mkdir, path
-from os.path import abspath, basename, join
+from os import path
+from os.path import join
 from pathlib import Path
 
 import click
@@ -31,42 +30,39 @@ from tomotools.utils.tomogram import Tomogram
     show_default=True,
     help="Number of CPUs, passed to justblend",
 )
-@click.argument("input_files", nargs=-1)
-@click.argument("output_dir")
-def blend_montages(cpus, input_files, output_dir):
+@click.argument(
+    "input_files",
+    type=click.Path(file_okay=True, dir_okay=True, path_type=Path),
+    nargs=-1,
+)
+@click.argument(
+    "output_dir",
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path, resolve_path=True),
+)
+def blend_montages(cpus: int, input_files: tuple[Path], output_dir: Path):
     """Blend montages using justblend.
 
     The input files must be montage .mrc/.st files, example:
     blend-montages MMM*.mrc output_dir
     """
-    if not path.isdir(output_dir):
-        mkdir(output_dir)
-
+    output_dir.mkdir(exist_ok=True)
     for input_file in input_files:
-        os.symlink(abspath(input_file), join(output_dir, basename(input_file)))
-
-    wd = os.getcwd()
+        os.symlink(input_file.absolute(), output_dir / input_file.name)
 
     os.chdir(output_dir)
-    links = [basename(input_file) for input_file in input_files]
     subprocess.run(
         ["justblend", "--cpus", str(cpus)]
-        + [basename(input_file) for input_file in input_files]
+        + [input_file.name for input_file in input_files]
     )
     # Delete temporary files
-    for file in (
-        links
-        + glob("*.ecd")
-        + glob("*.pl")
-        + glob("*.xef")
-        + glob("*.yef")
-        + glob("*.com")
-        + glob("*.log")
-        + ["processchunks-jb.out"]
-    ):
-        os.remove(file)
-
-    os.chdir(wd)
+    for file in input_files:
+        blend_file = file.with_stem(file.stem + "_blend")
+        (output_dir / file.name).unlink()
+        for ext in [".ecd", ".pl", ".xef", ".yef", ".alipl"]:
+            (output_dir / file.name).with_suffix(ext).unlink(missing_ok=True)
+        for ext in [".com", ".log", ".com.log"]:
+            (output_dir / blend_file.name).with_suffix(ext).unlink(missing_ok=True)
+    Path("processchunks-jb.out").unlink()
 
 
 @click.command()
@@ -546,8 +542,8 @@ def reconstruct(
                 if not path.isdir(excludedir):
                     os.mkdir(excludedir)
 
-                for file in glob(join(tiltseries.path.parent, "*_cutviews0.*")):
-                    os.rename(file, join(excludedir, Path(file).name))
+                for file in tiltseries.path.parent.glob("*_cutviews0.*"):
+                    os.rename(file, join(excludedir, file.name))
 
                 with open(join(excludedir, "README"), mode="w+") as file:
                     file.write("Restore by running excludeviews -restore")

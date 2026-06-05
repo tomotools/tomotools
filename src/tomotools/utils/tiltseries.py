@@ -5,7 +5,6 @@ import os
 import re
 import shutil
 import subprocess
-from glob import glob
 from operator import itemgetter
 from os import path
 from pathlib import Path
@@ -1033,11 +1032,11 @@ def convert_input_to_TiltSeries(input_files: list[Path], mdoc_ok=False):
 
         elif input_file.is_dir():
             return_list += [
-                TiltSeries(Path(Path(file).with_suffix("")))
+                TiltSeries(file.with_suffix(""))
                 for file in list(
-                    set(glob(path.join(input_file, "*.mdoc")))
-                    - set(glob(path.join(input_file, "*allviews*.mdoc")))
-                    - set(glob(path.join(input_file, "*cutviews*.mdoc")))
+                    set(Path(input_file).glob("*.mdoc"))
+                    - set(Path(input_file).glob("*allviews*.mdoc"))
+                    - set(Path(input_file).glob("*cutviews*.mdoc"))
                 )
             ]
 

@@ -1,6 +1,5 @@
 import os
 import subprocess
-from glob import glob
 from os import path
 from pathlib import Path
 
@@ -466,17 +465,16 @@ def convert_input_to_Tomogram(input_files: list[Path]):
             input_tomo.append(Tomogram(Path(input_file)))
         elif input_file.is_dir():
             input_tomo += [
-                Tomogram(Path(file))
-                for file in glob(path.join(input_file, "*_rec_bin_[0-9].mrc"))
+                Tomogram(file) for file in input_file.glob("*_rec_bin_[0-9].mrc")
             ]
             # Do not include full_rec, even_rec and odd_rec
             input_tomo += [
-                Tomogram(Path(Path(file)))
+                Tomogram(file)
                 for file in list(
-                    set(glob(path.join(input_file, "*_rec.mrc")))
-                    - set(glob(path.join(input_file, "*even_rec.mrc")))
-                    - set(glob(path.join(input_file, "*_odd_rec.mrc")))
-                    - set(glob(path.join(input_file, "*_full_rec.mrc")))
+                    set(input_file.glob("*_rec.mrc"))
+                    - set(input_file.glob("*even_rec.mrc"))
+                    - set(input_file.glob("*_odd_rec.mrc"))
+                    - set(input_file.glob("*_full_rec.mrc"))
                 )
             ]
 

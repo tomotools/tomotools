@@ -308,7 +308,7 @@ def invert_tlt_files(ts_dir: Path):
                 continue
 
             elif line.startswith("-"):
-                tlt_inverted.append(line[1:])
+                tlt_inverted.append(line.removeprefix("-"))
 
             else:
                 tlt_inverted.append("-" + line)
