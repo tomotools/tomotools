@@ -252,14 +252,17 @@ def _ensure_gainref_mrc(gain_ref: Path, output_dir: Path) -> Path:
     temp_gain.mkdir()
     gain_out = temp_gain / (gain_ref.with_suffix(".mrc").name)
     print(f"Found gain reference {gain_ref}, converting to {gain_out}")
-    if gain_ref.suffix == ".mrc":
-        gain_out = gain_ref
-    elif gain_ref.suffix == ".dm4":
-        subprocess.run(["dm2mrc", gain_ref, gain_out], stdout=subprocess.DEVNULL)
-    elif gain_ref.suffix in [".tif", ".tiff", ".gain"]:
-        subprocess.run(["tif2mrc", gain_ref, gain_out], stdout=subprocess.DEVNULL)
-    else:
-        raise AttributeError("Gain reference can only be in .tif(f) or .dm4 format!")
+    match gain_ref.suffix:
+        case ".mrc":
+            gain_out = gain_ref
+        case ".dm4":
+            subprocess.run(["dm2mrc", gain_ref, gain_out], stdout=subprocess.DEVNULL)
+        case ".tif" | ".tiff" | ".gain":
+            subprocess.run(["tif2mrc", gain_ref, gain_out], stdout=subprocess.DEVNULL)
+        case _:
+            raise AttributeError(
+                "Gain reference can only be in .tif(f) or .dm4 format!"
+            )
     return gain_out
 
 

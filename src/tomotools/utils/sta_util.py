@@ -158,19 +158,20 @@ def make_warp_dir(
     mdoc = mdocfile.downgrade_DateTime(mdoc)
 
     frames_mode, frames_dir = frames_strategy
-    if frames_mode in ("copy", "link"):
-        assert frames_dir is not None
-        try:
-            written_files = _link_or_copy_frames(
-                mdoc, frames_dir, frame_target_dir, frames_mode
-            )
-        except ValueError as e:
-            click.echo(f"Error processing frames for {ts.path.name}: {e}", err=True)
-            return
-    elif frames_mode == "extract":
-        written_files = _extract_frames(ts, mdoc, frame_target_dir)
-    else:
-        written_files = []
+    match frames_mode:
+        case "copy" | "link":
+            assert frames_dir is not None
+            try:
+                written_files = _link_or_copy_frames(
+                    mdoc, frames_dir, frame_target_dir, frames_mode
+                )
+            except ValueError as e:
+                click.echo(f"Error processing frames for {ts.path.name}: {e}", err=True)
+                return
+        case "extract":
+            written_files = _extract_frames(ts, mdoc, frame_target_dir)
+        case "skip":
+            written_files = []
     if len(written_files) > 0 and not len(mdoc["sections"]) == len(written_files):
         click.echo(
             f"Error: mismatch between mdoc entries and frames in {ts.path.name}",

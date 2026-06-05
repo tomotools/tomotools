@@ -70,23 +70,24 @@ class TiltSeries:
         """Create TiltSeries from a single mrc/st/mdoc file."""
         if not path.is_file():
             raise FileNotFoundError(f"File not found: {path}")
-        if path.suffix in [".mrc", ".st"]:
-            yield TiltSeries(path)
-        elif path.suffix == ".mdoc":
-            yield from TiltSeries._from_file(path.with_suffix(""))
-        elif path.suffix == ".edf":
-            edf = edffile.read_edf(path)
-            suffix = edf.get("Setup.RawImageStackExt", "mrc")
-            yield from TiltSeries._from_file(path.with_suffix("." + suffix))
-        elif path.suffix == ".ebt":
-            ebt = edffile.read_edf(path)
-            for dataset in edffile.get_ebt_datasets(ebt):
-                yield from TiltSeries._from_file(Path(dataset))
-        else:
-            with open(path) as file:
-                for line in file:
-                    if line.strip():
-                        yield from TiltSeries.from_path(Path(line.strip()))
+        match path.suffix:
+            case ".mrc" | ".st":
+                yield TiltSeries(path)
+            case ".mdoc":
+                yield from TiltSeries._from_file(path.with_suffix(""))
+            case ".edf":
+                edf = edffile.read_edf(path)
+                suffix = edf.get("Setup.RawImageStackExt", "mrc")
+                yield from TiltSeries._from_file(path.with_suffix("." + suffix))
+            case ".ebt":
+                ebt = edffile.read_edf(path)
+                for dataset in edffile.get_ebt_datasets(ebt):
+                    yield from TiltSeries._from_file(Path(dataset))
+            case _:
+                with open(path) as file:
+                    for line in file:
+                        if line.strip():
+                            yield from TiltSeries.from_path(Path(line.strip()))
 
     def find_split_files(self) -> bool:
         """Automatically try to find even/odd split files.
