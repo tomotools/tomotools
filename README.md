@@ -50,7 +50,7 @@ MotionCor2/3 and AreTomo2/3 can either be in PATH as `MotionCor2` / `MotionCor3`
 
 ## Installation
 
-Tomotools requires Python >= 3.12.
+`tomotools` requires Python >= 3.12.
 We suggest installing tomotools into its own conda / mamba environment.
 If you can only access your userspace, consider using [micromamba](https://mamba.readthedocs.io/en/latest/user_guide/micromamba.html).
 
