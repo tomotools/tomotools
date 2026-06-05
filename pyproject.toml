@@ -19,8 +19,6 @@ dependencies = [
     "numpy",
     "pandas",
     "mrcfile",
-    "emfile",
-    "dynamotable",
     "matplotlib",
 ]
 
@@ -28,11 +26,6 @@ dependencies = [
 packages = ["tomotools", "tomotools.commands", "tomotools.utils"]
 
 [project.optional-dependencies]
-cryocare = [
-    "tensorflow==2.4",
-    "Cryocare",
-    "packaging",
-]
 dev = [
     "pytest",
     "ruff",
