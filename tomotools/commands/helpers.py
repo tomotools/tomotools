@@ -25,6 +25,7 @@ def update(branch):
     )
     print("Update completed!")
 
+
 @click.command()
 @click.argument("orig_mdoc_dir", nargs=1, type=click.Path(exists=True))
 @click.argument("input_files", nargs=-1, type=click.Path(exists=True))
@@ -44,20 +45,17 @@ def restore_frames(orig_mdoc_dir, input_files):
 
     # Iterate over Tiltseries
     for ts in ts_list:
-
-
-
         mdoc = mdocfile.read(ts.mdoc)
 
         # For each, find the corresponding input mdoc
         orig_mdoc_paths = list(orig_mdoc_dir.glob(f"*{ts.path.stem}*.mdoc"))
 
         if len(orig_mdoc_paths) == 0:
-            print(f'{ts.path.name}: no original mdoc file found. Skipping.')
+            print(f"{ts.path.name}: no original mdoc file found. Skipping.")
             continue
 
         elif len(orig_mdoc_paths) > 1:
-            print(f'{ts.path.name}: multiple original mdoc files found. Skipping.')
+            print(f"{ts.path.name}: multiple original mdoc files found. Skipping.")
             print(orig_mdoc_paths)
             continue
 
@@ -66,14 +64,14 @@ def restore_frames(orig_mdoc_dir, input_files):
         orig_mdoc = mdocfile.read(orig_mdoc_paths[0])
 
         orig_mdoc = sorted(
-            orig_mdoc['sections'], key=lambda section: section['TiltAngle'])
+            orig_mdoc["sections"], key=lambda section: section["TiltAngle"]
+        )
 
         # Iterate over sections
-        for section in mdoc['sections']:
-
+        for section in mdoc["sections"]:
             for orig_section in orig_mdoc:
                 # Match by tilt angle
-                if orig_section['TiltAngle'] == section['TiltAngle']:
+                if orig_section["TiltAngle"] == section["TiltAngle"]:
                     same_section = orig_section
                 else:
                     continue
@@ -88,7 +86,6 @@ def restore_frames(orig_mdoc_dir, input_files):
         # Write fixed mdoc
         if all("SubFramePath" in section for section in mdoc["sections"]):
             for section in mdoc["sections"]:
-
                 section["SubFramePath"] = mdocfile.find_relative_path(
                     Path(orig_mdoc_dir),
                     Path(section.get("SubFramePath", "").replace("\\", path.sep)),

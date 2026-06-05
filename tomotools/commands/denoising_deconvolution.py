@@ -35,14 +35,15 @@ from tomotools.utils import mathutil
 )
 @click.option("--phaseflipped", is_flag=True, help="Data has been phase-flipped")
 @click.argument("input_files", nargs=-1, required=True)
-
-def deconv(defocus,
-           snrfalloff,
-           deconvstrength,
-           hpnyquist,
-           phaseshift,
-           phaseflipped,
-           input_files):
+def deconv(
+    defocus,
+    snrfalloff,
+    deconvstrength,
+    hpnyquist,
+    phaseshift,
+    phaseflipped,
+    input_files,
+):
     """Deconvolve your tomogram or list of tomograms.
 
     Python implementation Dimitri Tegunovs tom_deconv.m.
@@ -61,57 +62,58 @@ def deconv(defocus,
         )
 
     for input_file in input_files:
-
         with mrcfile.open(input_file) as mrc:
             angpix = float(mrc.voxel_size.x)
             volume_in = mrc.data
 
-        wiener = mathutil.wiener(angpix,
-                                 float(defocus),
-                                 float(snrfalloff),
-                                 float(deconvstrength),
-                                 float(hpnyquist),
-                                 phaseflipped,
-                                 int(phaseshift))
+        wiener = mathutil.wiener(
+            angpix,
+            float(defocus),
+            float(snrfalloff),
+            float(deconvstrength),
+            float(hpnyquist),
+            phaseflipped,
+            int(phaseshift),
+        )
 
         # In mcrfile convention, the array is ordered zyx!
-        sx = int(-1*np.floor(volume_in.shape[2]/2))
-        fx = sx + volume_in.shape[2] -1
+        sx = int(-1 * np.floor(volume_in.shape[2] / 2))
+        fx = sx + volume_in.shape[2] - 1
 
-        sy = int(-1*np.floor(volume_in.shape[1]/2))
-        fy = sy + volume_in.shape[1] -1
+        sy = int(-1 * np.floor(volume_in.shape[1] / 2))
+        fy = sy + volume_in.shape[1] - 1
 
-        sz = int(-1*np.floor(volume_in.shape[0]/2))
-        fz = sz + volume_in.shape[0] -1
+        sz = int(-1 * np.floor(volume_in.shape[0] / 2))
+        fz = sz + volume_in.shape[0] - 1
 
-        gridz,gridy,gridx = np.mgrid[sz:fz+1,sy:fy+1,sx:fx+1]
+        gridz, gridy, gridx = np.mgrid[sz : fz + 1, sy : fy + 1, sx : fx + 1]
 
-        gridx = np.divide(gridx,np.abs(sx))
-        gridy = np.divide(gridy,np.abs(sy))
-        gridz = np.divide(gridz,np.maximum(1, np.abs(sz)))
+        gridx = np.divide(gridx, np.abs(sx))
+        gridy = np.divide(gridy, np.abs(sy))
+        gridz = np.divide(gridz, np.maximum(1, np.abs(sz)))
 
         # Create input array with Euclidean distance from the center as cell value
-        r = np.sqrt(np.square(gridx)+np.square(gridy)+np.square(gridz))
+        r = np.sqrt(np.square(gridx) + np.square(gridy) + np.square(gridz))
 
-        del(gridx,gridy,gridz,sx,sy,sz,fx,fy,fz)
+        del (gridx, gridy, gridz, sx, sy, sz, fx, fy, fz)
 
         r = np.minimum(1, r)
         r = np.fft.ifftshift(r)
 
-        x = np.linspace(0,1,2048)
+        x = np.linspace(0, 1, 2048)
 
-        ramp = np.interp(r,x,wiener)
+        ramp = np.interp(r, x, wiener)
 
-        del(r)
+        del r
 
-        vol_deconv = np.real(np.fft.ifftn(np.fft.fftn(volume_in)*ramp))
+        vol_deconv = np.real(np.fft.ifftn(np.fft.fftn(volume_in) * ramp))
 
         # Cast to single precision / float32 (maximum allowed by mrc standard)
-        vol_deconv = vol_deconv.astype('float32')
+        vol_deconv = vol_deconv.astype("float32")
 
-        output_file = f'{path.splitext(input_file)[0]}_deconv.mrc'
+        output_file = f"{path.splitext(input_file)[0]}_deconv.mrc"
 
-        with mrcfile.open(output_file, mode = 'w+') as mrc:
+        with mrcfile.open(output_file, mode="w+") as mrc:
             mrc.set_data(vol_deconv)
             mrc.voxel_size = str(angpix)
             mrc.update_header_stats()

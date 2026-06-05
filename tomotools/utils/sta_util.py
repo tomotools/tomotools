@@ -106,10 +106,10 @@ def aretomo_export(ts: TiltSeries):
 def make_warp_dir(
     ts: TiltSeries,
     project_dir: Path,
-    frames_strategy: Tuple[Literal["skip"], None] |
-        Tuple[Literal["extract"], None] |
-        Tuple[Literal["copy"], Path] |
-        Tuple[Literal["link"], Path],
+    frames_strategy: Tuple[Literal["skip"], None]
+    | Tuple[Literal["extract"], None]
+    | Tuple[Literal["copy"], Path]
+    | Tuple[Literal["link"], Path],
     imod: bool = False,
 ):
     """Export tiltseries to Warp."""

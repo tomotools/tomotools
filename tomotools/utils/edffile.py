@@ -13,12 +13,13 @@ def read_edf(path: Path) -> Dict:
             values[key.strip()] = value.strip()
     return values
 
+
 def get_ebt_datasets(ebt: dict) -> List[str]:
     """Get datasets from ebt dict."""
     datasets = []
     i = 1
     while True:
-        key = f'meta.ref.ebt{i}'
+        key = f"meta.ref.ebt{i}"
         if key in ebt:
             datasets.append(ebt[key])
             i += 1

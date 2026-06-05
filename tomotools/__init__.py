@@ -30,6 +30,7 @@ def _get_version():
     except PackageNotFoundError:
         return "unknown"
 
+
 @click.group()
 def tomotools():
     """Scripts for cryo-ET data processing."""

@@ -1,4 +1,3 @@
-
 import os
 import shutil
 import subprocess
@@ -73,11 +72,14 @@ class Micrograph:
             override_gainref = Path(override_gainref)
         elif override_gainref is None and movies[0].mdoc is not None:
             # Check if there is a subframe mdoc and if it contains a gain reference path
-            gain_refs = {movie.mdoc["framesets"][0].get("GainReference", None)
-                         for movie in movies if movie.mdoc is not None}
+            gain_refs = {
+                movie.mdoc["framesets"][0].get("GainReference", None)
+                for movie in movies
+                if movie.mdoc is not None
+            }
             gain_refs.discard(None)
             if len(gain_refs) > 1:
-                raise Exception('Found multiple gain references, only one is supported')
+                raise Exception("Found multiple gain references, only one is supported")
             elif len(gain_refs) == 1:
                 # The gain ref should be in the same folder as the input file(s)
                 # Check if it's there.
@@ -91,9 +93,7 @@ class Micrograph:
         # Convert gain reference to mrc if needed
         if override_gainref is None:
             gain_ref_mrc = None
-            print(
-                "No gainref is given or found, continuing without gain correction."
-            )
+            print("No gainref is given or found, continuing without gain correction.")
         else:
             gain_ref_mrc = _ensure_gainref_mrc(override_gainref, output_dir)
             if not gain_ref_mrc.is_file():
@@ -127,8 +127,11 @@ class Micrograph:
         if mcrot is not None and mcflip is not None:
             command += ["-RotGain", str(mcrot), "-FlipGain", str(mcflip)]
 
-        if (override_gainref is not None and override_gainref.suffix == '.dm4' and
-            check_defects(override_gainref) is not None):
+        if (
+            override_gainref is not None
+            and override_gainref.suffix == ".dm4"
+            and check_defects(override_gainref) is not None
+        ):
             command += [
                 "-DefectMap",
                 defects_tif(override_gainref, tempdir, movies[0].path).absolute(),
@@ -142,27 +145,29 @@ class Micrograph:
                 str(patch_x),
                 str(patch_y),
                 "-Group",
-                f"{group} {4*group}",
+                f"{group} {4 * group}",
             ]
         else:
             command += ["-Group", str(group)]
 
         # Now, correct every movie separately, since -Serial 1 causes issues
         for movie in movies:
-
             if movie.is_mrc:
                 command_temp = command + ["-InMrc", movie.path.absolute()]
             elif movie.is_tiff:
                 command_temp = command + ["-InTiff", movie.path.absolute()]
 
-            command_temp += ["-OutMrc",
-                             str(output_dir.absolute()) +
-                             os.path.sep +
-                             movie.path.with_suffix(".mrc").name]
+            command_temp += [
+                "-OutMrc",
+                str(output_dir.absolute())
+                + os.path.sep
+                + movie.path.with_suffix(".mrc").name,
+            ]
 
-            with open(join(output_dir, "motioncor2.log"), "a") as out, open(
-                join(output_dir, "motioncor2.err"), "a"
-            ) as err:
+            with (
+                open(join(output_dir, "motioncor2.log"), "a") as out,
+                open(join(output_dir, "motioncor2.err"), "a") as err,
+            ):
                 subprocess.run(command_temp, cwd=tempdir, stdout=out, stderr=err)
 
         # If present, copy the mdoc files to the output dir
@@ -199,7 +204,7 @@ class Micrograph:
                         "Gain reference was specified, but not applied by MotionCor."
                     )
 
-        if  os.path.isdir(output_dir.joinpath("motioncor2_gain")):
+        if os.path.isdir(output_dir.joinpath("motioncor2_gain")):
             shutil.rmtree(output_dir.joinpath("motioncor2_gain"))
 
         output_micrographs = [
@@ -239,30 +244,24 @@ def motioncor_executable() -> Optional[str]:
     elif shutil.which("MotionCor2") is not None:
         return shutil.which("MotionCor2")
     else:
-        raise FileNotFoundError(
-                'MotionCor not found. Check README.md for setup info.'
-            )
+        raise FileNotFoundError("MotionCor not found. Check README.md for setup info.")
+
 
 def _ensure_gainref_mrc(gain_ref: Path, output_dir: Path) -> Path:
     temp_gain = output_dir / "motioncor2_gain"
     temp_gain.mkdir()
     gain_out = temp_gain / (gain_ref.with_suffix(".mrc").name)
-    print(
-        f"Found gain reference {gain_ref}, converting to {gain_out}"
-    )
+    print(f"Found gain reference {gain_ref}, converting to {gain_out}")
     if gain_ref.suffix == ".mrc":
         gain_out = gain_ref
     elif gain_ref.suffix == ".dm4":
-        subprocess.run(["dm2mrc", gain_ref, gain_out],
-                        stdout=subprocess.DEVNULL)
+        subprocess.run(["dm2mrc", gain_ref, gain_out], stdout=subprocess.DEVNULL)
     elif gain_ref.suffix in [".tif", ".tiff", ".gain"]:
-        subprocess.run(["tif2mrc", gain_ref, gain_out],
-                        stdout=subprocess.DEVNULL)
+        subprocess.run(["tif2mrc", gain_ref, gain_out], stdout=subprocess.DEVNULL)
     else:
-        raise AttributeError(
-            "Gain reference can only be in .tif(f) or .dm4 format!"
-        )
+        raise AttributeError("Gain reference can only be in .tif(f) or .dm4 format!")
     return gain_out
+
 
 def sem2mc2(RotationAndFlip: int = 0):
     """Read RotationAndFlip for MotionCor2.
@@ -278,14 +277,16 @@ def sem2mc2(RotationAndFlip: int = 0):
 
     https://bio3d.colorado.edu/SerialEM/betaHlp/html/about_properties.htm#per_camera_properties
     """
-    conv = {0: [0, 0],
-            1: [1, 0],
-            2: [2, 0],
-            3: [3, 0],
-            4: [0, 1],
-            5: [1, 2],
-            6: [2, 2],
-            7: [3, 2]}
+    conv = {
+        0: [0, 0],
+        1: [1, 0],
+        2: [2, 0],
+        3: [3, 0],
+        4: [0, 1],
+        5: [1, 2],
+        6: [2, 2],
+        7: [3, 2],
+    }
 
     return conv[RotationAndFlip]
 
