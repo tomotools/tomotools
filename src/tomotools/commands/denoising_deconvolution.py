@@ -63,6 +63,7 @@ def deconv(
     Original Script at https://github.com/dtegunov/tom_deconv/.
     """
     # TODO: automatically read defocus out of ctfplotter file?
+    # TODO: add proper parser for TiltSeries
     for input_file in input_files:
         with mrcfile.open(input_file) as mrc:
             angpix = float(mrc.voxel_size.x)
