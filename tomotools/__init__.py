@@ -4,7 +4,28 @@ from importlib.metadata import PackageNotFoundError, version
 
 import click
 
-from .commands import commands
+from tomotools.commands.denoising_deconvolution import (
+    cryocare_extract,
+    cryocare_predict,
+    cryocare_train,
+    deconv,
+)
+from tomotools.commands.dynamo import merge_dboxes
+from tomotools.commands.helpers import restore_frames, update
+from tomotools.commands.movies import create_movie
+from tomotools.commands.preprocessing_reconstruction import (
+    blend_montages,
+    fix_header_angle,
+    preprocess,
+    reconstruct,
+)
+from tomotools.commands.serialem import semnavigator
+from tomotools.commands.sta_preparation import (
+    fit_ctf,
+    imod2tomotwin,
+    imod2warp,
+    reconstruct_3dctf,
+)
 
 
 def _get_version():
@@ -19,5 +40,20 @@ def tomotools():
     click.echo(f"Tomotools version {_get_version()} \n")
 
 
-for command in commands:
-    tomotools.add_command(command)
+tomotools.add_command(blend_montages)
+tomotools.add_command(create_movie)
+tomotools.add_command(cryocare_extract)
+tomotools.add_command(cryocare_predict)
+tomotools.add_command(cryocare_train)
+tomotools.add_command(deconv)
+tomotools.add_command(fit_ctf)
+tomotools.add_command(fix_header_angle)
+tomotools.add_command(imod2tomotwin)
+tomotools.add_command(imod2warp)
+tomotools.add_command(merge_dboxes)
+tomotools.add_command(preprocess)
+tomotools.add_command(reconstruct)
+tomotools.add_command(reconstruct_3dctf)
+tomotools.add_command(restore_frames)
+tomotools.add_command(semnavigator)
+tomotools.add_command(update)

@@ -4,11 +4,10 @@ import shutil
 import subprocess
 from os import path
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import List, Literal, Tuple
 
 import click
 import mrcfile
-from typing_extensions import Literal
 
 from tomotools.utils import mdocfile, tomogram
 from tomotools.utils.tiltseries import (
@@ -107,12 +106,10 @@ def aretomo_export(ts: TiltSeries):
 def make_warp_dir(
     ts: TiltSeries,
     project_dir: Path,
-    frames_strategy: Union[
-        Tuple[Literal["skip"], None],
-        Tuple[Literal["extract"], None],
-        Tuple[Literal["copy"], Path],
+    frames_strategy: Tuple[Literal["skip"], None] |
+        Tuple[Literal["extract"], None] |
+        Tuple[Literal["copy"], Path] |
         Tuple[Literal["link"], Path],
-    ],
     imod: bool = False,
 ):
     """Export tiltseries to Warp."""

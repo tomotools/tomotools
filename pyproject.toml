@@ -8,7 +8,7 @@ description = "Scripts to make cryo-electron tomography a bit easier."
 readme = "README.md"
 version = "0.4.7"
 
-requires-python = ">=3.8"
+requires-python = ">=3.12"
 license = {text = "None so far"}
 authors = [
   {email = "moritz.wachsmuth@bioquant.uni-heidelberg.de", name = "Moritz Wachsmuth-Melm"},
@@ -72,7 +72,7 @@ lint.extend-ignore = [
     "D416", # Section name should end with a colon
     "C901", # Function too complex -> noted as TODO in code
     "RUF005", # Interferes with subprocess.run,
-    "RUF015", # Prefer next(iter) over iter[0] 
+    "RUF015", # Prefer next(iter) over iter[0]
     "B012", # We use try/ finally a lot to avoid raising exceptions
     "D301" # Use backslash for proper formatting in docstring
 ]
