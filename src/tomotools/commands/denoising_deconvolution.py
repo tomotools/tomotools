@@ -5,15 +5,10 @@ import click
 import mrcfile
 import numpy as np
 
-from tomotools.utils import mathutil
+from tomotools.utils import mathutil, tiltseries, tomogram
 
 
 @click.command()
-@click.option(
-    "--defocus",
-    help="(Central) defocus in um. Positive values denote underfocus.",
-    required=True,
-)
 @click.option(
     "--snrfalloff",
     default=1.0,
@@ -43,7 +38,6 @@ from tomotools.utils import mathutil
     required=True,
 )
 def deconv(
-    defocus: float,
     snrfalloff: float,
     deconvstrength: float,
     hpnyquist: float,
@@ -57,23 +51,39 @@ def deconv(
 
     The input file should be a reconstructed tomogram.
     AngPix is automatically read from the header.
+    CTF will be determined using imod ctfplotter.
 
     Output file will be an mrc in the same folder, with added _deconv suffix.
 
     Original Script at https://github.com/dtegunov/tom_deconv/.
     """
-    # TODO: automatically read defocus out of ctfplotter file?
-    # TODO: add proper parser for TiltSeries
-    for input_file in input_files:
-        with mrcfile.open(input_file) as mrc:
-            angpix = float(mrc.voxel_size.x)
+
+    input_tomo = tomogram.convert_input_to_Tomogram(list(input_files))
+
+    ts_list = tiltseries.convert_input_to_TiltSeries(
+        tomo.path.parent for tomo in input_tomo
+    )
+
+    for ts_in in ts_list:
+        # Test, whether .defocus file is found
+        if not path.isfile(ts_in.path.with_suffix(".defocus")):
+            tiltseries.run_ctfplotter(ts_in, True)
+
+    for tomo, ts_in in zip(input_tomo, ts_list):
+        angpix = tomo.angpix
+
+        with mrcfile.open(tomo.path) as mrc:
             volume_in = mrc.data
-        if volume_in is None:
-            raise ValueError(f"Input file {input_file} is empty.")
+
+        defocus = tiltseries.parse_ctfplotter(ts_in.path.with_suffix(".defocus"))
+
+        middle_defocus = (
+            float(defocus.iloc[round(len(defocus.index) / 2)].df_1_nm.strip()) / 1000
+        )
 
         wiener = mathutil.wiener(
             angpix,
-            float(defocus),
+            float(middle_defocus),
             float(snrfalloff),
             float(deconvstrength),
             float(hpnyquist),
@@ -116,9 +126,9 @@ def deconv(
         # Cast to single precision / float32 (maximum allowed by mrc standard)
         vol_deconv = vol_deconv.astype("float32")
 
-        output_file = f"{path.splitext(input_file)[0]}_deconv.mrc"
-
-        with mrcfile.open(output_file, mode="w+") as mrc:
+        with mrcfile.open(
+            tomo.path.parent / f"{tomo.path.stem}_deconv.mrc", mode="w+"
+        ) as mrc:
             mrc.set_data(vol_deconv)
             mrc.voxel_size = str(angpix)
             mrc.update_header_stats()

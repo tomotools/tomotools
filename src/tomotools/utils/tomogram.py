@@ -39,11 +39,13 @@ class Tomogram:
         return find_Tomogram_halves(self, dir)
 
     @property
-    def angpix(self):
+    def angpix(self) -> float:
         """Return angpix from header."""
-        with mrcfile.mmap(self.path, mode="r") as mrc:
-            self.angpix = float(mrc.voxel_size.x)
-        return self.angpix
+        if hasattr(self, "_angpix"):
+            return self._angpix
+        with mrcfile.mmap(self.path) as mrc:
+            self._angpix = float(mrc.voxel_size.x)
+        return self._angpix
 
     def dimZYX(self):
         """Return full dimensions from data shape."""
