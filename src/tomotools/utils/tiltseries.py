@@ -51,6 +51,10 @@ class TiltSeries:
             yield from TiltSeries._from_dir(path)
         elif path.is_file():
             yield from TiltSeries._from_file(path)
+        elif not path.exists():
+            raise FileNotFoundError(f"{path} does not exist!")
+        else:
+            raise ValueError(f"{path} is neither a directory nor a file!")
 
     @staticmethod
     def _from_dir(path: Path) -> Iterator["TiltSeries"]:
