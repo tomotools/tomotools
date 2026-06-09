@@ -32,7 +32,7 @@ from tomotools.utils.tomogram import Tomogram
 )
 @click.argument(
     "input_files",
-    type=click.Path(file_okay=True, dir_okay=True, path_type=Path),
+    type=click.Path(file_okay=True, dir_okay=True, exists=True, path_type=Path),
     nargs=-1,
 )
 @click.argument(
