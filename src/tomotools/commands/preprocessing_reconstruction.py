@@ -222,10 +222,12 @@ def preprocess(
 
             try:
                 movies = [
-                    Movie(section["SubFramePath"], section["TiltAngle"])
+                    Movie(section["SubFramePath"].absolute(), section["TiltAngle"])
                     for section in mdoc["sections"]
                 ]
-            except FileNotFoundError:
+            except (FileNotFoundError, AttributeError):
+                # Attribute error occurs if SubFramePath is set to None
+                # This happens if mdocfile.find_relative_path fails
                 print(
                     f"Movie frames not found for {input_file.mdoc.name}, use --frames."
                 )

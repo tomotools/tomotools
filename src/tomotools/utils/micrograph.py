@@ -154,14 +154,19 @@ class Micrograph:
         # Now, correct every movie separately, since -Serial 1 causes issues
         for movie in movies:
             in_flag = "-InMrc" if movie.is_mrc else "-InTiff"
-            out_path = output_dir / movie.path.with_suffix(".mrc").name
-            command += [in_flag, movie.path.absolute(), "-OutMrc", out_path]
+            out_path = (output_dir / movie.path.with_suffix(".mrc").name).absolute()
+            movie_command = command + [
+                in_flag,
+                movie.path,
+                "-OutMrc",
+                out_path,
+            ]
 
             with (
                 open(output_dir / "motioncor2.log", "a") as out,
                 open(output_dir / "motioncor2.err", "a") as err,
             ):
-                subprocess.run(command, cwd=tempdir, stdout=out, stderr=err)
+                subprocess.run(movie_command, cwd=output_dir, stdout=out, stderr=err)
 
         # If present, copy the mdoc files to the output dir
         # Rename from .tif.mdoc to .mrc.mdoc
