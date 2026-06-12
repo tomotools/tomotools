@@ -14,7 +14,11 @@ from tomotools.utils.tiltseries import (
 
 
 @click.command()
-@click.argument("input_files", nargs=-1)
+@click.argument(
+    "input_files",
+    type=click.Path(file_okay=True, dir_okay=True, path_type=Path),
+    nargs=-1,
+)
 def fit_ctf(input_files):
     """Performs interactive CTF-Fitting.
 

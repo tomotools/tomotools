@@ -34,7 +34,7 @@ from tomotools.utils import mathutil, tiltseries, tomogram
 @click.argument(
     "input_files",
     nargs=-1,
-    type=click.Path(file_okay=True, dir_okay=False, path_type=Path),
+    type=click.Path(file_okay=True, dir_okay=True, path_type=Path),
     required=True,
 )
 def deconv(
