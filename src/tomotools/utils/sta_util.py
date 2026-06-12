@@ -284,9 +284,9 @@ def tomotwin_prep(tomotwin_dir, ts_list, thickness, uid, bin_up=True):
 
         rec = tomogram.Tomogram.from_tiltseries(
             ts_ali,
-            bin=1,
+            binned=binning,
             sirt=0,
-            thickness=round(thickness / binning),
+            thickness=round(thickness),
             convert_to_byte=False,
         )
 
