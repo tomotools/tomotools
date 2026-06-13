@@ -44,8 +44,6 @@ def aretomo_export(ts: TiltSeries):
         else:
             raise FileNotFoundError(f"No exported imod stack found in {imod_dir_at}")
 
-        ali_stack_imod = TiltSeries(imod_dir_at / f"{ali_stack.stem}.st")
-
     elif path.isdir(imod_dir_at2):
         if (imod_dir_at2 / f"{ts.path.stem}_st.mrc").is_file():
             ali_stack_imod = TiltSeries(imod_dir_at2 / f"{ts.path.stem}_st.mrc")

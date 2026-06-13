@@ -27,10 +27,10 @@ def fit_ctf(input_files):
     Defaults to overwriting previous results. Saves results to folder.
 
     """
-    tiltseries = convert_input_to_TiltSeries(input_files)
+    ts_list = convert_input_to_TiltSeries(input_files)
 
-    for ts in tiltseries:
-        run_ctfplotter(ts, True)
+    for ts in ts_list:
+        run_ctfplotter(ts=ts, overwrite=True)
 
 
 @click.command()

@@ -47,11 +47,16 @@ class Tomogram:
             self._angpix = float(mrc.voxel_size.x)
         return self._angpix
 
-    def dimZYX(self):
-        """Return full dimensions from data shape."""
-        with mrcfile.mmap(self.path, mode="r") as mrc:
-            self.dimZYX = mrc.data.shape
-        return self.dimZYX
+    @property
+    def dimZYX(self) -> tuple[float, float, float]:
+        """Return ZYX dimensions."""
+        if hasattr(self, "_dimZYX"):
+            return self._dimZYX
+        with mrcfile.mmap(self.path) as mrc:
+            if mrc.data is None:
+                raise ValueError("No data in MRC file.")
+            self._dimZYX = mrc.data.shape
+        return self._dimZYX
 
     @staticmethod
     def from_tiltseries(
@@ -464,7 +469,7 @@ def convert_input_to_Tomogram(input_files: list[Path]):
             input_tomo.append(Tomogram(Path(input_file)))
         elif input_file.is_dir():
             input_tomo += [
-                Tomogram(file) for file in input_file.glob("*_rec_bin_[0-9].mrc")
+                Tomogram(file) for file in input_file.glob("*_rec_bin_[0-9]*.mrc")
             ]
             # Do not include full_rec, even_rec and odd_rec
             input_tomo += [

@@ -603,7 +603,7 @@ def reconstruct(
 
             tomo_pitch = Tomogram.from_tiltseries(
                 binned_ts,
-                binned=min(bin, 8),
+                binned=max(bin, 8),
                 do_EVN_ODD=False,
                 trim=False,
                 thickness=round(10000 / pix_xy),
@@ -671,7 +671,7 @@ def reconstruct(
 
         Tomogram.from_tiltseries(
             tiltseries_dosefiltered,
-            binned=8,
+            binned=bin,
             thickness=thickness,
             x_axis_tilt=x_axis_tilt,
             z_shift=z_shift,

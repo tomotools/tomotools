@@ -26,13 +26,13 @@ class TiltSeries:
 
     def __init__(self, ts_path: Path):
         # TODO: find a better, type-checkeable way to init from just an mdoc
-        if ts_path is None:
-            self.path = None
-        elif not path.isfile(ts_path):
-            raise FileNotFoundError(f"File not found: {ts_path}")
-        else:
-            self.path: Path = Path(ts_path)
-        self.mdoc: Path = Path(f"{ts_path}.mdoc")
+        self.path: Path | None = None
+        self.mdoc: Path | None = None
+
+        if ts_path is not None and ts_path.is_file():
+            self.path: Path = ts_path
+        if self.path is not None:
+            self.mdoc: Path = Path(f"{ts_path}.mdoc")
         self._is_split: bool | None = None
         self.evn_path: Path | None = None
         self.odd_path: Path | None = None
@@ -101,12 +101,12 @@ class TiltSeries:
         """
         for even, odd in [
             (
-                self.path.with_name(self.path.stem + "_EVN"),
-                self.path.with_name(self.path.stem + "_ODD"),
+                self.path.with_name(self.path.stem + "_EVN.mrc"),
+                self.path.with_name(self.path.stem + "_ODD.mrc"),
             ),
             (
-                self.path.with_name(self.path.stem + "_even"),
-                self.path.with_name(self.path.stem + "_odd"),
+                self.path.with_name(self.path.stem + "_even.mrc"),
+                self.path.with_name(self.path.stem + "_odd.mrc"),
             ),
         ]:
             if even.is_file() and odd.is_file():
@@ -558,7 +558,7 @@ def align_with_areTomo(
                 "-AlignZ",
                 alignZ,
             ]
-            + (["-TiltAxis", override_axis] if override_axis is not None else [])
+            + (["-TiltAxis", str(override_axis)] if override_axis is not None else [])
             + (["-Gpu"] + [str(i) for i in gpu_id])
             + (["-Patch", patch_x, patch_y] if local else []),
             stdout=subprocess.DEVNULL,
@@ -623,16 +623,14 @@ def align_with_areTomo(
             mrc.voxel_size = str(angpix)
             mrc.update_header_stats()
 
-        try:
-            os.remove(ali_stack_evn.with_name(f"{ali_stack_evn.stem}.tlt"))
-            os.remove(ali_stack_odd.with_name(f"{ali_stack_odd.stem}.tlt"))
-        finally:
-            print(f"Done aligning ENV and ODD stacks for {ts.path.stem} with AreTomo.")
-            return (
-                TiltSeries(ali_stack)
-                .with_split_files(ali_stack_evn, ali_stack_odd)
-                .with_mdoc(orig_mdoc)
-            )
+        ali_stack_evn.with_name(f"{ali_stack_evn.stem}.tlt").unlink(missing_ok=True)
+        ali_stack_odd.with_name(f"{ali_stack_odd.stem}.tlt").unlink(missing_ok=True)
+        print(f"Done aligning ENV and ODD stacks for {ts.path.stem} with AreTomo.")
+        return (
+            TiltSeries(ali_stack)
+            .with_split_files(ali_stack_evn, ali_stack_odd)
+            .with_mdoc(orig_mdoc)
+        )
 
     return TiltSeries(ali_stack).with_mdoc(orig_mdoc)
 
