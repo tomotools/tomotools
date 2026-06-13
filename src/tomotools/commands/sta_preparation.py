@@ -275,7 +275,7 @@ def imod2tomotwin(
     UID will be put in from of name, e.g. 230105_TS_01.mrc.
     """
     ts_list: list[TiltSeries] = []
-    
+
     tomotwin_dir = Path(tomotwin_dir)
 
     for input_file in input_files:

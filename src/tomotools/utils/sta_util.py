@@ -34,23 +34,23 @@ def aretomo_export(ts: TiltSeries):
 
     ali_stack = ts.path.with_name(f"{ts.path.stem}_ali.mrc")
 
-    imod_dir = path.join(ts.path.parent, (ali_stack.stem + "_Imod"))
+    # Output paths for AreTomo and AreTomo2 look different
+    imod_dir_at = ts.path.parent / f"{ali_stack.stem}_Imod"
+    imod_dir_at2 = ts.path.parent / f"{ts.path.stem}_Imod"
 
-    if path.isdir(imod_dir) and path.isfile(
-        path.join(imod_dir, (ali_stack.stem + ".st"))
-    ):
-        print(f"Previous AreTomo export found for {ts.path.name}. Re-using.")
+    if path.isdir(imod_dir_at):
+        if (imod_dir_at / f"{ali_stack.stem}.st").is_file():
+            ali_stack_imod = TiltSeries(imod_dir_at / f"{ali_stack.stem}.st")
+        else:
+            raise FileNotFoundError(f"No exported imod stack found in {imod_dir_at}")
 
-        ali_stack_imod = TiltSeries(Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
+        ali_stack_imod = TiltSeries(imod_dir_at / f"{ali_stack.stem}.st")
 
-        with mrcfile.mmap(ali_stack_imod.path, mode="r+") as mrc:
-            mrc.voxel_size = str(angpix)
-
-            # Check whether labels were already added
-            if len(mrc.get_labels()) == 0:
-                for label in labels:
-                    mrc.add_label(label)
-            mrc.update_header_stats()
+    elif path.isdir(imod_dir_at2):
+        if (imod_dir_at2 / f"{ts.path.stem}_st.mrc").is_file():
+            ali_stack_imod = TiltSeries(imod_dir_at2 / f"{ts.path.stem}_st.mrc")
+        else:
+            raise FileNotFoundError(f"No exported imod stack found in {imod_dir_at2}")
 
     elif not path.isfile(aln_file):
         raise FileNotFoundError(
@@ -80,17 +80,24 @@ def aretomo_export(ts: TiltSeries):
             stdout=subprocess.DEVNULL,
         )
 
-        ali_stack_imod = TiltSeries(Path(path.join(imod_dir, (ali_stack.stem + ".st"))))
+        if path.isdir(imod_dir_at):
+            ali_stack_imod = TiltSeries(imod_dir_at / f"{ali_stack.stem}.st")
+        elif path.isdir(imod_dir_at2):
+            ali_stack_imod = TiltSeries(imod_dir_at2 / f"{ts.path.stem}_st.mrc")
+        else:
+            raise FileNotFoundError(f"No exported imod stack found in {ts.path.parent}")
 
         with mrcfile.mmap(ali_stack, mode="r+") as mrc:
             mrc.voxel_size = str(angpix)
             mrc.update_header_stats()
 
-        with mrcfile.mmap(ali_stack_imod.path, mode="r+") as mrc:
-            mrc.voxel_size = str(angpix)
+    with mrcfile.mmap(ali_stack_imod.path, mode="r+") as mrc:
+        mrc.voxel_size = str(angpix)
+
+        if len(mrc.get_labels()) == 0:
             for label in labels:
                 mrc.add_label(label)
-            mrc.update_header_stats()
+        mrc.update_header_stats()
 
     # Get view exclusion list and create appropriate mdoc
     exclude = parse_darkimgs(ts)
