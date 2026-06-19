@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import Dict, List
 
 
-def read_edf(path: Path) -> Dict:
+def read_edf(path: Path) -> dict[str, str]:
     """Read ebt file and return a dict with the values."""
     values = {}
     with open(path) as file:
@@ -13,12 +12,13 @@ def read_edf(path: Path) -> Dict:
             values[key.strip()] = value.strip()
     return values
 
-def get_ebt_datasets(ebt: dict) -> List[str]:
+
+def get_ebt_datasets(ebt: dict) -> list[str]:
     """Get datasets from ebt dict."""
     datasets = []
     i = 1
     while True:
-        key = f'meta.ref.ebt{i}'
+        key = f"meta.ref.ebt{i}"
         if key in ebt:
             datasets.append(ebt[key])
             i += 1

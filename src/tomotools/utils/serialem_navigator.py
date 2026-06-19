@@ -1,5 +1,4 @@
 import os
-from typing import Tuple
 
 
 class SEMNavigator:
@@ -62,6 +61,6 @@ def _parse_header(line: str) -> str:
     return value
 
 
-def _parse_field(line: str) -> Tuple[str, str]:
+def _parse_field(line: str) -> tuple[str, str]:
     key, value = line.split(" = ", maxsplit=1)
     return key.strip(), value.strip()

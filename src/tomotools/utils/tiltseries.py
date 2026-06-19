@@ -1,14 +1,13 @@
+from collections.abc import Iterator
 import csv
 import math
 import os
 import re
 import shutil
 import subprocess
-from glob import glob
 from operator import itemgetter
 from os import path
 from pathlib import Path
-from typing import Iterator, List, Optional, Tuple
 
 import mrcfile
 import numpy as np
@@ -27,16 +26,16 @@ class TiltSeries:
 
     def __init__(self, ts_path: Path):
         # TODO: find a better, type-checkeable way to init from just an mdoc
-        if ts_path is None:
-            self.path = None
-        elif not path.isfile(ts_path):
-            raise FileNotFoundError(f"File not found: {ts_path}")
-        else:
-            self.path: Path = Path(ts_path)
-        self.mdoc: Path = Path(f"{ts_path}.mdoc")
-        self._is_split: Optional[bool] = None
-        self.evn_path: Optional[Path] = None
-        self.odd_path: Optional[Path] = None
+        self.path: Path | None = None
+        self.mdoc: Path | None = None
+
+        if ts_path is not None and ts_path.is_file():
+            self.path: Path = ts_path
+        if self.path is not None:
+            self.mdoc: Path = Path(f"{ts_path}.mdoc")
+        self._is_split: bool | None = None
+        self.evn_path: Path | None = None
+        self.odd_path: Path | None = None
 
     @property
     def is_split(self) -> bool:
@@ -52,6 +51,10 @@ class TiltSeries:
             yield from TiltSeries._from_dir(path)
         elif path.is_file():
             yield from TiltSeries._from_file(path)
+        elif not path.exists():
+            raise FileNotFoundError(f"{path} does not exist!")
+        else:
+            raise ValueError(f"{path} is neither a directory nor a file!")
 
     @staticmethod
     def _from_dir(path: Path) -> Iterator["TiltSeries"]:
@@ -70,23 +73,24 @@ class TiltSeries:
         """Create TiltSeries from a single mrc/st/mdoc file."""
         if not path.is_file():
             raise FileNotFoundError(f"File not found: {path}")
-        if path.suffix in [".mrc", ".st"]:
-            yield TiltSeries(path)
-        elif path.suffix == ".mdoc":
-            yield from TiltSeries._from_file(path.with_suffix(""))
-        elif path.suffix == ".edf":
-            edf = edffile.read_edf(path)
-            suffix = edf.get("Setup.RawImageStackExt", "mrc")
-            yield from TiltSeries._from_file(path.with_suffix("." + suffix))
-        elif path.suffix == ".ebt":
-            ebt = edffile.read_edf(path)
-            for dataset in edffile.get_ebt_datasets(ebt):
-                yield from TiltSeries._from_file(Path(dataset))
-        else:
-            with open(path) as file:
-                for line in file:
-                    if line.strip():
-                        yield from TiltSeries.from_path(Path(line.strip()))
+        match path.suffix:
+            case ".mrc" | ".st":
+                yield TiltSeries(path)
+            case ".mdoc":
+                yield from TiltSeries._from_file(path.with_suffix(""))
+            case ".edf":
+                edf = edffile.read_edf(path)
+                suffix = edf.get("Setup.RawImageStackExt", "mrc")
+                yield from TiltSeries._from_file(path.with_suffix("." + suffix))
+            case ".ebt":
+                ebt = edffile.read_edf(path)
+                for dataset in edffile.get_ebt_datasets(ebt):
+                    yield from TiltSeries._from_file(Path(dataset))
+            case _:
+                with open(path) as file:
+                    for line in file:
+                        if line.strip():
+                            yield from TiltSeries.from_path(Path(line.strip()))
 
     def find_split_files(self) -> bool:
         """Automatically try to find even/odd split files.
@@ -97,12 +101,12 @@ class TiltSeries:
         """
         for even, odd in [
             (
-                self.path.with_name(self.path.stem + "_EVN"),
-                self.path.with_name(self.path.stem + "_ODD"),
+                self.path.with_name(self.path.stem + "_EVN.mrc"),
+                self.path.with_name(self.path.stem + "_ODD.mrc"),
             ),
             (
-                self.path.with_name(self.path.stem + "_even"),
-                self.path.with_name(self.path.stem + "_odd"),
+                self.path.with_name(self.path.stem + "_even.mrc"),
+                self.path.with_name(self.path.stem + "_odd.mrc"),
             ),
         ]:
             if even.is_file() and odd.is_file():
@@ -159,11 +163,13 @@ class TiltSeries:
         return self._angpix
 
     @property
-    def dimZYX(self) -> Tuple[float, float, float]:
+    def dimZYX(self) -> tuple[float, float, float]:
         """Return ZYX dimensions."""
         if hasattr(self, "_dimZYX"):
             return self._dimZYX
         with mrcfile.mmap(self.path) as mrc:
+            if mrc.data is None:
+                raise ValueError("No data in MRC file.")
             self._dimZYX = mrc.data.shape
         return self._dimZYX
 
@@ -189,6 +195,8 @@ class TiltSeries:
     def _update_axis_angle(self, tilt_axis_angle: float):
         """Update TiltAxisAngle in header."""
         with mrcfile.mmap(self.path, mode="r+") as mrc:
+            if mrc.header is None:
+                raise ValueError("No header in MRC file.")
             labels = mrc.header.label
 
             # Tomo5 Notation
@@ -234,6 +242,8 @@ class TiltSeries:
             # Copy the first 10 titles into the newly created mrc
             mrc.update_header_from_data()
             mrc.update_header_stats()
+            if mrc.header is None:
+                raise ValueError("No header in MRC file.")
             for i in range(10):
                 title = mdoc["titles"][i].encode() if i < len(mdoc["titles"]) else b""
                 mrc.header["label"][i] = title
@@ -243,6 +253,8 @@ class TiltSeries:
     @staticmethod
     def _update_mdoc_from_mrc_header(path: Path, mdoc: dict):
         with mrcfile.mmap(path, "r+") as mrc:
+            if mrc.header is None:
+                raise ValueError("No header in MRC file.")
             # Copy over some global information from the first section into the mdoc
             mdoc["PixelSpacing"] = mdoc["sections"][0]["PixelSpacing"]
             mdoc["ImageFile"] = path.name
@@ -251,13 +263,13 @@ class TiltSeries:
 
     @staticmethod
     def from_micrographs(
-        micrographs: List[Micrograph],
+        micrographs: list[Micrograph],
         ts_path: Path,
-        mdoc: Optional[dict] = None,
+        mdoc: dict | None = None,
         reorder=False,
-        overwrite_titles: Optional[List[str]] = None,
-        overwrite_angles: Optional[float] = None,
-        overwrite_dose: Optional[float] = None,
+        overwrite_titles: list[str | None] = None,
+        overwrite_angles: float | None = None,
+        overwrite_dose: float | None = None,
     ) -> "TiltSeries":
         """Create TiltSeries from Micrographs, aka run newstack."""
         # TODO: Possibly remove overwrite_titles
@@ -344,7 +356,7 @@ class TiltSeries:
             return TiltSeries(ts_path)
 
 
-def aretomo_executable() -> Optional[str]:
+def aretomo_executable() -> str | None:
     """Return AreTomo1/2 executable.
 
     Path can be set with one of the following ways (in order of priority):
@@ -396,6 +408,7 @@ def bin_tiltseries(
     print(f"{ts.path}: Binned to {bin}.")
 
     if do_evn_odd and ts.is_split:
+        assert ts.evn_path is not None and ts.odd_path is not None
         if overwrite:
             binned_stack_evn = ts.evn_path
             binned_stack_odd = ts.odd_path
@@ -455,8 +468,8 @@ def align_with_areTomo(
     local: bool,
     previous: bool,
     do_evn_odd: bool,
-    gpu: str,
-    override_axis: Optional[float] = None,
+    gpu: str | None,
+    override_axis: float | None = None,
     volz: int = 250,
 ):
     """Takes a TiltSeries as input and runs AreTomo on it.
@@ -471,6 +484,9 @@ def align_with_areTomo(
 
     Will apply the pixel size from the input stack to the output stack.
     """
+    aretomo_exe = aretomo_executable()
+    if aretomo_exe is None:
+        raise FileNotFoundError("AreTomo not found.")
     ali_stack = ts.path.with_name(f"{ts.path.stem}_ali.mrc")
     aln_file = ts.path.with_suffix(".aln")
     orig_mdoc = ts.mdoc
@@ -500,7 +516,7 @@ def align_with_areTomo(
 
         subprocess.run(
             [
-                aretomo_executable(),
+                aretomo_exe,
                 "-InMrc",
                 ts.path,
                 "-OutMrc",
@@ -528,7 +544,7 @@ def align_with_areTomo(
 
         subprocess.run(
             [
-                aretomo_executable(),
+                aretomo_exe,
                 "-InMrc",
                 ts.path,
                 "-OutMrc",
@@ -542,7 +558,7 @@ def align_with_areTomo(
                 "-AlignZ",
                 alignZ,
             ]
-            + (["-TiltAxis", override_axis] if override_axis is not None else [])
+            + (["-TiltAxis", str(override_axis)] if override_axis is not None else [])
             + (["-Gpu"] + [str(i) for i in gpu_id])
             + (["-Patch", patch_x, patch_y] if local else []),
             stdout=subprocess.DEVNULL,
@@ -563,11 +579,12 @@ def align_with_areTomo(
         aln_to_tlt(aln_file)
 
     if do_evn_odd and ts.is_split:
+        assert ts.evn_path is not None and ts.odd_path is not None
         ali_stack_evn = ts.evn_path.with_name(f"{ts.path.stem}_ali_EVN.mrc")
         ali_stack_odd = ts.odd_path.with_name(f"{ts.path.stem}_ali_ODD.mrc")
         subprocess.run(
             [
-                aretomo_executable(),
+                aretomo_exe,
                 "-InMrc",
                 ts.evn_path,
                 "-OutMrc",
@@ -584,7 +601,7 @@ def align_with_areTomo(
 
         subprocess.run(
             [
-                aretomo_executable(),
+                aretomo_exe,
                 "-InMrc",
                 ts.odd_path,
                 "-OutMrc",
@@ -606,16 +623,14 @@ def align_with_areTomo(
             mrc.voxel_size = str(angpix)
             mrc.update_header_stats()
 
-        try:
-            os.remove(ali_stack_evn.with_name(f"{ali_stack_evn.stem}.tlt"))
-            os.remove(ali_stack_odd.with_name(f"{ali_stack_odd.stem}.tlt"))
-        finally:
-            print(f"Done aligning ENV and ODD stacks for {ts.path.stem} with AreTomo.")
-            return (
-                TiltSeries(ali_stack)
-                .with_split_files(ali_stack_evn, ali_stack_odd)
-                .with_mdoc(orig_mdoc)
-            )
+        ali_stack_evn.with_name(f"{ali_stack_evn.stem}.tlt").unlink(missing_ok=True)
+        ali_stack_odd.with_name(f"{ali_stack_odd.stem}.tlt").unlink(missing_ok=True)
+        print(f"Done aligning ENV and ODD stacks for {ts.path.stem} with AreTomo.")
+        return (
+            TiltSeries(ali_stack)
+            .with_split_files(ali_stack_evn, ali_stack_odd)
+            .with_mdoc(orig_mdoc)
+        )
 
     return TiltSeries(ali_stack).with_mdoc(orig_mdoc)
 
@@ -650,6 +665,7 @@ def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
         )
 
         if ts.is_split and do_evn_odd:
+            assert ts.evn_path is not None and ts.odd_path is not None
             filtered_evn = ts.path.with_name(f"{ts.path.stem}_filtered_EVN.mrc")
             filtered_odd = ts.path.with_name(f"{ts.path.stem}_filtered_ODD.mrc")
 
@@ -739,7 +755,8 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool, binning=1)
             stdout=subprocess.DEVNULL,
         )
 
-        if do_evn_odd:
+        if do_evn_odd and ts.is_split:
+            assert ts.evn_path is not None and ts.odd_path is not None
             ali_stack_evn = ts.evn_path.with_name(f"{ts.path.stem}_ali_even.mrc")
             ali_stack_odd = ts.odd_path.with_name(f"{ts.path.stem}_ali_odd.mrc")
 
@@ -995,7 +1012,7 @@ def parse_darkimgs(ts: TiltSeries):
     return dark_tilts
 
 
-def convert_input_to_TiltSeries(input_files: List[Path], mdoc_ok=False):
+def convert_input_to_TiltSeries(input_files: list[Path], mdoc_ok=False):
     """Takes list of input files or folders from Click.
 
     Returns list of TiltSeries objects with or without split frames.
@@ -1032,11 +1049,11 @@ def convert_input_to_TiltSeries(input_files: List[Path], mdoc_ok=False):
 
         elif input_file.is_dir():
             return_list += [
-                TiltSeries(Path(Path(file).with_suffix("")))
+                TiltSeries(file.with_suffix(""))
                 for file in list(
-                    set(glob(path.join(input_file, "*.mdoc")))
-                    - set(glob(path.join(input_file, "*allviews*.mdoc")))
-                    - set(glob(path.join(input_file, "*cutviews*.mdoc")))
+                    set(Path(input_file).glob("*.mdoc"))
+                    - set(Path(input_file).glob("*allviews*.mdoc"))
+                    - set(Path(input_file).glob("*cutviews*.mdoc"))
                 )
             ]
 

@@ -1,5 +1,3 @@
-from typing import List
-
 from tomotools.utils.tiltseries import TiltSeries
 
 
@@ -86,7 +84,7 @@ def fake_ctfcom(ts: TiltSeries, binning: int):
 
 
 def fix_tiltcom(
-    ts: TiltSeries, thickness: int, fsirt: int, bin: int, fullimage: List[int]
+    ts: TiltSeries, thickness: int, fsirt: int, bin: int, fullimage: list[int]
 ):
     """
     Make sure tilt.com file has the right parameters.
@@ -109,9 +107,7 @@ def fix_tiltcom(
     if get_value(ts.path.with_name("tilt.com"), "FakeSIRTiterations") is not None:
         modify_value(ts.path.with_name("tilt.com"), "FakeSIRTiterations", str(fsirt))
 
-    if get_value(ts.path.with_name("tilt.com"), "LOCALFILE") is not None and get_value(
-        ts.path.with_name("tilt.com"), "LOCALFILE"
-    ).endswith(".xf"):
-        remove_value(ts.path.with_name("tilt.com"), "LOCALFILE")
-
+    match get_value(ts.path.with_name("tilt.com"), "LOCALFILE"):
+        case str(localfile) if localfile.endswith(".xf"):
+            remove_value(ts.path.with_name("tilt.com"), "LOCALFILE")
     return

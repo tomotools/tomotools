@@ -1,29 +1,41 @@
-name: Ruff lint and fix, followed by pytest
+name: Ruff and test
+on:
+  push:
+    branches: [main]
+  pull_request:
 
-on: [push, pull_request]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  ruff:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+      - uses: astral-sh/ruff-action@v3
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: "format --check"
+
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff pytest
-          pip install .
-      - name: Lint and fix with ruff
-        uses: chartboost/ruff-action@v1
-        with:
-            args: check --fix .
-      - name: Test with pytest
-        run: |
-          pytest -q .
+          allow-prereleases: true
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install --upgrade pip
+      - run: pip install --group dev .
+      - run: pytest -q

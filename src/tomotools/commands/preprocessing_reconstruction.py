@@ -1,9 +1,8 @@
 import os
 import shutil
 import subprocess
-from glob import glob
-from os import mkdir, path
-from os.path import abspath, basename, join
+from os import path
+from os.path import join
 from pathlib import Path
 
 import click
@@ -31,42 +30,39 @@ from tomotools.utils.tomogram import Tomogram
     show_default=True,
     help="Number of CPUs, passed to justblend",
 )
-@click.argument("input_files", nargs=-1)
-@click.argument("output_dir")
-def blend_montages(cpus, input_files, output_dir):
+@click.argument(
+    "input_files",
+    type=click.Path(file_okay=True, dir_okay=True, exists=True, path_type=Path),
+    nargs=-1,
+)
+@click.argument(
+    "output_dir",
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path, resolve_path=True),
+)
+def blend_montages(cpus: int, input_files: tuple[Path], output_dir: Path):
     """Blend montages using justblend.
 
     The input files must be montage .mrc/.st files, example:
     blend-montages MMM*.mrc output_dir
     """
-    if not path.isdir(output_dir):
-        mkdir(output_dir)
-
+    output_dir.mkdir(exist_ok=True)
     for input_file in input_files:
-        os.symlink(abspath(input_file), join(output_dir, basename(input_file)))
-
-    wd = os.getcwd()
+        os.symlink(input_file.absolute(), output_dir / input_file.name)
 
     os.chdir(output_dir)
-    links = [basename(input_file) for input_file in input_files]
     subprocess.run(
         ["justblend", "--cpus", str(cpus)]
-        + [basename(input_file) for input_file in input_files]
+        + [input_file.name for input_file in input_files]
     )
     # Delete temporary files
-    for file in (
-        links
-        + glob("*.ecd")
-        + glob("*.pl")
-        + glob("*.xef")
-        + glob("*.yef")
-        + glob("*.com")
-        + glob("*.log")
-        + ["processchunks-jb.out"]
-    ):
-        os.remove(file)
-
-    os.chdir(wd)
+    for file in input_files:
+        blend_file = file.with_stem(file.stem + "_blend")
+        (output_dir / file.name).unlink()
+        for ext in [".ecd", ".pl", ".xef", ".yef", ".alipl"]:
+            (output_dir / file.name).with_suffix(ext).unlink(missing_ok=True)
+        for ext in [".com", ".log", ".com.log"]:
+            (output_dir / blend_file.name).with_suffix(ext).unlink(missing_ok=True)
+    Path("processchunks-jb.out").unlink()
 
 
 @click.command()
@@ -226,10 +222,12 @@ def preprocess(
 
             try:
                 movies = [
-                    Movie(section["SubFramePath"], section["TiltAngle"])
+                    Movie(section["SubFramePath"].absolute(), section["TiltAngle"])
                     for section in mdoc["sections"]
                 ]
-            except FileNotFoundError:
+            except (FileNotFoundError, AttributeError):
+                # Attribute error occurs if SubFramePath is set to None
+                # This happens if mdocfile.find_relative_path fails
                 print(
                     f"Movie frames not found for {input_file.mdoc.name}, use --frames."
                 )
@@ -277,8 +275,8 @@ def preprocess(
         # Grab frame size to estimate appropriate patch numbers
         # Will only be used if --patch is specified
         patch_x, patch_y = [
-            str(round(mdoc["ImageSize"][0] / 800)),
-            str(round(mdoc["ImageSize"][1] / 800)),
+            round(mdoc["ImageSize"][0] / 800),
+            round(mdoc["ImageSize"][1] / 800),
         ]
 
         frames_corrected_dir = output_dir.joinpath("frames_corrected")
@@ -433,27 +431,31 @@ def preprocess(
 )
 @click.option(
     "--batch-file",
-    type=click.Path(exists=True, dir_okay=False),
+    type=click.Path(file_okay=True, dir_okay=False, path_type=Path),
     help="Pass a tab-separated file with tilt series names and views to exclude.",
 )
-@click.argument("input_files", nargs=-1, type=click.Path(exists=True))
+@click.argument(
+    "input_files",
+    nargs=-1,
+    type=click.Path(file_okay=True, dir_okay=True, path_type=Path),
+)
 # TODO: Fix complexity error C901
 def reconstruct(
-    move,
-    thickness,
-    local,
-    imod,
-    extra_thickness,
-    bin,
-    ali_d,
-    sirt,
-    do_positioning,
-    previous,
-    gpu,
-    do_evn_odd,
-    bytes,
-    batch_file,
-    input_files,
+    move: bool,
+    thickness: int | None,
+    local: bool,
+    imod: bool,
+    extra_thickness: int,
+    bin: int,
+    ali_d: int,
+    sirt: int,
+    do_positioning: bool,
+    previous: bool,
+    gpu: str | None,
+    do_evn_odd: bool,
+    bytes: bool,
+    batch_file: Path | None,
+    input_files: tuple[Path],
 ):
     """Align and reconstruct the given tiltseries.
 
@@ -491,7 +493,7 @@ def reconstruct(
                     ts_info.update(temp)
 
     # Iterate over the tiltseries objects and align and reconstruct
-    input_ts = convert_input_to_TiltSeries(input_files)
+    input_ts = convert_input_to_TiltSeries(list(input_files))
 
     for tiltseries in input_ts:
         print(f"\nNow working on {tiltseries.path.name}.")
@@ -546,8 +548,8 @@ def reconstruct(
                 if not path.isdir(excludedir):
                     os.mkdir(excludedir)
 
-                for file in glob(join(tiltseries.path.parent, "*_cutviews0.*")):
-                    os.rename(file, join(excludedir, Path(file).name))
+                for file in tiltseries.path.parent.glob("*_cutviews0.*"):
+                    os.rename(file, join(excludedir, file.name))
 
                 with open(join(excludedir, "README"), mode="w+") as file:
                     file.write("Restore by running excludeviews -restore")
@@ -588,7 +590,7 @@ def reconstruct(
         x_axis_tilt: float = 0
         z_shift: float = 0
         if thickness is None:
-            thickness: int = round(6000 / pix_xy) + extra_thickness
+            thickness = round(6000 / pix_xy) + extra_thickness
 
         if do_positioning:
             print(f"Trying to run automatic positioning on {tiltseries.path.name}.")
@@ -601,7 +603,7 @@ def reconstruct(
 
             tomo_pitch = Tomogram.from_tiltseries(
                 binned_ts,
-                bin=8,
+                binned=max(bin, 8),
                 do_EVN_ODD=False,
                 trim=False,
                 thickness=round(10000 / pix_xy),
@@ -655,7 +657,7 @@ def reconstruct(
                 else:
                     x_axis_tilt = float(tomopitch[-3].split()[-1])
                     z_shift_line, thickness_line = tomopitch[-1].split(";")
-                    z_shift = z_shift_line.split()[-1]
+                    z_shift = float(z_shift_line.split()[-1])
                     thickness = int(thickness_line.split()[-1]) + extra_thickness
                     print(
                         f"{tiltseries.path}: Succesfully estimated tomopitch:"
@@ -669,7 +671,7 @@ def reconstruct(
 
         Tomogram.from_tiltseries(
             tiltseries_dosefiltered,
-            binned=8,
+            binned=bin,
             thickness=thickness,
             x_axis_tilt=x_axis_tilt,
             z_shift=z_shift,

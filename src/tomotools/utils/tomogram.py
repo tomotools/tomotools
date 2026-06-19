@@ -1,9 +1,8 @@
 import os
 import subprocess
-from glob import glob
 from os import path
 from pathlib import Path
-from typing import List, Optional
+
 
 import mrcfile
 
@@ -19,8 +18,8 @@ class Tomogram:
             raise FileNotFoundError(f"File not found: {path}")
         self.path: Path = path
         self.is_split: bool = False
-        self.evn_path: Optional[Path] = None
-        self.odd_path: Optional[Path] = None
+        self.evn_path: Path | None = None
+        self.odd_path: Path | None = None
 
     def with_split_files(self, evn_file: Path, odd_file: Path) -> "Tomogram":
         """Create tomogram with EVN/ODD by passing their paths."""
@@ -40,24 +39,31 @@ class Tomogram:
         return find_Tomogram_halves(self, dir)
 
     @property
-    def angpix(self):
+    def angpix(self) -> float:
         """Return angpix from header."""
-        with mrcfile.mmap(self.path, mode="r") as mrc:
-            self.angpix = float(mrc.voxel_size.x)
-        return self.angpix
+        if hasattr(self, "_angpix"):
+            return self._angpix
+        with mrcfile.mmap(self.path) as mrc:
+            self._angpix = float(mrc.voxel_size.x)
+        return self._angpix
 
-    def dimZYX(self):
-        """Return full dimensions from data shape."""
-        with mrcfile.mmap(self.path, mode="r") as mrc:
-            self.dimZYX = mrc.data.shape
-        return self.dimZYX
+    @property
+    def dimZYX(self) -> tuple[float, float, float]:
+        """Return ZYX dimensions."""
+        if hasattr(self, "_dimZYX"):
+            return self._dimZYX
+        with mrcfile.mmap(self.path) as mrc:
+            if mrc.data is None:
+                raise ValueError("No data in MRC file.")
+            self._dimZYX = mrc.data.shape
+        return self._dimZYX
 
     @staticmethod
     def from_tiltseries(
         tiltseries: TiltSeries,
         binned: int = 8,
         sirt: int = 5,
-        thickness: Optional[int] = None,
+        thickness: int | None = None,
         x_axis_tilt: float = 0,
         z_shift: float = 0,
         do_EVN_ODD: bool = False,
@@ -67,10 +73,6 @@ class Tomogram:
         """Create Tomogram from TiltSeries, aka reconstruct."""
         # TODO: Reduce complexity C901
         ali_stack = tiltseries.path
-
-        if do_EVN_ODD and tiltseries.is_split:
-            ali_stack_evn = tiltseries.evn_path
-            ali_stack_odd = tiltseries.odd_path
 
         pix_xy = tiltseries.angpix
 
@@ -133,6 +135,7 @@ class Tomogram:
         print(f"{tiltseries.path}: Finished reconstruction.")
 
         if do_EVN_ODD and tiltseries.is_split:
+            assert tiltseries.evn_path is not None and tiltseries.odd_path is not None
             full_rec_evn = tiltseries.path.with_name(
                 f"{tiltseries.path.stem}_full_rec_EVN.mrc"
             )
@@ -145,7 +148,7 @@ class Tomogram:
                 + (["-FakeSIRTiterations", str(sirt)] if sirt > 0 else [])
                 + [
                     "-InputProjections",
-                    ali_stack_evn,
+                    tiltseries.evn_path,
                     "-OutputFile",
                     full_rec_evn,
                     "-IMAGEBINNED",
@@ -187,7 +190,7 @@ class Tomogram:
                 + (["-FakeSIRTiterations", str(sirt)] if sirt > 0 else [])
                 + [
                     "-InputProjections",
-                    ali_stack_odd,
+                    tiltseries.odd_path,
                     "-OutputFile",
                     full_rec_odd,
                     "-IMAGEBINNED",
@@ -357,7 +360,7 @@ class Tomogram:
         binning=1,
         thickness=3000,
         z_slices_nm=25,
-        fullimage: Optional[List] = None,
+        fullimage: list | None = None,
     ) -> "Tomogram":
         """
         Calculate Tomogram with imod ctf3d.
@@ -427,7 +430,7 @@ class Tomogram:
         )
 
 
-def find_Tomogram_halves(tomo: Tomogram, split_dir: Optional[Path] = None):
+def find_Tomogram_halves(tomo: Tomogram, split_dir: Path | None = None):
     """Check whether tomogram has EVN/ODD halves.
 
     Optionally, you can pass a directory where the split reconstructions are.
@@ -453,7 +456,7 @@ def find_Tomogram_halves(tomo: Tomogram, split_dir: Optional[Path] = None):
         return tomo
 
 
-def convert_input_to_Tomogram(input_files: List[Path]):
+def convert_input_to_Tomogram(input_files: list[Path]):
     """Takes list of input files or folders from Click.
 
     Returns list of Tomogram objects with or without split reconstructions.
@@ -466,17 +469,16 @@ def convert_input_to_Tomogram(input_files: List[Path]):
             input_tomo.append(Tomogram(Path(input_file)))
         elif input_file.is_dir():
             input_tomo += [
-                Tomogram(Path(file))
-                for file in glob(path.join(input_file, "*_rec_bin_[0-9].mrc"))
+                Tomogram(file) for file in input_file.glob("*_rec_bin_[0-9]*.mrc")
             ]
             # Do not include full_rec, even_rec and odd_rec
             input_tomo += [
-                Tomogram(Path(Path(file)))
+                Tomogram(file)
                 for file in list(
-                    set(glob(path.join(input_file, "*_rec.mrc")))
-                    - set(glob(path.join(input_file, "*even_rec.mrc")))
-                    - set(glob(path.join(input_file, "*_odd_rec.mrc")))
-                    - set(glob(path.join(input_file, "*_full_rec.mrc")))
+                    set(input_file.glob("*_rec.mrc"))
+                    - set(input_file.glob("*even_rec.mrc"))
+                    - set(input_file.glob("*_odd_rec.mrc"))
+                    - set(input_file.glob("*_full_rec.mrc"))
                 )
             ]
 

@@ -1,7 +1,7 @@
 import click
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
-from matplotlib.path import Path
+from matplotlib.path import Path as MPath
 
 from tomotools.utils.serialem_navigator import SEMNavigator
 
@@ -24,8 +24,8 @@ def semnavigator(path):
         all_ptsx += ptsx
         all_ptsy += ptsy
         vertices = list(zip(ptsx, ptsy))
-        codes = [Path.MOVETO] + [Path.LINETO] * (len(vertices) - 1)
-        path = Path(vertices, codes)
+        codes = [MPath.MOVETO] + [MPath.LINETO] * (len(vertices) - 1)
+        path = MPath(vertices, codes)
         patch = patches.PathPatch(path, facecolor="none", lw=2)
         ax.add_patch(patch)
         ax.text(*vertices[0], item)

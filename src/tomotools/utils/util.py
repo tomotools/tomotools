@@ -25,6 +25,7 @@ def num_gpus():
 
 def gpuinfo():
     """Parse nvidia-smi output."""
+
     def indent_level(line: str):
         indent_level = 0
         while line[indent_level * 4 : indent_level * 4 + 4] == "    ":

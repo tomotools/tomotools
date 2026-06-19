@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+
 
 from tomotools.utils import mdocfile
 
@@ -13,7 +13,7 @@ class Movie:
         self.path: Path = path
         self.tilt_angle: float = tilt_angle
         self.mdoc_path: Path = Path(f"{path}.mdoc")
-        self.mdoc: Optional[dict] = (
+        self.mdoc: dict | None = (
             mdocfile.read(self.mdoc_path) if self.mdoc_path.is_file() else None
         )
 

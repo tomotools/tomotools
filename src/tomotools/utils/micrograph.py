@@ -1,12 +1,9 @@
-
 import os
 import shutil
 import subprocess
-from glob import glob
-from os import path
-from os.path import basename, isfile, join
+from os.path import isfile, join
 from pathlib import Path
-from typing import List, Optional
+
 
 from tomotools.utils import mdocfile, util
 from tomotools.utils.movie import Movie
@@ -23,8 +20,8 @@ class Micrograph:
         self.mdoc = mdocfile.read(self.mdoc_path) if self.mdoc_path.is_file() else None
         self.tilt_angle: float = tilt_angle
         self.is_split: bool = False
-        self.evn_path: Optional[Path] = None
-        self.odd_path: Optional[Path] = None
+        self.evn_path: Path | None = None
+        self.odd_path: Path | None = None
 
     def with_split_files(self, evn_file: Path, odd_file: Path) -> "Micrograph":
         """Create Micrograph with associated EVN ODD stacks, giving their paths."""
@@ -49,7 +46,7 @@ class Micrograph:
 
     @staticmethod
     def from_movies(
-        movies: List[Movie],
+        movies: list[Movie],
         output_dir: Path,
         splitsum: bool = False,
         binning: int = 1,
@@ -57,11 +54,11 @@ class Micrograph:
         patch: bool = False,
         patch_x: int = 5,
         patch_y: int = 7,
-        mcrot: Optional[int] = None,
-        mcflip: Optional[int] = None,
-        override_gainref: Optional[Path] = None,
-        gpu: Optional[str] = None,
-    ) -> "List[Micrograph]":
+        mcrot: int | None = None,
+        mcflip: int | None = None,
+        override_gainref: Path | None = None,
+        gpu: str | None = None,
+    ) -> "list[Micrograph]":
         """Create micrograph from a list of movies using MotionCor."""
         tempdir = output_dir.joinpath("motioncor2_temp")
         tempdir.mkdir(parents=True)
@@ -73,15 +70,18 @@ class Micrograph:
             override_gainref = Path(override_gainref)
         elif override_gainref is None and movies[0].mdoc is not None:
             # Check if there is a subframe mdoc and if it contains a gain reference path
-            gain_refs = {movie.mdoc["framesets"][0].get("GainReference", None)
-                         for movie in movies if movie.mdoc is not None}
+            gain_refs = {
+                movie.mdoc["framesets"][0].get("GainReference", None)
+                for movie in movies
+                if movie.mdoc is not None
+            }
             gain_refs.discard(None)
             if len(gain_refs) > 1:
-                raise Exception('Found multiple gain references, only one is supported')
+                raise Exception("Found multiple gain references, only one is supported")
             elif len(gain_refs) == 1:
                 # The gain ref should be in the same folder as the input file(s)
                 # Check if it's there.
-                override_gainref = gain_refs.pop()
+                override_gainref = Path(gain_refs.pop())
                 override_gainref = movies[0].path.parent / override_gainref  # pyright: ignore[reportOperatorIssue]
                 if not override_gainref.is_file():  # pyright: ignore[reportOptionalMemberAccess]
                     raise FileNotFoundError(
@@ -91,9 +91,7 @@ class Micrograph:
         # Convert gain reference to mrc if needed
         if override_gainref is None:
             gain_ref_mrc = None
-            print(
-                "No gainref is given or found, continuing without gain correction."
-            )
+            print("No gainref is given or found, continuing without gain correction.")
         else:
             gain_ref_mrc = _ensure_gainref_mrc(override_gainref, output_dir)
             if not gain_ref_mrc.is_file():
@@ -127,11 +125,17 @@ class Micrograph:
         if mcrot is not None and mcflip is not None:
             command += ["-RotGain", str(mcrot), "-FlipGain", str(mcflip)]
 
-        if (override_gainref is not None and override_gainref.suffix == '.dm4' and
-            check_defects(override_gainref) is not None):
+        if (
+            override_gainref is not None
+            and override_gainref.suffix == ".dm4"
+            and check_defects(override_gainref) is not None
+        ):
+            defects_tif_path = defects_tif(override_gainref, tempdir, movies[0].path)
+            if defects_tif_path is None:
+                raise FileNotFoundError("Defects file could not be created.")
             command += [
                 "-DefectMap",
-                defects_tif(override_gainref, tempdir, movies[0].path).absolute(),
+                defects_tif_path.absolute(),
             ]
 
         # Patch alignment takes two groupings, for global and local alignments.
@@ -142,28 +146,27 @@ class Micrograph:
                 str(patch_x),
                 str(patch_y),
                 "-Group",
-                f"{group} {4*group}",
+                f"{group} {4 * group}",
             ]
         else:
             command += ["-Group", str(group)]
 
         # Now, correct every movie separately, since -Serial 1 causes issues
         for movie in movies:
+            in_flag = "-InMrc" if movie.is_mrc else "-InTiff"
+            out_path = (output_dir / movie.path.with_suffix(".mrc").name).absolute()
+            movie_command = command + [
+                in_flag,
+                movie.path,
+                "-OutMrc",
+                out_path,
+            ]
 
-            if movie.is_mrc:
-                command_temp = command + ["-InMrc", movie.path.absolute()]
-            elif movie.is_tiff:
-                command_temp = command + ["-InTiff", movie.path.absolute()]
-
-            command_temp += ["-OutMrc",
-                             str(output_dir.absolute()) +
-                             os.path.sep +
-                             movie.path.with_suffix(".mrc").name]
-
-            with open(join(output_dir, "motioncor2.log"), "a") as out, open(
-                join(output_dir, "motioncor2.err"), "a"
-            ) as err:
-                subprocess.run(command_temp, cwd=tempdir, stdout=out, stderr=err)
+            with (
+                open(output_dir / "motioncor2.log", "a") as out,
+                open(output_dir / "motioncor2.err", "a") as err,
+            ):
+                subprocess.run(movie_command, cwd=output_dir, stdout=out, stderr=err)
 
         # If present, copy the mdoc files to the output dir
         # Rename from .tif.mdoc to .mrc.mdoc
@@ -199,7 +202,7 @@ class Micrograph:
                         "Gain reference was specified, but not applied by MotionCor."
                     )
 
-        if  os.path.isdir(output_dir.joinpath("motioncor2_gain")):
+        if os.path.isdir(output_dir.joinpath("motioncor2_gain")):
             shutil.rmtree(output_dir.joinpath("motioncor2_gain"))
 
         output_micrographs = [
@@ -216,7 +219,7 @@ class Micrograph:
         return output_micrographs
 
 
-def motioncor_executable() -> Optional[str]:
+def motioncor_executable() -> str | None:
     """Return MotionCor2/3 executable.
 
     Path can be set with one of the following ways (in order of priority):
@@ -239,30 +242,27 @@ def motioncor_executable() -> Optional[str]:
     elif shutil.which("MotionCor2") is not None:
         return shutil.which("MotionCor2")
     else:
-        raise FileNotFoundError(
-                'MotionCor not found. Check README.md for setup info.'
-            )
+        raise FileNotFoundError("MotionCor not found. Check README.md for setup info.")
+
 
 def _ensure_gainref_mrc(gain_ref: Path, output_dir: Path) -> Path:
     temp_gain = output_dir / "motioncor2_gain"
     temp_gain.mkdir()
     gain_out = temp_gain / (gain_ref.with_suffix(".mrc").name)
-    print(
-        f"Found gain reference {gain_ref}, converting to {gain_out}"
-    )
-    if gain_ref.suffix == ".mrc":
-        gain_out = gain_ref
-    elif gain_ref.suffix == ".dm4":
-        subprocess.run(["dm2mrc", gain_ref, gain_out],
-                        stdout=subprocess.DEVNULL)
-    elif gain_ref.suffix in [".tif", ".tiff", ".gain"]:
-        subprocess.run(["tif2mrc", gain_ref, gain_out],
-                        stdout=subprocess.DEVNULL)
-    else:
-        raise AttributeError(
-            "Gain reference can only be in .tif(f) or .dm4 format!"
-        )
+    print(f"Found gain reference {gain_ref}, converting to {gain_out}")
+    match gain_ref.suffix:
+        case ".mrc":
+            gain_out = gain_ref
+        case ".dm4":
+            subprocess.run(["dm2mrc", gain_ref, gain_out], stdout=subprocess.DEVNULL)
+        case ".tif" | ".tiff" | ".gain":
+            subprocess.run(["tif2mrc", gain_ref, gain_out], stdout=subprocess.DEVNULL)
+        case _:
+            raise AttributeError(
+                "Gain reference can only be in .tif(f) or .dm4 format!"
+            )
     return gain_out
+
 
 def sem2mc2(RotationAndFlip: int = 0):
     """Read RotationAndFlip for MotionCor2.
@@ -278,23 +278,25 @@ def sem2mc2(RotationAndFlip: int = 0):
 
     https://bio3d.colorado.edu/SerialEM/betaHlp/html/about_properties.htm#per_camera_properties
     """
-    conv = {0: [0, 0],
-            1: [1, 0],
-            2: [2, 0],
-            3: [3, 0],
-            4: [0, 1],
-            5: [1, 2],
-            6: [2, 2],
-            7: [3, 2]}
+    conv = {
+        0: [0, 0],
+        1: [1, 0],
+        2: [2, 0],
+        3: [3, 0],
+        4: [0, 1],
+        5: [1, 2],
+        6: [2, 2],
+        7: [3, 2],
+    }
 
     return conv[RotationAndFlip]
 
 
-def check_defects(gainref: os.PathLike):
+def check_defects(gainref: Path) -> Path | None:
     """Checks for a SerialEM-created defects file and -if found- returns file name."""
     defects_temp = []
 
-    defects_temp.extend(glob(path.join(path.dirname(gainref), "defects*.txt")))
+    defects_temp.extend(gainref.parent.glob("defects*.txt"))
 
     if len(defects_temp) == 1:
         return defects_temp[0]
@@ -307,7 +309,7 @@ def check_defects(gainref: os.PathLike):
         return None
 
 
-def defects_tif(gainref, tempdir, template):
+def defects_tif(gainref: Path, tempdir: Path, template: Path) -> Path | None:
     """Create Defect Map for MC2 from defects.txt.
 
     Input SerialEM gain reference, example frame and temporary directory.
@@ -315,8 +317,10 @@ def defects_tif(gainref, tempdir, template):
 
     Returns path of the defects.tif
     """
-    defects_txt = check_defects(gainref)
-    defects_tif = Path(tempdir) / f"{basename(defects_txt)}.tif"
+    defects_txt: Path | None = check_defects(gainref)
+    if defects_txt is None:
+        return None
+    defects_tif = Path(tempdir) / defects_txt.with_suffix(".tif")
 
     subprocess.run(["clip", "defect", "-D", defects_txt, template, defects_tif])
     print(f"Found and converted defects file {defects_tif}")

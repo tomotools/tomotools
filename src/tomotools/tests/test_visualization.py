@@ -1,5 +1,7 @@
 """Test tom_deconv math."""
+
 import csv
+from pathlib import Path
 import unittest
 
 import numpy as np
@@ -180,7 +182,7 @@ class mathutil_test(unittest.TestCase):
                     "phaseflipped": False,
                     "phaseshift": 0,
                 },
-                "result": "tomotools/tests/testfiles/Wiener_case1.csv",
+                "result": Path(__file__).parent / "testfiles/Wiener_case1.csv",
             },
             {
                 "in": {
@@ -192,7 +194,7 @@ class mathutil_test(unittest.TestCase):
                     "phaseflipped": True,
                     "phaseshift": 0,
                 },
-                "result": "tomotools/tests/testfiles/Wiener_case2.csv",
+                "result": Path(__file__).parent / "testfiles/Wiener_case2.csv",
             },
         ]
 
