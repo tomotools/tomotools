@@ -20,8 +20,12 @@ dependencies = [
     "numpy",
     "pandas",
     "mrcfile",
+    "starfile",
     "matplotlib",
 ]
+
+[project.optional-dependencies]
+warpylib = ["warpylib"]
 
 [dependency-groups]
 dev = [

@@ -8,6 +8,7 @@ from tomotools.commands.denoising_deconvolution import (
     deconv,
 )
 from tomotools.commands.helpers import restore_frames, update
+from tomotools.commands.isonet import WARPYLIB_AVAILABLE, warp2isonet
 from tomotools.commands.movies import create_movie
 from tomotools.commands.preprocessing_reconstruction import (
     blend_montages,
@@ -43,6 +44,8 @@ tomotools.add_command(reconstruct)
 tomotools.add_command(deconv)
 tomotools.add_command(imod2warp)
 tomotools.add_command(imod2tomotwin)
+if WARPYLIB_AVAILABLE:
+    tomotools.add_command(warp2isonet)
 tomotools.add_command(fit_ctf)
 tomotools.add_command(reconstruct_3dctf)
 tomotools.add_command(semnavigator)
