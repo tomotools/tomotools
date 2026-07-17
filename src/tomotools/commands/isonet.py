@@ -1,10 +1,11 @@
+from dataclasses import dataclass
 import gc
 import os
 import warnings
 import xml.etree.ElementTree as ET
 from importlib.util import find_spec
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 import click
 import mrcfile
@@ -27,9 +28,33 @@ warnings.filterwarnings(
 )
 
 
+@dataclass
+class WarpSettings:
+    path: Path
+    processing_path: Path
+    dimensions_px: tuple[int, int, int]
+
+    @classmethod
+    def read(cls, path: Path) -> "Self":
+        root = ET.parse(path).getroot()
+        processing_folder = root.find("./Import/Param[@Name='ProcessingFolder']").get(
+            "Value"
+        )
+        dims = tuple(
+            int(root.find(f"./Tomo/Param[@Name='Dimensions{axis}']").get("Value"))
+            for axis in ("X", "Y", "Z")
+        )
+        return cls(
+            path=path,
+            processing_path=(Path(path).parent / processing_folder).resolve(),
+            dimensions_px=dims,  # pyright: ignore[reportArgumentType]
+        )
+
+
 @click.command()
 @click.option(
     "--settings",
+    "settings_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     required=True,
     help="Path to a warp_tiltseries.settings file (supplies the processing folder and tomogram dimensions).",
@@ -43,21 +68,33 @@ warnings.filterwarnings(
 @click.option(
     "-b",
     "--bin",
+    "binning",
     type=int,
     required=True,
     help="Binning level for reconstructions.",
 )
+@click.argument(
+    "tomos",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    nargs=-1,
+)
 def warp2isonet(
-    settings: Path,
+    settings_path: Path,
     isonet_dir: Path,
     binning: int,
+    tomos: tuple[Path, ...],
 ):
     """Export even/odd tomograms for IsoNet2."""
-    processing_folder, dim_px = read_warp_settings(settings)
+    from warpylib import TiltSeries
+
+    settings = WarpSettings.read(settings_path)
 
     isonet_dir.mkdir(parents=True, exist_ok=True)
 
-    tomo_list = parse_tomos(processing_folder)
+    if tomos:
+        tomo_list = [TiltSeries(str(tomo)) for tomo in tomos]
+    else:
+        tomo_list = parse_tomos(settings.processing_path)
     if len(tomo_list) == 0:
         click.echo("No tomograms found in processing folder.", err=True)
         return
@@ -71,7 +108,9 @@ def warp2isonet(
         item_show_func=lambda t: t.name if t is not None else "",
     ) as bar:
         for tomo in bar:
-            particle_star = make_noCTF_EVNODD(tomo, binning, isonet_dir, dim_px=dim_px)
+            particle_star = make_noCTF_EVNODD(
+                tomo, binning, isonet_dir, warp_settings=settings
+            )
             output_star_list.append(particle_star)
 
     output_star = pd.DataFrame().from_records(output_star_list)
@@ -89,24 +128,6 @@ def warp2isonet(
     output_star["rlnNumberSubtomo"] = round(6000 / len(output_star.index))
 
     starfile.write(output_star, isonet_dir / f"isonet2_tomos_bin_{binning}.star")
-
-
-def read_warp_settings(
-    settings_path: Path,
-) -> tuple[Path, tuple[int, int, int]]:
-    """Read ProcessingFolder and Tomo Dimensions(X,Y,Z) from a warp_tiltseries.settings file.
-
-    The ProcessingFolder is resolved relative to the settings file's parent directory.
-    """
-    root = ET.parse(settings_path).getroot()
-    processing_folder = root.find("./Import/Param[@Name='ProcessingFolder']").get(
-        "Value"
-    )
-    dims = tuple(
-        int(root.find(f"./Tomo/Param[@Name='Dimensions{axis}']").get("Value"))
-        for axis in ("X", "Y", "Z")
-    )
-    return (Path(settings_path).parent / processing_folder).resolve(), dims
 
 
 def parse_tomos(processing_folder: Path):
@@ -134,7 +155,7 @@ def make_noCTF_EVNODD(
     ts: "TiltSeries",
     binning: int,
     isonet_root_dir: Path,
-    dim_px: tuple[int, int, int] = (4092, 5760, 3000),
+    warp_settings: WarpSettings,
 ):
     """Make EVN/ODD tomogram without any CTF modulation.
 
@@ -180,12 +201,12 @@ def make_noCTF_EVNODD(
     orig_angpix = ts.ctf.pixel_size
     out_angpix = orig_angpix * binning
 
-    dim_a = torch.tensor(  # pyright: ignore[reportPossiblyUnboundVariable]
-        [dim_px[0] * orig_angpix, dim_px[1] * orig_angpix, dim_px[2] * orig_angpix],
-        dtype=torch.float32,  # pyright: ignore[reportPossiblyUnboundVariable]
+    # Tomogram dimensions in the xml file are missing the Z dimension
+    ts.volume_dimensions_physical[2] = (
+        ts.volume_dimensions_physical[0]
+        * warp_settings.dimensions_px[2]
+        / warp_settings.dimensions_px[0]
     )
-
-    ts.volume_dimensions_physical = dim_a
 
     # reconstruct with EVN/ODD
     evn_path = tomo_dir / f"{ts.name[:-4]}_even.mrc"
@@ -197,7 +218,9 @@ def make_noCTF_EVNODD(
         load_half_averages=True,
     )
     tomo_evn = ts.reconstruct_full(
-        tilt_data=ts_evn, pixel_size=out_angpix, volume_dimensions_physical=dim_a
+        tilt_data=ts_evn,
+        pixel_size=out_angpix,
+        volume_dimensions_physical=ts.volume_dimensions_physical,
     )
 
     mrcfile.write(
@@ -205,7 +228,9 @@ def make_noCTF_EVNODD(
     )
 
     tomo_odd = ts.reconstruct_full(
-        tilt_data=ts_odd, pixel_size=out_angpix, volume_dimensions_physical=dim_a
+        tilt_data=ts_odd,
+        pixel_size=out_angpix,
+        volume_dimensions_physical=ts.volume_dimensions_physical,
     )
 
     mrcfile.write(
