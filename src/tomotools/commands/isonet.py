@@ -142,12 +142,9 @@ def parse_tomos(processing_folder: Path):
     from warpylib import TiltSeries
 
     tomo_list = []
-
-    for tomo in processing_folder.glob("*.xml"):
-        ts = TiltSeries(str(tomo))
-
-        tomo_list.append(ts)
-
+    for xml in processing_folder.glob("*.xml"):
+        if ET.parse(xml).getroot().tag == "TiltSeries":
+            tomo_list.append(TiltSeries(str(xml)))
     return tomo_list
 
 
