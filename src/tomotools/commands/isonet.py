@@ -1,11 +1,12 @@
 from dataclasses import dataclass
+from functools import partial
 import gc
-import os
+import multiprocessing
 import warnings
 import xml.etree.ElementTree as ET
 from importlib.util import find_spec
 from pathlib import Path
-from typing import TYPE_CHECKING, Self
+from typing import Iterable, Self
 
 import click
 import mrcfile
@@ -17,9 +18,6 @@ WARPYLIB_AVAILABLE = (
     and find_spec("warpylib") is not None
     and find_spec("torch") is not None
 )
-
-if TYPE_CHECKING:
-    from warpylib import TiltSeries
 
 warnings.filterwarnings(
     "ignore",
@@ -73,8 +71,16 @@ class WarpSettings:
     required=True,
     help="Binning level for reconstructions.",
 )
+@click.option(
+    "-j",
+    "--processes",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Number of tomograms to reconstruct in parallel.",
+)
 @click.argument(
-    "tomos",
+    "tomo_xmls",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     nargs=-1,
 )
@@ -82,36 +88,36 @@ def warp2isonet(
     settings_path: Path,
     isonet_dir: Path,
     binning: int,
-    tomos: tuple[Path, ...],
+    processes: int,
+    tomo_xmls: tuple[Path, ...] | list[Path],
 ):
     """Export even/odd tomograms for IsoNet2."""
-    from warpylib import TiltSeries
-
     settings = WarpSettings.read(settings_path)
+    tomo_dir = isonet_dir / "tomo"
+    tomo_dir.mkdir(parents=True, exist_ok=True)
 
-    isonet_dir.mkdir(parents=True, exist_ok=True)
-
-    if tomos:
-        tomo_list = [TiltSeries(str(tomo)) for tomo in tomos]
-    else:
-        tomo_list = parse_tomos(settings.processing_path)
-    if len(tomo_list) == 0:
+    if not tomo_xmls:
+        tomo_xmls = sorted(settings.processing_path.glob("*.xml"))
+    tomo_xmls = filter_tomo_xmls(tomo_xmls)
+    if len(tomo_xmls) == 0:
         click.echo("No tomograms found in processing folder.", err=True)
         return
 
-    output_star_list = []
+    worker = partial(
+        make_noCTF_EVNODD,
+        binning=binning,
+        tomo_dir=tomo_dir,
+        warp_settings=settings,
+    )
 
-    with click.progressbar(
-        tomo_list,
-        label="Reconstructing...",
-        show_pos=True,
-        item_show_func=lambda t: t.name if t is not None else "",
-    ) as bar:
-        for tomo in bar:
-            particle_star = make_noCTF_EVNODD(
-                tomo, binning, isonet_dir, warp_settings=settings
-            )
-            output_star_list.append(particle_star)
+    with multiprocessing.Pool(processes=processes) as pool:
+        with click.progressbar(
+            pool.imap(worker, tomo_xmls),
+            length=len(tomo_xmls),
+            label="Reconstructing...",
+            show_pos=True,
+        ) as bar:
+            output_star_list = list(bar)
 
     output_star = pd.DataFrame().from_records(output_star_list)
 
@@ -130,50 +136,38 @@ def warp2isonet(
     starfile.write(output_star, isonet_dir / f"isonet2_tomos_bin_{binning}.star")
 
 
-def parse_tomos(processing_folder: Path):
-    """Return a list of TiltSeries objects from a processing_path.
-
-    Inputs:
-        processing_folder (Path): folder with WarpTools processing results.
-
-    Returns:
-        tomo_list ([]): list containing TiltSeries objects for all tomograms in folder.
-    """
-    from warpylib import TiltSeries
-
-    tomo_list = []
-    for xml in processing_folder.glob("*.xml"):
+def filter_tomo_xmls(xmls: Iterable[Path]):
+    """Filter a list of xml files to only include tomogram xmls."""
+    tomo_list: list[Path] = []
+    for xml in xmls:
         if ET.parse(xml).getroot().tag == "TiltSeries":
-            tomo_list.append(TiltSeries(str(xml)))
+            tomo_list.append(xml)
     return tomo_list
 
 
 def make_noCTF_EVNODD(
-    ts: "TiltSeries",
+    ts_path: Path,
     binning: int,
-    isonet_root_dir: Path,
+    tomo_dir: Path,
     warp_settings: WarpSettings,
 ):
     """Make EVN/ODD tomogram without any CTF modulation.
 
     Inputs:
-        ts (TiltSeries): warpylib TiltSeries to work on.
+        ts_path (Path): path to the TiltSeries file.
         binning (int): binning level to reconstruct at.
         isonet_root_dir (Path): output path for all IsoNet2 processing.
         dim_px (Tuple[int,int,int]): xyz extent of tomogram in unbinned pixels.
+        warp_settings (WarpSettings): warp settings object with processing folder and tomogram dimensions.
 
     Returns:
         tomo_values ({}): dict with all relevant values for IsoNet2 star file.
     """
+    from warpylib import TiltSeries
     import torch
 
-    # prepare output folders
-    tomo_dir = isonet_root_dir / "tomo"
-
-    if not os.path.isdir(tomo_dir):
-        os.mkdir(tomo_dir)
-
     # reset CTF information in the memory to get tomogram without any correction
+    ts = TiltSeries(str(ts_path))
     y_offset = ts.level_angle_y
 
     defocus_um = ts.ctf.get_copy().defocus
