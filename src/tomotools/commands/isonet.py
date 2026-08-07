@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from functools import partial
 import gc
 import multiprocessing
+import multiprocessing.synchronize
 import warnings
 import xml.etree.ElementTree as ET
 from importlib.util import find_spec
@@ -63,6 +64,23 @@ class WarpSettings:
         return tuple(dim * self.unbin_angpix for dim in self.dimensions_px)  # pyright: ignore[reportReturnType]
 
 
+_read_semaphore: multiprocessing.synchronize.Semaphore
+_reconstruct_semaphore: multiprocessing.synchronize.Semaphore
+_write_semaphore: multiprocessing.synchronize.Semaphore
+
+
+def _init_worker(
+    read_semaphore: "multiprocessing.synchronize.Semaphore",
+    reconstruct_semaphore: "multiprocessing.synchronize.Semaphore",
+    write_semaphore: "multiprocessing.synchronize.Semaphore",
+):
+    """Share semaphores limiting concurrent read/reconstruct/write calls with pool workers."""
+    global _read_semaphore, _reconstruct_semaphore, _write_semaphore
+    _read_semaphore = read_semaphore
+    _reconstruct_semaphore = reconstruct_semaphore
+    _write_semaphore = write_semaphore
+
+
 @click.command()
 @click.option(
     "--settings",
@@ -86,12 +104,25 @@ class WarpSettings:
     help="Binning level for reconstructions.",
 )
 @click.option(
-    "-j",
-    "--processes",
+    "--read-jobs",
     type=int,
     default=1,
     show_default=True,
-    help="Number of tomograms to reconstruct in parallel.",
+    help="Number of concurrent image-loading (ts.load_images) operations.",
+)
+@click.option(
+    "--reconstruct-jobs",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Number of concurrent reconstruction (ts.reconstruct_full) operations.",
+)
+@click.option(
+    "--write-jobs",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Number of concurrent MRC-writing (mrcfile.write) operations.",
 )
 @click.argument(
     "tomo_xmls",
@@ -102,7 +133,9 @@ def warp2isonet(
     settings_path: Path,
     isonet_dir: Path,
     binning: int,
-    processes: int,
+    read_jobs: int,
+    reconstruct_jobs: int,
+    write_jobs: int,
     tomo_xmls: tuple[Path, ...] | list[Path],
 ):
     """Export even/odd tomograms for IsoNet2."""
@@ -124,8 +157,16 @@ def warp2isonet(
         warp_settings=settings,
     )
 
+    read_semaphore = multiprocessing.Semaphore(read_jobs)
+    reconstruct_semaphore = multiprocessing.Semaphore(reconstruct_jobs)
+    write_semaphore = multiprocessing.Semaphore(write_jobs)
+
     with (
-        multiprocessing.Pool(processes=processes) as pool,
+        multiprocessing.Pool(
+            processes=read_jobs + reconstruct_jobs + write_jobs,
+            initializer=_init_worker,
+            initargs=(read_semaphore, reconstruct_semaphore, write_semaphore),
+        ) as pool,
         click.progressbar(
             pool.imap(worker, tomo_xmls),
             length=len(tomo_xmls),
@@ -212,30 +253,32 @@ def make_noCTF_EVNODD(
     evn_path = tomo_dir / f"{ts_path.name[:-4]}_even.mrc"
     odd_path = tomo_dir / f"{ts_path.name[:-4]}_odd.mrc"
 
-    _, ts_evn, ts_odd = ts.load_images(
-        original_pixel_size=warp_settings.bin_angpix(),
-        desired_pixel_size=out_angpix,
-        load_half_averages=True,
-    )
-    tomo_evn = ts.reconstruct_full(
-        tilt_data=ts_evn,
-        pixel_size=out_angpix,
-        volume_dimensions_physical=ts.volume_dimensions_physical,
-    )
+    with _read_semaphore:
+        _, ts_evn, ts_odd = ts.load_images(
+            original_pixel_size=warp_settings.bin_angpix(),
+            desired_pixel_size=out_angpix,
+            load_half_averages=True,
+        )
 
-    mrcfile.write(
-        evn_path, data=tomo_evn.numpy(), overwrite=True, voxel_size=out_angpix
-    )
+    with _reconstruct_semaphore:
+        tomo_evn = ts.reconstruct_full(
+            tilt_data=ts_evn,
+            pixel_size=out_angpix,
+            volume_dimensions_physical=ts.volume_dimensions_physical,
+        )
+        tomo_odd = ts.reconstruct_full(
+            tilt_data=ts_odd,
+            pixel_size=out_angpix,
+            volume_dimensions_physical=ts.volume_dimensions_physical,
+        )
 
-    tomo_odd = ts.reconstruct_full(
-        tilt_data=ts_odd,
-        pixel_size=out_angpix,
-        volume_dimensions_physical=ts.volume_dimensions_physical,
-    )
-
-    mrcfile.write(
-        odd_path, data=tomo_odd.numpy(), overwrite=True, voxel_size=out_angpix
-    )
+    with _write_semaphore:
+        mrcfile.write(
+            evn_path, data=tomo_evn.numpy(), overwrite=True, voxel_size=out_angpix
+        )
+        mrcfile.write(
+            odd_path, data=tomo_odd.numpy(), overwrite=True, voxel_size=out_angpix
+        )
 
     # save values to starfile
     tomo_values = {
