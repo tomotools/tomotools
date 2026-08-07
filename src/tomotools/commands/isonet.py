@@ -1,13 +1,13 @@
-from dataclasses import dataclass
-from functools import partial
-import gc
 import multiprocessing
 import multiprocessing.synchronize
 import warnings
 import xml.etree.ElementTree as ET
+from collections.abc import Iterable
+from dataclasses import dataclass
+from functools import partial
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Iterable, Self
+from typing import Self
 
 import click
 import mrcfile
@@ -157,18 +157,19 @@ def warp2isonet(
         warp_settings=settings,
     )
 
-    read_semaphore = multiprocessing.Semaphore(read_jobs)
-    reconstruct_semaphore = multiprocessing.Semaphore(reconstruct_jobs)
-    write_semaphore = multiprocessing.Semaphore(write_jobs)
+    mp_context = multiprocessing.get_context("spawn")
+    read_semaphore = mp_context.Semaphore(read_jobs)
+    reconstruct_semaphore = mp_context.Semaphore(reconstruct_jobs)
+    write_semaphore = mp_context.Semaphore(write_jobs)
 
     with (
-        multiprocessing.Pool(
+        mp_context.Pool(
             processes=read_jobs + reconstruct_jobs + write_jobs,
             initializer=_init_worker,
             initargs=(read_semaphore, reconstruct_semaphore, write_semaphore),
         ) as pool,
         click.progressbar(
-            pool.imap(worker, tomo_xmls),
+            pool.imap_unordered(worker, tomo_xmls),
             length=len(tomo_xmls),
             label="Reconstructing...",
             show_pos=True,
@@ -292,8 +293,4 @@ def make_noCTF_EVNODD(
     }
 
     ts.save_meta(tomo_dir / f"{ts_path.name[:-4]}.xml")
-
-    del ts_evn, ts_odd, tomo_evn, tomo_odd
-    gc.collect()
-
     return tomo_values
