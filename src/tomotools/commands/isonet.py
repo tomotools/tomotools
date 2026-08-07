@@ -30,6 +30,8 @@ warnings.filterwarnings(
 class WarpSettings:
     path: Path
     processing_path: Path
+    binning: float
+    unbin_angpix: float
     dimensions_px: tuple[int, int, int]
 
     @classmethod
@@ -38,6 +40,10 @@ class WarpSettings:
         processing_folder = root.find("./Import/Param[@Name='ProcessingFolder']").get(
             "Value"
         )
+        binning = float(root.find("./Import/Param[@Name='BinTimes']").get("Value"))
+        unbin_angpix = float(
+            root.find("./Import/Param[@Name='PixelSize']").get("Value")
+        )
         dims = tuple(
             int(root.find(f"./Tomo/Param[@Name='Dimensions{axis}']").get("Value"))
             for axis in ("X", "Y", "Z")
@@ -45,8 +51,16 @@ class WarpSettings:
         return cls(
             path=path,
             processing_path=(Path(path).parent / processing_folder).resolve(),
+            binning=binning,
+            unbin_angpix=unbin_angpix,
             dimensions_px=dims,  # pyright: ignore[reportArgumentType]
         )
+
+    def bin_angpix(self) -> float:
+        return self.unbin_angpix * (2**self.binning)
+
+    def dimension_angstrom(self) -> tuple[float, float, float]:
+        return tuple(dim * self.unbin_angpix for dim in self.dimensions_px)  # pyright: ignore[reportReturnType]
 
 
 @click.command()
@@ -110,14 +124,16 @@ def warp2isonet(
         warp_settings=settings,
     )
 
-    with multiprocessing.Pool(processes=processes) as pool:
-        with click.progressbar(
+    with (
+        multiprocessing.Pool(processes=processes) as pool,
+        click.progressbar(
             pool.imap(worker, tomo_xmls),
             length=len(tomo_xmls),
             label="Reconstructing...",
             show_pos=True,
-        ) as bar:
-            output_star_list = list(bar)
+        ) as bar,
+    ):
+        output_star_list = list(bar)
 
     output_star = pd.DataFrame().from_records(output_star_list)
 
@@ -163,8 +179,8 @@ def make_noCTF_EVNODD(
     Returns:
         tomo_values ({}): dict with all relevant values for IsoNet2 star file.
     """
-    from warpylib import TiltSeries
     import torch
+    from warpylib import TiltSeries
 
     # reset CTF information in the memory to get tomogram without any correction
     ts = TiltSeries(str(ts_path))
@@ -188,23 +204,16 @@ def make_noCTF_EVNODD(
         ts.grid_ctf_defocus_delta.flat_values.shape
     )
 
-    # generate output pixel sizes and tomogram dimensions
-    orig_angpix = ts.ctf.pixel_size
-    out_angpix = orig_angpix * binning
-
+    out_angpix = binning * warp_settings.bin_angpix()
     # Tomogram dimensions in the xml file are missing the Z dimension
-    ts.volume_dimensions_physical[2] = (
-        ts.volume_dimensions_physical[0]
-        * warp_settings.dimensions_px[2]
-        / warp_settings.dimensions_px[0]
-    )
-
+    # so it's calculated from the warp settings
+    ts.volume_dimensions_physical = torch.tensor(warp_settings.dimension_angstrom())
     # reconstruct with EVN/ODD
-    evn_path = tomo_dir / f"{ts.name[:-4]}_even.mrc"
-    odd_path = tomo_dir / f"{ts.name[:-4]}_odd.mrc"
+    evn_path = tomo_dir / f"{ts_path.name[:-4]}_even.mrc"
+    odd_path = tomo_dir / f"{ts_path.name[:-4]}_odd.mrc"
 
     _, ts_evn, ts_odd = ts.load_images(
-        original_pixel_size=orig_angpix,
+        original_pixel_size=warp_settings.bin_angpix(),
         desired_pixel_size=out_angpix,
         load_half_averages=True,
     )
@@ -230,7 +239,7 @@ def make_noCTF_EVNODD(
 
     # save values to starfile
     tomo_values = {
-        "rlnTomoName": f"{ts.name[:-4]}",
+        "rlnTomoName": f"{ts_path.name[:-4]}",
         "rlnTomoReconstructedTomogramHalf1": evn_path,
         "rlnTomoReconstructedTomogramHalf2": odd_path,
         "rlnPixelSize": out_angpix,
@@ -239,7 +248,7 @@ def make_noCTF_EVNODD(
         "rlnTiltMax": round(t_max),
     }
 
-    ts.save_meta(tomo_dir / f"{ts.name[:-4]}.xml")
+    ts.save_meta(tomo_dir / f"{ts_path.name[:-4]}.xml")
 
     del ts_evn, ts_odd, tomo_evn, tomo_odd
     gc.collect()
