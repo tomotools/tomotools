@@ -55,6 +55,7 @@ def fit_ctf(input_files):
     show_default=True,
     help="Input files are outputs of AreTomo, not imod.",
 )
+@click.option("--prefix", type=str, help="Prefix for all tiltseries names.")
 @click.option(
     "--link-frames",
     type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
@@ -86,6 +87,7 @@ def imod2warp(
     batch_input: bool,
     v2: bool,
     aretomo: bool,
+    prefix: str | None,
     link_frames: Path | None,
     copy_frames: Path | None,
     extract_frames: bool,
@@ -138,6 +140,7 @@ def imod2warp(
                 project_dir,
                 frames_strategy=frames_strategy,
                 imod=not aretomo,
+                prefix=prefix,
             )
 
 
