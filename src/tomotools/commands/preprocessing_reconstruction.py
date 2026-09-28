@@ -52,7 +52,8 @@ def blend_montages(cpus: int, input_files: tuple[Path], output_dir: Path):
     os.chdir(output_dir)
     subprocess.run(
         ["justblend", "--cpus", str(cpus)]
-        + [input_file.name for input_file in input_files]
+        + [input_file.name for input_file in input_files],
+        check=True,
     )
     # Delete temporary files
     for file in input_files:
@@ -247,7 +248,8 @@ def preprocess(
                         "-ou",
                         str(output_dir.joinpath(input_file.path.name)),
                         "-quiet",
-                    ]
+                    ],
+                    check=True,
                 )
                 if exposuredose is not None:
                     os.unlink(output_dir / f"{input_file.path.name}.mdoc")
@@ -255,11 +257,13 @@ def preprocess(
 
             else:
                 print(f"Just copying {input_file.path} to {output_dir}. \n")
-                subprocess.run(["cp", input_file.path, output_dir])
+                subprocess.run(["cp", input_file.path, output_dir], check=True)
                 if exposuredose is not None:
                     mdocfile.write(mdoc, output_dir / f"{input_file.path.name}.mdoc")
                 else:
-                    subprocess.run(["cp", f"{input_file.path.name}.mdoc", output_dir])
+                    subprocess.run(
+                        ["cp", f"{input_file.path.name}.mdoc", output_dir], check=True
+                    )
             continue
 
         print(f"Frames were found for {input_file.mdoc.name}, will run MotionCor.")
@@ -528,7 +532,9 @@ def reconstruct(
             if excludetilts is not None:
                 exclude_cmd = ["excludeviews", "-views", excludetilts, "-delete"]
                 subprocess.run(
-                    exclude_cmd + [str(tiltseries.path)], stdout=subprocess.DEVNULL
+                    exclude_cmd + [str(tiltseries.path)],
+                    stdout=subprocess.DEVNULL,
+                    check=True,
                 )
                 print(f"Excluded specified tilts from {tiltseries.path}.")
 
@@ -536,10 +542,12 @@ def reconstruct(
                     subprocess.run(
                         exclude_cmd + [str(tiltseries.evn_path)],
                         stdout=subprocess.DEVNULL,
+                        check=True,
                     )
                     subprocess.run(
                         exclude_cmd + [str(tiltseries.odd_path)],
                         stdout=subprocess.DEVNULL,
+                        check=True,
                     )
                     print("Excluded specified tilts from EVN and ODD stacks.")
 
@@ -630,6 +638,7 @@ def reconstruct(
                     "48",
                 ],
                 stdout=subprocess.DEVNULL,
+                check=False,
             )
 
             # If it fails, just use default values
@@ -649,6 +658,7 @@ def reconstruct(
                     ],
                     capture_output=True,
                     text=True,
+                    check=False,
                 ).stdout.splitlines()
 
                 # Check for failed process again.

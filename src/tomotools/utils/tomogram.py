@@ -3,7 +3,6 @@ import subprocess
 from os import path
 from pathlib import Path
 
-
 import mrcfile
 
 from tomotools.utils import comfile
@@ -103,7 +102,7 @@ class Tomogram:
                 "-XAXISTILT",
                 str(x_axis_tilt),
                 "-TILTFILE",
-                f"{list(tiltseries.path.parent.glob('*.tlt'))[0]}",
+                f"{next(iter(tiltseries.path.parent.glob('*.tlt')))}",
                 "-THICKNESS",
                 str(thickness),
                 "-RADIAL",
@@ -130,6 +129,7 @@ class Tomogram:
                 "0",
             ],
             stdout=subprocess.DEVNULL,
+            check=True,
         )
 
         print(f"{tiltseries.path}: Finished reconstruction.")
@@ -156,7 +156,7 @@ class Tomogram:
                     "-XAXISTILT",
                     str(x_axis_tilt),
                     "-TILTFILE",
-                    f"{list(tiltseries.path.parent.glob('*.tlt'))[0]}",
+                    f"{next(iter(tiltseries.path.parent.glob('*.tlt')))}",
                     "-THICKNESS",
                     str(thickness),
                     "-RADIAL",
@@ -183,6 +183,7 @@ class Tomogram:
                     "0",
                 ],
                 stdout=subprocess.DEVNULL,
+                check=True,
             )
 
             subprocess.run(
@@ -198,7 +199,7 @@ class Tomogram:
                     "-XAXISTILT",
                     str(x_axis_tilt),
                     "-TILTFILE",
-                    f"{list(tiltseries.path.parent.glob('*.tlt'))[0]}",
+                    f"{next(iter(tiltseries.path.parent.glob('*.tlt')))}",
                     "-THICKNESS",
                     str(thickness),
                     "-RADIAL",
@@ -225,6 +226,7 @@ class Tomogram:
                     "0",
                 ],
                 stdout=subprocess.DEVNULL,
+                check=True,
             )
 
             print(f"{tiltseries.path}: Finished reconstruction of EVN/ODD stacks.")
@@ -257,13 +259,14 @@ class Tomogram:
                         "-sy",
                         f"1,{full_rec_dim[0]}",
                         "-sz",
-                        f"{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}",  # noqa: E501
+                        f"{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}",
                     ]
                     if convert_to_byte
                     else []
                 )
                 + [full_rec, final_rec],
                 stdout=subprocess.DEVNULL,
+                check=False,
             )
 
             if tr.returncode != 0:
@@ -302,13 +305,14 @@ class Tomogram:
                             "-sy",
                             f"1,{full_rec_dim[0]}",
                             "-sz",
-                            f"{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}",  # noqa: E501
+                            f"{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}",
                         ]
                         if convert_to_byte
                         else []
                     )
                     + [full_rec_evn, final_rec_evn],
                     stdout=subprocess.DEVNULL,
+                    check=True,
                 )
 
                 subprocess.run(
@@ -330,13 +334,14 @@ class Tomogram:
                             "-sy",
                             f"1,{full_rec_dim[0]}",
                             "-sz",
-                            f"{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}",  # noqa: E501
+                            f"{int(full_rec_dim[1]) / 3:.0f},{int(full_rec_dim[1]) * 2 / 3:.0f}",
                         ]
                         if convert_to_byte
                         else []
                     )
                     + [full_rec_odd, final_rec_odd],
                     stdout=subprocess.DEVNULL,
+                    check=True,
                 )
 
                 print(f"{tiltseries.path}: Finished trimming.")
@@ -394,6 +399,7 @@ class Tomogram:
         subprocess.run(
             ["ctf3dsetup", "-th", str(z_slices_nm), "-pa", "tilt"],
             cwd=tiltseries.path.parent,
+            check=True,
         )
 
         print(f"Reconstructing {tiltseries.path.parent.name} with ctf3d.")
@@ -403,6 +409,7 @@ class Tomogram:
             ["processchunks", "localhost", "ctf3d"],
             cwd=tiltseries.path.parent,
             stdout=subprocess.DEVNULL,
+            check=True,
         )
 
         print(f"Reconstruction of {tiltseries.path.parent.name} done.")
@@ -418,7 +425,8 @@ class Tomogram:
                 tiltseries.path.parent / f"{tiltseries.path.stem}_3dctf_rec.mrc",
                 tiltseries.path.parent
                 / f"{tiltseries.mdoc.with_suffix('').stem}_3dctf_rec_rot.mrc",
-            ]
+            ],
+            check=True,
         )
         print(f"Rotation of {tiltseries.path.parent.name} done.")
 
@@ -487,7 +495,6 @@ def convert_input_to_Tomogram(input_files: list[Path]):
         if tomo.is_split:
             print(f"Found reconstruction {tomo.path} with EVN and ODD stacks.")
         else:
-            tomo = tomo
             print(f"Found reconstruction {tomo.path}.")
 
     return input_tomo

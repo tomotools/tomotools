@@ -1,5 +1,5 @@
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import click
 
@@ -41,12 +41,13 @@ def create_movie(
         "yuv420p",
         output_file_tmp if palindromic else output_file,
     ]
-    subprocess.run(cmd)
+    subprocess.run(cmd, check=True)
     if palindromic:
         with open(videofiles_tmp, "w") as f:
             f.write(f"file {output_file_tmp}\nfile {output_file_rev}\n")
         subprocess.run(
-            ["ffmpeg", "-i", output_file_tmp, "-vf", "reverse", "-y", output_file_rev]
+            ["ffmpeg", "-i", output_file_tmp, "-vf", "reverse", "-y", output_file_rev],
+            check=True,
         )
         subprocess.run(
             [
@@ -60,7 +61,8 @@ def create_movie(
                 "-c",
                 "copy",
                 output_file,
-            ]
+            ],
+            check=True,
         )
         output_file_tmp.unlink()
         output_file_rev.unlink()
