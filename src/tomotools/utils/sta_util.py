@@ -16,6 +16,7 @@ from tomotools.utils.tiltseries import (
     TiltSeries,
     align_with_areTomo,
     align_with_imod,
+    bin_tiltseries,
     aretomo_executable,
     dose_filter,
     parse_ctfplotter,
@@ -355,7 +356,6 @@ def isonet_prep(
     binning: int,
     prefix: str,
     aretomo: bool,
-    gpu: str | None,
 ) -> None:
     """Align, dose-filter and reconstruct EVN/ODD halves; write IsoNet2 STAR file.
 
@@ -373,17 +373,38 @@ def isonet_prep(
     tomo_dir = isonet_dir / "tomo"
     tomo_dir.mkdir(parents=True, exist_ok=True)
 
+    starfile_name = isonet_dir / f"isonet2_tomos_bin_{binning}.star"
+
+    if starfile_name.exists():
+        prev_star = starfile.read(starfile_name)
+    else:
+        prev_star = pd.DataFrame()
+
     records = []
     for ts in ts_list:
         click.echo(f"Processing {ts.path.parent.name}...")
 
         # Align
         if aretomo:
-            ts_ali = align_with_areTomo(
-                ts, local=False, previous=False, do_evn_odd=True, gpu=gpu
+            tiltseries_at = align_with_areTomo(
+                ts,
+                local=False,
+                previous=False,
+                do_evn_odd=True,
+                gpu=None,
             )
+
+            ts_ali = bin_tiltseries(
+                tiltseries_at,
+                bin=binning,
+                do_evn_odd=True,
+                overwrite=True,
+            )
+
         else:
-            ts_ali = align_with_imod(ts, previous=True, do_evn_odd=True)
+            ts_ali = align_with_imod(
+                ts, binning=binning, previous=True, do_evn_odd=True
+            )
 
         # Dose filter
         ts_filtered = dose_filter(ts_ali, do_evn_odd=True)
@@ -411,7 +432,7 @@ def isonet_prep(
         # Gather per-tomogram metadata for STAR file
         defocus_file = ts.defocus_file()
         defocus_A = _mean_defocus_A(defocus_file) if defocus_file else 0
-        tilt_min, tilt_max = _tilt_range(ts_ali)
+        tilt_min, tilt_max = _tilt_range(ts)
 
         records.append(
             {
@@ -426,7 +447,6 @@ def isonet_prep(
         )
 
     output_star = pd.DataFrame.from_records(records)
-    output_star["rlnIndex"] = output_star.index + 1
     output_star["rlnVoltage"] = 300
     output_star["rlnSphericalAberration"] = 2.7
     output_star["rlnAmplitudeContrast"] = 0.07
@@ -437,4 +457,9 @@ def isonet_prep(
     output_star["rlnCorrectedTomoName"] = "None"
     output_star["rlnDenoisedTomoName"] = "None"
     output_star["rlnNumberSubtomo"] = round(6000 / len(output_star))
-    starfile.write(output_star, isonet_dir / f"isonet2_tomos_bin_{binning}.star")
+
+    full_star = pd.concat([prev_star, output_star], ignore_index=True)
+    full_star["rlnIndex"] = full_star.index + 1
+    full_star["rlnNumberSubtomo"] = round(6000 / len(output_star))
+
+    starfile.write(full_star, isonet_dir / f"isonet2_tomos_bin_{binning}.star")

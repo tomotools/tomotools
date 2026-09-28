@@ -1,6 +1,5 @@
 import multiprocessing
 import multiprocessing.synchronize
-import subprocess
 import warnings
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable
@@ -9,6 +8,7 @@ from functools import partial
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Self
+from os import path
 
 import click
 import mrcfile
@@ -329,12 +329,6 @@ def make_noCTF_EVNODD(
     show_default=True,
     help="Align with AreTomo (fresh alignment) instead of imod (requires previous .xf/.tlt).",
 )
-@click.option(
-    "--gpu",
-    default=None,
-    show_default=True,
-    help="GPU(s) for AreTomo, comma-separated IDs. Auto-detected if omitted.",
-)
 @click.argument("input_files", nargs=-1)
 @click.argument("isonet_dir", nargs=1)
 def imod2isonet(
@@ -342,7 +336,6 @@ def imod2isonet(
     binning: int,
     prefix: str,
     aretomo: bool,
-    gpu: str | None,
     input_files: tuple[str, ...],
     isonet_dir: str,
 ):
@@ -390,20 +383,16 @@ def imod2isonet(
     click.echo(f"Running ctfplotter on {len(valid_ts)} tilt series...")
     ctf_ok: list[TiltSeries] = []
     for ts in valid_ts:
-        try:
+        # First, check whether all defocus files are there
+        if not path.isfile(ts.path.with_suffix(".defocus")):
+            ctf_ok.append(ts)
+        else:
             run_ctfplotter(ts, overwrite=False)
             ctf_ok.append(ts)
-        except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            click.echo(
-                f"Warning: ctfplotter failed for {ts.path.parent.name}: {e} — skipping.",
-                err=True,
-            )
 
     if not ctf_ok:
         click.echo("No tilt series passed CTF check. Aborting.", err=True)
         return
-
-    click.echo(f"CTF pre-flight done. Proceeding with {len(ctf_ok)} tilt series.")
 
     # --- Pass 2: align, dose-filter, reconstruct ---
     sta_util.isonet_prep(
@@ -413,5 +402,4 @@ def imod2isonet(
         binning=binning,
         prefix=prefix,
         aretomo=aretomo,
-        gpu=gpu,
     )
