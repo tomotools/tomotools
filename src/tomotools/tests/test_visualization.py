@@ -1,8 +1,8 @@
 """Test tom_deconv math."""
 
 import csv
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 import numpy as np
 
@@ -202,7 +202,7 @@ class mathutil_test(unittest.TestCase):
             with self.subTest(cases):
                 with open(case["result"]) as file:
                     result = csv.reader(file)
-                    result = list(result)[0]
+                    result = next(iter(result))
                     result = [float(ele) for ele in result]
 
                 self.assertTrue(

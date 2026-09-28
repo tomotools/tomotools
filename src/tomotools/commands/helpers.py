@@ -21,7 +21,8 @@ def update(branch):
             "install",
             "--upgrade",
             f"git+https://github.com/tomotools/tomotools.git@{branch}",
-        ]
+        ],
+        check=True,
     )
     print("Update completed!")
 
@@ -77,7 +78,7 @@ def restore_frames(orig_mdoc_dir, input_files):
                     continue
 
                 # Confirm Acquistion time
-                if not same_section["DateTime"] == section["DateTime"]:
+                if same_section["DateTime"] != section["DateTime"]:
                     print(f"{ts.path.stem}: {section['TiltAngle']} deg DateTime error:")
                     print(f"{same_section['DateTime']} vs. {section['DateTime']}")
                 else:
