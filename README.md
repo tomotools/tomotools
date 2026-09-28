@@ -35,6 +35,7 @@ tomotools [subcommand] --help
 - **imod2tomotwin**: Takes a list of tomogram directories and reconstructs for TomoTwin picking.
 - **fit-ctf**: Run imod ctfplotter on a set of tiltseries and save results to their folder.
 - **reconstruct-3dctf**: Perform reconstruction using imods `ctf3d` function.
+- **imod2isonet**: Takes a list of tilt series folders (imod- or AreTomo-aligned) with EVN/ODD half-stacks and reconstructs even/odd tomograms for IsoNet2, without CTF correction.
 - **warp2isonet**: Reconstruct WarpTools-style tomograms for IsoNet2, skipping CTF correction (installation see below!).
 
 ### Other
