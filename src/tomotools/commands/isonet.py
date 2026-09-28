@@ -284,8 +284,8 @@ def make_noCTF_EVNODD(
     # save values to starfile
     tomo_values = {
         "rlnTomoName": f"{ts_path.name[:-4]}",
-        "rlnTomoReconstructedTomogramHalf1": evn_path,
-        "rlnTomoReconstructedTomogramHalf2": odd_path,
+        "rlnTomoReconstructedTomogramHalf1": tomo_dir.stem / evn_path.name,
+        "rlnTomoReconstructedTomogramHalf2": tomo_dir.stem / odd_path.name,
         "rlnPixelSize": out_angpix,
         "rlnDefocus": int(defocus_um * 10000),
         "rlnTiltMin": round(t_min),
