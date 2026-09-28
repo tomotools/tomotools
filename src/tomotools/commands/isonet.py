@@ -1,5 +1,6 @@
 import multiprocessing
 import multiprocessing.synchronize
+import subprocess
 import warnings
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable
@@ -13,6 +14,9 @@ import click
 import mrcfile
 import pandas as pd
 import starfile
+
+from tomotools.utils import sta_util
+from tomotools.utils.tiltseries import TiltSeries, run_ctfplotter
 
 WARPYLIB_AVAILABLE = (
     find_spec("torch_projectors") is not None
@@ -294,3 +298,120 @@ def make_noCTF_EVNODD(
 
     ts.save_meta(tomo_dir / f"{ts_path.name[:-4]}.xml")
     return tomo_values
+
+
+@click.command()
+@click.option(
+    "-d",
+    "--thickness",
+    default=3000,
+    show_default=True,
+    help="Tomogram thickness in unbinned pixels.",
+)
+@click.option(
+    "-b",
+    "--bin",
+    "binning",
+    required=True,
+    type=int,
+    help="Binning level for reconstruction.",
+)
+@click.option(
+    "--prefix",
+    default="",
+    show_default=True,
+    help="Prefix prepended to output filenames (e.g. session ID).",
+)
+@click.option(
+    "--aretomo",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Align with AreTomo (fresh alignment) instead of imod (requires previous .xf/.tlt).",
+)
+@click.option(
+    "--gpu",
+    default=None,
+    show_default=True,
+    help="GPU(s) for AreTomo, comma-separated IDs. Auto-detected if omitted.",
+)
+@click.argument("input_files", nargs=-1)
+@click.argument("isonet_dir", nargs=1)
+def imod2isonet(
+    thickness: int,
+    binning: int,
+    prefix: str,
+    aretomo: bool,
+    gpu: str | None,
+    input_files: tuple[str, ...],
+    isonet_dir: str,
+):
+    """Export even/odd tomograms for IsoNet2.
+
+    Takes as input several tilt series folders obtained after processing with
+    tomotools (imod-aligned by default, or AreTomo-aligned with --aretomo).
+    EVN/ODD half-stacks must be present alongside the main aligned stack.
+
+    Pipeline per tilt series (two passes):
+
+    \b
+    Pass 1 — CTF pre-flight (interactive):
+      Check/run ctfplotter on every tilt series before any reconstruction starts.
+    Pass 2 — Align, dose-filter, reconstruct:
+      Align → dose-filter → WBP reconstruction (no CTF correction) → symlink halves.
+
+    Writes an IsoNet2-compatible RELION STAR file to ISONET_DIR.
+    """
+    # Collect all tilt series
+    ts_list: list[TiltSeries] = []
+    for input_file in input_files:
+        ts_list.extend(TiltSeries.from_path(Path(input_file)))
+
+    if not ts_list:
+        click.echo("No tilt series found in the provided input paths.", err=True)
+        return
+
+    # Drop any TS that lack EVN/ODD halves
+    valid_ts: list[TiltSeries] = []
+    for ts in ts_list:
+        if not ts.is_split:
+            click.echo(
+                f"Warning: {ts.path.parent.name} has no EVN/ODD halves — skipping.",
+                err=True,
+            )
+        else:
+            valid_ts.append(ts)
+
+    if not valid_ts:
+        click.echo("No tilt series with EVN/ODD halves found. Aborting.", err=True)
+        return
+
+    # --- Pass 1: CTF pre-flight (all interactive work before reconstruction) ---
+    click.echo(f"Running ctfplotter on {len(valid_ts)} tilt series...")
+    ctf_ok: list[TiltSeries] = []
+    for ts in valid_ts:
+        try:
+            run_ctfplotter(ts, overwrite=False)
+            ctf_ok.append(ts)
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            click.echo(
+                f"Warning: ctfplotter failed for {ts.path.parent.name}: {e} — skipping.",
+                err=True,
+            )
+
+    if not ctf_ok:
+        click.echo("No tilt series passed CTF check. Aborting.", err=True)
+        return
+
+    click.echo(f"CTF pre-flight done. Proceeding with {len(ctf_ok)} tilt series.")
+
+    # --- Pass 2: align, dose-filter, reconstruct ---
+    sta_util.isonet_prep(
+        isonet_dir=Path(isonet_dir),
+        ts_list=ctf_ok,
+        thickness=thickness,
+        binning=binning,
+        prefix=prefix,
+        aretomo=aretomo,
+        gpu=gpu,
+    )

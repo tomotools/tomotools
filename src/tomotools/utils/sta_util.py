@@ -8,12 +8,16 @@ from typing import Literal
 
 import click
 import mrcfile
+import pandas as pd
+import starfile
 
 from tomotools.utils import mdocfile, tomogram
 from tomotools.utils.tiltseries import (
     TiltSeries,
+    align_with_areTomo,
     align_with_imod,
     aretomo_executable,
+    dose_filter,
     parse_ctfplotter,
     parse_darkimgs,
     run_ctfplotter,
@@ -325,3 +329,112 @@ def invert_tlt_files(ts_dir: Path):
         with open(tlt, "w+") as file:
             for line in tlt_inverted:
                 file.write(f"{line}\n")
+
+
+def _mean_defocus_A(defocus_file: Path) -> int:
+    """Return mean defocus in Angstrom from a ctfplotter .defocus file."""
+    df = parse_ctfplotter(defocus_file)
+    return int(df["df_1_nm"].astype(float).mean() * 10)
+
+
+def _tilt_range(ts: TiltSeries) -> tuple[int, int]:
+    """Return (min_tilt, max_tilt) in degrees from the .tlt file of ts."""
+    tlt_file = ts.path.with_suffix(".tlt")
+    tilts = [
+        float(line.strip())
+        for line in tlt_file.read_text().splitlines()
+        if line.strip()
+    ]
+    return round(min(tilts)), round(max(tilts))
+
+
+def isonet_prep(
+    isonet_dir: Path,
+    ts_list: list[TiltSeries],
+    thickness: int,
+    binning: int,
+    prefix: str,
+    aretomo: bool,
+    gpu: str | None,
+) -> None:
+    """Align, dose-filter and reconstruct EVN/ODD halves; write IsoNet2 STAR file.
+
+    Expects all tilt series in ts_list to already have EVN/ODD halves and a
+    ctfplotter defocus file (run_ctfplotter should have been called beforehand).
+
+    For each tilt series:
+      1. Align: imod (previous=True) or AreTomo (fresh).
+      2. Dose-filter full stack and EVN/ODD halves.
+      3. Reconstruct EVN/ODD tomograms with plain WBP (no CTF correction).
+      4. Symlink EVN/ODD halves into <isonet_dir>/tomo/.
+
+    Writes isonet2_tomos_bin_<binning>.star in isonet_dir.
+    """
+    tomo_dir = isonet_dir / "tomo"
+    tomo_dir.mkdir(parents=True, exist_ok=True)
+
+    records = []
+    for ts in ts_list:
+        click.echo(f"Processing {ts.path.parent.name}...")
+
+        # Align
+        if aretomo:
+            ts_ali = align_with_areTomo(
+                ts, local=False, previous=False, do_evn_odd=True, gpu=gpu
+            )
+        else:
+            ts_ali = align_with_imod(ts, previous=True, do_evn_odd=True)
+
+        # Dose filter
+        ts_filtered = dose_filter(ts_ali, do_evn_odd=True)
+
+        # Reconstruct without CTF correction (plain WBP)
+        tomo = tomogram.Tomogram.from_tiltseries(
+            ts_filtered,
+            binned=binning,
+            sirt=0,
+            thickness=thickness,
+            convert_to_byte=False,
+            do_EVN_ODD=True,
+        )
+
+        assert tomo.is_split and tomo.evn_path is not None and tomo.odd_path is not None
+
+        # Symlink halves into output directory
+        name = ts.path.parent.name
+        out_name = f"{prefix}_{name}" if prefix else name
+        evn_link = tomo_dir / f"{out_name}_even.mrc"
+        odd_link = tomo_dir / f"{out_name}_odd.mrc"
+        os.symlink(tomo.evn_path.absolute(), evn_link)
+        os.symlink(tomo.odd_path.absolute(), odd_link)
+
+        # Gather per-tomogram metadata for STAR file
+        defocus_file = ts.defocus_file()
+        defocus_A = _mean_defocus_A(defocus_file) if defocus_file else 0
+        tilt_min, tilt_max = _tilt_range(ts_ali)
+
+        records.append(
+            {
+                "rlnTomoName": out_name,
+                "rlnTomoReconstructedTomogramHalf1": str(Path("tomo") / evn_link.name),
+                "rlnTomoReconstructedTomogramHalf2": str(Path("tomo") / odd_link.name),
+                "rlnPixelSize": ts.angpix * binning,
+                "rlnDefocus": defocus_A,
+                "rlnTiltMin": tilt_min,
+                "rlnTiltMax": tilt_max,
+            }
+        )
+
+    output_star = pd.DataFrame.from_records(records)
+    output_star["rlnIndex"] = output_star.index + 1
+    output_star["rlnVoltage"] = 300
+    output_star["rlnSphericalAberration"] = 2.7
+    output_star["rlnAmplitudeContrast"] = 0.07
+    output_star["rlnDeconvTomoName"] = "None"
+    output_star["rlnMaskBoundary"] = "None"
+    output_star["rlnMaskName"] = "None"
+    output_star["rlnBoxFile"] = "None"
+    output_star["rlnCorrectedTomoName"] = "None"
+    output_star["rlnDenoisedTomoName"] = "None"
+    output_star["rlnNumberSubtomo"] = round(6000 / len(output_star))
+    starfile.write(output_star, isonet_dir / f"isonet2_tomos_bin_{binning}.star")
