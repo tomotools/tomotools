@@ -6,9 +6,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 from importlib.util import find_spec
+from os import path
 from pathlib import Path
 from typing import Self
-from os import path
 
 import click
 import mrcfile
