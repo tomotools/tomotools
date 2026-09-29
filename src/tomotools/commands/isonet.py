@@ -61,9 +61,7 @@ class WarpSettings:
         return self.unbin_angpix * (2**self.binning)
 
     def dimension_angstrom(self) -> tuple[float, float, float]:
-        return tuple(
-            dim * self.unbin_angpix for dim in self.dimensions_px
-        )  # pyright: ignore[reportReturnType]
+        return tuple(dim * self.unbin_angpix for dim in self.dimensions_px)  # pyright: ignore[reportReturnType]
 
 
 _read_semaphore: multiprocessing.synchronize.Semaphore
@@ -241,15 +239,11 @@ def make_noCTF_EVNODD(
     ts.ctf.defocus = 0
     ts.ctf.defocus_delta = 0
 
-    ts.grid_ctf_defocus.values = (
-        torch.zeros(  # pyright: ignore[reportPossiblyUnboundVariable]
-            ts.grid_ctf_defocus.flat_values.shape
-        )
+    ts.grid_ctf_defocus.values = torch.zeros(  # pyright: ignore[reportPossiblyUnboundVariable]
+        ts.grid_ctf_defocus.flat_values.shape
     )
-    ts.grid_ctf_defocus_delta.values = (
-        torch.zeros(  # pyright: ignore[reportPossiblyUnboundVariable]
-            ts.grid_ctf_defocus_delta.flat_values.shape
-        )
+    ts.grid_ctf_defocus_delta.values = torch.zeros(  # pyright: ignore[reportPossiblyUnboundVariable]
+        ts.grid_ctf_defocus_delta.flat_values.shape
     )
 
     out_angpix = binning * warp_settings.bin_angpix()
