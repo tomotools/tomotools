@@ -1,10 +1,10 @@
-from collections.abc import Iterator
 import csv
 import math
 import os
 import re
 import shutil
 import subprocess
+from collections.abc import Iterator
 from operator import itemgetter
 from os import path
 from pathlib import Path
@@ -267,7 +267,7 @@ class TiltSeries:
         ts_path: Path,
         mdoc: dict | None = None,
         reorder=False,
-        overwrite_titles: list[str | None] = None,
+        overwrite_titles: list[str | None] | None = None,
         overwrite_angles: float | None = None,
         overwrite_dose: float | None = None,
     ) -> "TiltSeries":
@@ -322,6 +322,7 @@ class TiltSeries:
         subprocess.run(
             ["newstack"] + micrograph_paths + [ts_path, "-quiet"],
             stdout=subprocess.DEVNULL,
+            check=True,
         )
 
         # Sync MRC header and MDOC
@@ -343,10 +344,12 @@ class TiltSeries:
             subprocess.run(
                 ["newstack"] + micrograph_evn_paths + [ts_evn, "-quiet"],
                 stdout=subprocess.DEVNULL,
+                check=True,
             )
             subprocess.run(
                 ["newstack"] + micrograph_odd_paths + [ts_odd, "-quiet"],
                 stdout=subprocess.DEVNULL,
+                check=True,
             )
 
             TiltSeries._update_mrc_header_from_mdoc(ts_evn, stack_mdoc)
@@ -403,6 +406,7 @@ def bin_tiltseries(
             "-quiet",
         ],
         stdout=subprocess.DEVNULL,
+        check=True,
     )
 
     print(f"{ts.path}: Binned to {bin}.")
@@ -434,6 +438,7 @@ def bin_tiltseries(
                 "-quiet",
             ],
             stdout=subprocess.DEVNULL,
+            check=True,
         )
 
         subprocess.run(
@@ -450,6 +455,7 @@ def bin_tiltseries(
                 "-quiet",
             ],
             stdout=subprocess.DEVNULL,
+            check=True,
         )
 
         print(f"{ts.path}: Binned EVN/ODD to {bin}.")
@@ -493,7 +499,7 @@ def align_with_areTomo(
 
     if gpu is None:
         # gpu_id = [0]
-        gpu_id = [int(i) for i in range(0, util.num_gpus())]
+        gpu_id = [int(i) for i in range(util.num_gpus())]
 
     else:
         # Turn GPU list into list of integers
@@ -506,7 +512,9 @@ def align_with_areTomo(
     tlt_file = ts.path.with_suffix(".rawtlt")
 
     if not path.isfile(tlt_file):
-        subprocess.run(["extracttilts", ts.path, tlt_file], stdout=subprocess.DEVNULL)
+        subprocess.run(
+            ["extracttilts", ts.path, tlt_file], stdout=subprocess.DEVNULL, check=True
+        )
 
     if previous:
         if not path.isfile(aln_file):
@@ -529,6 +537,7 @@ def align_with_areTomo(
                 "0",
             ],
             stdout=subprocess.DEVNULL,
+            check=True,
         )
 
     if not previous:
@@ -562,6 +571,7 @@ def align_with_areTomo(
             + (["-Gpu"] + [str(i) for i in gpu_id])
             + (["-Patch", patch_x, patch_y] if local else []),
             stdout=subprocess.DEVNULL,
+            check=True,
         )
 
     with mrcfile.mmap(ali_stack, mode="r+") as mrc:
@@ -597,6 +607,7 @@ def align_with_areTomo(
                 "0",
             ],
             stdout=subprocess.DEVNULL,
+            check=True,
         )
 
         subprocess.run(
@@ -614,6 +625,7 @@ def align_with_areTomo(
                 "0",
             ],
             stdout=subprocess.DEVNULL,
+            check=True,
         )
         with mrcfile.mmap(ali_stack_evn, mode="r+") as mrc:
             mrc.voxel_size = str(angpix)
@@ -662,6 +674,7 @@ def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
                 filtered_stack,
             ],
             stdout=subprocess.DEVNULL,
+            check=True,
         )
 
         if ts.is_split and do_evn_odd:
@@ -680,6 +693,7 @@ def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
                     filtered_evn,
                 ],
                 stdout=subprocess.DEVNULL,
+                check=True,
             )
             subprocess.run(
                 [
@@ -692,6 +706,7 @@ def dose_filter(ts: TiltSeries, do_evn_odd: bool) -> TiltSeries:
                     filtered_odd,
                 ],
                 stdout=subprocess.DEVNULL,
+                check=True,
             )
 
             print(f"Done dose-filtering {ts.path} and EVN/ODD stacks.")
@@ -753,6 +768,7 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool, binning=1)
                 ["-bin", str(binning), "-AntialiasFilter", "-1"] if binning != 1 else []
             ),
             stdout=subprocess.DEVNULL,
+            check=True,
         )
 
         if do_evn_odd and ts.is_split:
@@ -786,6 +802,7 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool, binning=1)
                     else []
                 ),
                 stdout=subprocess.DEVNULL,
+                check=True,
             )
 
             subprocess.run(
@@ -814,6 +831,7 @@ def align_with_imod(ts: TiltSeries, previous: bool, do_evn_odd: bool, binning=1)
                     else []
                 ),
                 stdout=subprocess.DEVNULL,
+                check=True,
             )
 
             print(f"Aligned {ts.path} and associated EVN/ODD stacks with imod.")
@@ -910,6 +928,7 @@ def run_ctfplotter(ts: TiltSeries, overwrite: bool):
                     "3,1",
                 ],
                 stdout=out,
+                check=True,
             )
 
     return ts.path.with_name(f"{ts.path.stem}.defocus")
@@ -933,9 +952,7 @@ def parse_ctfplotter(file: Path):
     with open(file) as f:
         reader = csv.reader(f, delimiter="\t")
         for row in reader:
-            if row == []:
-                pass
-            elif row[1] == "0":
+            if row == [] or row[1] == "0":
                 pass
             else:
                 df_temp = pd.DataFrame(

@@ -5,9 +5,7 @@ def get_value(path, key):
     """Get value from comfile at path using key."""
     with open(path) as file:
         for line in file:
-            if line.startswith(f"{key}\t"):
-                return line.split()[1].strip()
-            elif line.startswith(f"{key} "):
+            if line.startswith((f"{key}\t", f"{key} ")):
                 return line.split()[1].strip()
     return None
 
@@ -25,8 +23,6 @@ def modify_value(path, key, value):
     with open(path, "w") as file:
         file.writelines(lines)
 
-    return
-
 
 def remove_value(path, key):
     """Remove value from comfile."""
@@ -36,17 +32,13 @@ def remove_value(path, key):
     with open(path) as file:
         lines = file.readlines()
     for _, line in enumerate(lines):
-        if line.startswith(f"{key}\t"):
-            continue
-        elif line.startswith(f"{key} "):
+        if line.startswith((f"{key}\t", f"{key} ")):
             continue
         else:
             lines_cleaned.append(line)
 
     with open(path, "w") as file:
         file.writelines(lines_cleaned)
-
-    return
 
 
 def fake_ctfcom(ts: TiltSeries, binning: int):
@@ -80,8 +72,6 @@ def fake_ctfcom(ts: TiltSeries, binning: int):
         file.truncate(0)
         file.write("\n".join(content))
 
-    return
-
 
 def fix_tiltcom(
     ts: TiltSeries, thickness: int, fsirt: int, bin: int, fullimage: list[int]
@@ -110,4 +100,3 @@ def fix_tiltcom(
     match get_value(ts.path.with_name("tilt.com"), "LOCALFILE"):
         case str(localfile) if localfile.endswith(".xf"):
             remove_value(ts.path.with_name("tilt.com"), "LOCALFILE")
-    return

@@ -8,7 +8,7 @@ def _convert_value_field(field: str):
         # it might either be a string containing spaces or a tuple of ints/floats
         fields_split = [_convert_value_field(f) for f in field.split()]
         # check if all fields were successfully converted to int or float
-        if all(isinstance(v, int) or isinstance(v, float) for v in fields_split):
+        if all(isinstance(v, (int, float)) for v in fields_split):
             return fields_split
         else:
             # otherwise it must have been a string
@@ -91,8 +91,7 @@ def write(mdoc, path):
                 continue
             _write_key_value(file, key, value)
 
-        for title in mdoc["titles"]:
-            file.write(f"\n\n[T = {title}]")
+        file.writelines(f"\n\n[T = {title}]" for title in mdoc["titles"])
 
         file.write("\n")
         for i, section in enumerate(mdoc["sections"]):

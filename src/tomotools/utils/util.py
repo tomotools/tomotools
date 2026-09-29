@@ -33,7 +33,7 @@ def gpuinfo():
         return indent_level
 
     lines = (
-        subprocess.run(["nvidia-smi", "-q"], capture_output=True)
+        subprocess.run(["nvidia-smi", "-q"], capture_output=True, check=True)
         .stdout.decode("utf-8")
         .splitlines()
     )
