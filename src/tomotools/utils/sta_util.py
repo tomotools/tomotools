@@ -122,6 +122,7 @@ def make_warp_dir(
         | tuple[Literal["link"], Path]
     ),
     imod: bool = False,
+    prefix: str = "",
 ):
     """Export tiltseries to Warp."""
     ts_path = ts.path
@@ -131,6 +132,9 @@ def make_warp_dir(
     tlt_file = ts_path.with_suffix(".tlt")
     rawtlt_file = ts_path.with_suffix(".rawtlt")
     required_files = [ts_path, mdoc_path, xf_path]
+
+    ts_root = prefix + ts.path.stem
+
     if imod:
         required_files.append(ta_solution_path)
 
@@ -146,16 +150,16 @@ def make_warp_dir(
         return
     # Create imod subdirectory
     # copy alignment files (to protect against later modification)
-    ts_dir = project_dir / "imod" / ts.path.stem
+    ts_dir = project_dir / "imod" / ts_root
     ts_dir.mkdir()
 
-    shutil.copy(xf_path, ts_dir)
+    shutil.copy(xf_path, ts_dir / (ts_root + ".xf"))
     if imod:
         shutil.copy(ta_solution_path, ts_dir)
     if tlt_file.is_file():
-        shutil.copy(tlt_file, ts_dir)
+        shutil.copy(tlt_file, ts_dir / (ts_root + ".tlt"))
     elif rawtlt_file.is_file():
-        shutil.copy(rawtlt_file, ts_dir / ts.path.with_suffix(".tlt").name)
+        shutil.copy(rawtlt_file, ts_dir / (ts_root + ".rawtlt"))
 
     # invert tilt-angles in tlt file (done during import in Warp 1.X)
     invert_tlt_files(ts_dir)
@@ -189,7 +193,7 @@ def make_warp_dir(
         return
     for subframe_path, section in zip(written_files, mdoc["sections"]):
         section["SubFramePath"] = "X:\\WarpDir\\" + subframe_path.name
-    mdocfile.write(mdoc, project_dir / "mdoc" / f"{ts.path.stem}.mdoc")
+    mdocfile.write(mdoc, project_dir / "mdoc" / f"{ts_root}.mdoc")
 
 
 def _get_subframes(mdoc: dict, src_dir: Path) -> list[Path]:
