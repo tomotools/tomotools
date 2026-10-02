@@ -4,7 +4,6 @@ import subprocess
 from os.path import isfile, join
 from pathlib import Path
 
-
 from tomotools.utils import mdocfile, util
 from tomotools.utils.movie import Movie
 
@@ -77,7 +76,9 @@ class Micrograph:
             }
             gain_refs.discard(None)
             if len(gain_refs) > 1:
-                raise Exception("Found multiple gain references, only one is supported")
+                raise ValueError(
+                    "Found multiple gain references, only one is supported"
+                )
             elif len(gain_refs) == 1:
                 # The gain ref should be in the same folder as the input file(s)
                 # Check if it's there.
@@ -166,7 +167,9 @@ class Micrograph:
                 open(output_dir / "motioncor2.log", "a") as out,
                 open(output_dir / "motioncor2.err", "a") as err,
             ):
-                subprocess.run(movie_command, cwd=output_dir, stdout=out, stderr=err)
+                subprocess.run(
+                    movie_command, cwd=output_dir, stdout=out, stderr=err, check=True
+                )
 
         # If present, copy the mdoc files to the output dir
         # Rename from .tif.mdoc to .mrc.mdoc
@@ -178,7 +181,7 @@ class Micrograph:
                     isinstance(movie.mdoc["framesets"], list)
                     and len(movie.mdoc["framesets"]) == 1
                 ):
-                    raise Exception(
+                    raise ValueError(
                         "Unexpected MDOC format: can only handle 1 frameset per mdoc"
                     )
                 # Adjust pixel size and binning
@@ -198,7 +201,7 @@ class Micrograph:
         if gain_ref_mrc is not None:
             with open(join(output_dir, "motioncor2.log")) as log:
                 if any(line.startswith("Warning: Gain ref not found.") for line in log):
-                    raise Exception(
+                    raise RuntimeError(
                         "Gain reference was specified, but not applied by MotionCor."
                     )
 
@@ -254,9 +257,13 @@ def _ensure_gainref_mrc(gain_ref: Path, output_dir: Path) -> Path:
         case ".mrc":
             gain_out = gain_ref
         case ".dm4":
-            subprocess.run(["dm2mrc", gain_ref, gain_out], stdout=subprocess.DEVNULL)
+            subprocess.run(
+                ["dm2mrc", gain_ref, gain_out], stdout=subprocess.DEVNULL, check=True
+            )
         case ".tif" | ".tiff" | ".gain":
-            subprocess.run(["tif2mrc", gain_ref, gain_out], stdout=subprocess.DEVNULL)
+            subprocess.run(
+                ["tif2mrc", gain_ref, gain_out], stdout=subprocess.DEVNULL, check=True
+            )
         case _:
             raise AttributeError(
                 "Gain reference can only be in .tif(f) or .dm4 format!"
@@ -322,6 +329,8 @@ def defects_tif(gainref: Path, tempdir: Path, template: Path) -> Path | None:
         return None
     defects_tif = Path(tempdir) / defects_txt.with_suffix(".tif")
 
-    subprocess.run(["clip", "defect", "-D", defects_txt, template, defects_tif])
+    subprocess.run(
+        ["clip", "defect", "-D", defects_txt, template, defects_tif], check=True
+    )
     print(f"Found and converted defects file {defects_tif}")
     return defects_tif

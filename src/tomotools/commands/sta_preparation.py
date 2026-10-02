@@ -2,7 +2,6 @@ import os
 from os import path
 from pathlib import Path
 
-
 import click
 
 from tomotools.utils import comfile, sta_util, tiltseries, tomogram
@@ -222,8 +221,6 @@ def reconstruct_3dctf(thickness, bin, input_files):
         print("\n")
 
         print("\n")
-
-    return
 
 
 @click.command()

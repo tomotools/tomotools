@@ -76,6 +76,7 @@ def aretomo_export(ts: TiltSeries):
                 "2",
             ],
             stdout=subprocess.DEVNULL,
+            check=True,
         )
 
         if path.isdir(imod_dir_at):
@@ -184,7 +185,7 @@ def make_warp_dir(
             written_files = _extract_frames(ts, mdoc, frame_target_dir)
         case "skip":
             written_files = []
-    if len(written_files) > 0 and not len(mdoc["sections"]) == len(written_files):
+    if len(written_files) > 0 and len(mdoc["sections"]) != len(written_files):
         click.echo(
             f"Error: mismatch between mdoc entries and frames in {ts.path.name}",
             err=True,
@@ -328,5 +329,3 @@ def invert_tlt_files(ts_dir: Path):
         with open(tlt, "w+") as file:
             for line in tlt_inverted:
                 file.write(f"{line}\n")
-
-    return

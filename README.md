@@ -35,6 +35,7 @@ tomotools [subcommand] --help
 - **imod2tomotwin**: Takes a list of tomogram directories and reconstructs for TomoTwin picking.
 - **fit-ctf**: Run imod ctfplotter on a set of tiltseries and save results to their folder.
 - **reconstruct-3dctf**: Perform reconstruction using imods `ctf3d` function.
+- **warp2isonet**: Reconstruct WarpTools-style tomograms for IsoNet2, skipping CTF correction (installation see below!).
 
 ### Other
 
@@ -48,6 +49,8 @@ tomotools [subcommand] --help
 
 `tomotools` depends on commands from MotionCor2 or MotionCor3, IMOD, and AreTomo 1.X or AreTomo2 for full functionality. IMOD should be in PATH.
 MotionCor2/3 and AreTomo2/3 can either be in PATH as `MotionCor2` / `MotionCor3` or `AreTomo` / `AreTomo2` respectively, or set using the envar `MOTIONCOR_EXECUTABLE` or `ARETOMO_EXECUTABLE`.
+
+For `tomotools warp2isonet`, `torch-projectors` and `warpylib` are required, and need to be installed by the user.
 
 ## Installation
 
@@ -67,5 +70,7 @@ With tomotools installed into a conda environment, you can then start tomotools 
 conda activate tomotools
 tomotools --help
 ```
+
+For `tomotools warp2isonet`, please install `warpylib` and `torch-projectors` manually, see [note on GPU compabibility](https://github.com/warpem/torch-projectors/blob/main/README.md) in `torch-projectors` README.
 
 ### Feedback, Bug Reports and Contributions are always welcome!

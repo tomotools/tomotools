@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "Tomotools"
 description = "Scripts to make cryo-electron tomography a bit easier."
 readme = "README.md"
-version = "0.5.0"
+version = "0.5.1"
 
 requires-python = ">=3.12"
 license = "GPL-2.0-only"
@@ -20,8 +20,12 @@ dependencies = [
     "numpy",
     "pandas",
     "mrcfile",
+    "starfile",
     "matplotlib",
 ]
+
+[project.optional-dependencies]
+warpylib = ["warpylib"]
 
 [dependency-groups]
 dev = [
