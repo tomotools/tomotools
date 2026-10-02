@@ -32,6 +32,7 @@ tomotools [subcommand] --help
 ### Subtomogram Averaging Preparation
 
 - **imod2warp**: Takes a list of tomogram folder with alignments or a file listing them and prepares everything for Warp or WarpTools.
+- **warp2imod**: Takes a WarpTools project and a folder of imod-aligned tomogram folders and writes the alignments (and tilt angles) stored in Warp's xml files back to the imod `.xf`/`.tlt` files. Existing files are kept as `.xfbackup`/`.tltbackup`. The reverse of `ts_import_alignments`.
 - **imod2tomotwin**: Takes a list of tomogram directories and reconstructs for TomoTwin picking.
 - **fit-ctf**: Run imod ctfplotter on a set of tiltseries and save results to their folder.
 - **reconstruct-3dctf**: Perform reconstruction using imods `ctf3d` function.
