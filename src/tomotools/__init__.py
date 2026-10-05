@@ -23,6 +23,7 @@ from tomotools.commands.sta_preparation import (
     imod2warp,
     reconstruct_3dctf,
 )
+from tomotools.commands.warp_import import warp2imod
 
 
 def _get_version():
@@ -43,6 +44,7 @@ tomotools.add_command(preprocess)
 tomotools.add_command(reconstruct)
 tomotools.add_command(deconv)
 tomotools.add_command(imod2warp)
+tomotools.add_command(warp2imod)
 tomotools.add_command(imod2tomotwin)
 if WARPYLIB_AVAILABLE:
     tomotools.add_command(warp2isonet)
