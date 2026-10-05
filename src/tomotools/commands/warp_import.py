@@ -75,6 +75,7 @@ def warp2imod(
             name = xml_file.stem.removeprefix(prefix)
             ts_dir = imod_dir / name
             if not ts_dir.is_dir():
+                skipped.append(f"{xml_file.name}: folder {ts_dir} not found")
                 continue
             try:
                 warp_xml.export_alignment_to_imod(
