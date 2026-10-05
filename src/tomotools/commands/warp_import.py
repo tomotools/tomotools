@@ -64,25 +64,24 @@ def warp2imod(
         raise click.ClickException(
             f"No xml files starting with '{prefix}' found in {xml_dir}."
         )
-    click.echo(f"Using alignment pixel size of {alignment_angpix} A/px.")
 
-    n_done = 0
-    for xml_file in xml_files:
-        name = xml_file.stem.removeprefix(prefix)
-        ts_dir = imod_dir / name
-        if not ts_dir.is_dir():
-            click.echo(
-                f"{xml_file.name}: folder {ts_dir} not found, skipping.", err=True
-            )
-            continue
-        try:
-            status = warp_xml.export_alignment_to_imod(
-                xml_file, ts_dir, name, alignment_angpix
-            )
-        except ValueError as e:
-            click.echo(f"{xml_file.name}: {e}, skipping.", err=True)
-            continue
-        click.echo(f"{name}: {status}.")
-        n_done += 1
+    skipped: list[str] = []
+    with click.progressbar(
+        xml_files,
+        label="Converting...",
+        show_pos=True,
+    ) as bar:
+        for xml_file in bar:
+            name = xml_file.stem.removeprefix(prefix)
+            ts_dir = imod_dir / name
+            if not ts_dir.is_dir():
+                continue
+            try:
+                warp_xml.export_alignment_to_imod(
+                    xml_file, ts_dir, name, alignment_angpix
+                )
+            except ValueError as e:
+                skipped.append(f"{xml_file.name}: {e}")
 
-    click.echo(f"Converted {n_done} of {len(xml_files)} tilt series.")
+    for message in skipped:
+        click.echo(f"Skipped {message}", err=True)
